@@ -16,73 +16,16 @@ import {
 // Common shape of a Tabler icon component (size/stroke/className props).
 export type TablerIcon = ComponentType<{ size?: number | string; stroke?: number; className?: string }>;
 
-// Static product taxonomy for the sidebar (placeholder until a real one exists).
-// A product optionally maps to a catalog chart (project/name) for ordering.
-export interface ProductDef {
-  slug: string;
-  label: string;
-  chart?: { project: string; name: string };
-  // Static JSON Schema filename under /public/schemas/ used to render the order
-  // form (until the product maps to a real Harbor chart).
-  schema?: string;
-}
-export interface CategoryDef {
-  id: string;
-  label: string;
-  Icon: TablerIcon;
-  products: ProductDef[];
-}
+// Иконка категории каталога по её slug (категории живут в БД и управляются
+// админом; иконки — клиентская косметика с дефолтом для незнакомых slug'ов).
+const CATEGORY_ICONS: Record<string, TablerIcon> = {
+  platform: IconStack3,
+  databases: IconDatabase,
+  network: IconNetwork,
+};
 
-export const PRODUCT_CATEGORIES: CategoryDef[] = [
-  {
-    id: "platform",
-    label: "Платформа",
-    Icon: IconStack3,
-    products: [{ slug: "namespace", label: "Namespace" }],
-  },
-  {
-    id: "databases",
-    label: "Базы данных",
-    Icon: IconDatabase,
-    products: [{ slug: "postgresql", label: "PostgreSQL", chart: { project: "platform", name: "postgres" } }],
-  },
-  {
-    id: "network",
-    label: "Сеть",
-    Icon: IconNetwork,
-    products: [
-      { slug: "ingress", label: "Ingress Gateway", chart: { project: "platform", name: "ingress-gateway" } },
-      { slug: "egress", label: "Egress Gateway" },
-      { slug: "policies", label: "Policies" },
-    ],
-  },
-];
-
-export function findProduct(slug: string): ProductDef | undefined {
-  for (const cat of PRODUCT_CATEGORIES) {
-    const p = cat.products.find((x) => x.slug === slug);
-    if (p) return p;
-  }
-  return undefined;
-}
-
-// Reverse lookup: the product mapped to a given catalog chart (project/name).
-// Used to seed a friendly default (e.g. "Ingress Gateway") on the order form.
-export function findProductByChart(project: string, name: string): ProductDef | undefined {
-  for (const cat of PRODUCT_CATEGORIES) {
-    const p = cat.products.find((x) => x.chart?.project === project && x.chart?.name === name);
-    if (p) return p;
-  }
-  return undefined;
-}
-
-// Reverse lookup: the sidebar category (taxonomy) a chart belongs to — so the
-// "Категория" column reflects the left-menu grouping (e.g. "Сеть") instead of the
-// raw Harbor project. Returns undefined for charts not placed in the taxonomy.
-export function findCategoryByChart(project: string, name: string): CategoryDef | undefined {
-  return PRODUCT_CATEGORIES.find((cat) =>
-    cat.products.some((x) => x.chart?.project === project && x.chart?.name === name),
-  );
+export function categoryIcon(id: string): TablerIcon {
+  return CATEGORY_ICONS[id] ?? IconBox;
 }
 
 // Map a chart/product name to a Tabler icon (brand where available, else by kind).

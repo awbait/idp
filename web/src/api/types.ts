@@ -129,6 +129,40 @@ export interface SystemStatus {
   components: ComponentStatus[];
 }
 
+// --- публикации чартов (каталог с метаданными) ---
+
+// Жизненный цикл черновика view-документа публикации.
+export type PublicationStatus = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED";
+
+// Категория каталога (группировка в каталоге и левом меню).
+export interface Category {
+  id: string; // slug
+  label: string;
+  sort: number;
+}
+
+// Лёгкая проекция публикации в ответе /catalog (без тел view-документов).
+export interface PublicationSummary {
+  id: string;
+  category_id: string;
+  owner_team: string;
+  created_by: string;
+  created_by_name: string;
+  status: PublicationStatus;
+  published: boolean; // есть действующая approved-view
+  has_order_view: boolean; // approved-view содержит views.order (форма заказа)
+}
+
+// Чарт каталога: Harbor-данные + оверлей публикации (может отсутствовать).
+export interface CatalogChart extends Chart {
+  publication?: PublicationSummary | null;
+}
+
+export interface CatalogResponse {
+  categories: Category[];
+  charts: CatalogChart[];
+}
+
 // View-документ публикации чарта (бывший /schemas/{chart}.ui.json, теперь в БД,
 // отдаётся бэкендом). views.* — презентационные проекции поверх values.schema.json
 // (order/routes/listeners/resources, см. SchemaForm.View).

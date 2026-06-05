@@ -5,6 +5,7 @@ import "./index.css";
 import { Layout } from "./components/Layout";
 import { UserProvider } from "./auth/UserContext";
 import { TeamProvider } from "./app/TeamContext";
+import { CatalogProvider } from "./app/CatalogContext";
 import { CatalogPage } from "./pages/CatalogPage";
 import { ChartDetailPage } from "./pages/ChartDetailPage";
 import { OrderPage } from "./pages/OrderPage";
@@ -12,7 +13,6 @@ import { RequestsPage } from "./pages/RequestsPage";
 import { RequestDetailPage } from "./pages/RequestDetailPage";
 import { ApplicationsPage } from "./pages/ApplicationsPage";
 import { ProductPage } from "./pages/ProductPage";
-import { ProductOrderPage } from "./pages/ProductOrderPage";
 import { StatusPage } from "./pages/StatusPage";
 
 const router = createBrowserRouter([
@@ -26,8 +26,7 @@ const router = createBrowserRouter([
       { path: "catalog/:project/:name/order", element: <OrderPage /> },
       { path: "requests", element: <RequestsPage /> },
       { path: "requests/:id/edit", element: <OrderPage /> },
-      { path: "products/:slug", element: <ProductPage /> },
-      { path: "products/:slug/order", element: <ProductOrderPage /> },
+      { path: "products/:project/:name", element: <ProductPage /> },
       { path: "requests/:id", element: <RequestDetailPage /> },
       { path: "applications", element: <ApplicationsPage /> },
       { path: "status", element: <StatusPage /> },
@@ -39,7 +38,9 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <UserProvider>
       <TeamProvider>
-        <RouterProvider router={router} />
+        <CatalogProvider>
+          <RouterProvider router={router} />
+        </CatalogProvider>
       </TeamProvider>
     </UserProvider>
   </StrictMode>,

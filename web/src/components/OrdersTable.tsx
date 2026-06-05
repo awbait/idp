@@ -21,7 +21,8 @@ import { useTeam } from "../app/TeamContext";
 import { ErrorBox, Spinner } from "./ui";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { StatusBadge, StatusDot } from "./StatusBadge";
-import { ProductIcon, findCategoryByChart } from "./icons";
+import { ProductIcon } from "./icons";
+import { useCatalog } from "../app/CatalogContext";
 import type { OrderRequest, RequestStatus } from "../api/types";
 
 interface Props {
@@ -73,6 +74,13 @@ export function OrdersTable({ title, filter, orderTo, orderDisabledReason, empty
   const { team } = useTeam();
   const { user } = useUser();
   const navigate = useNavigate();
+
+  // Лейбл категории заказа из публикации его чарта (для колонки «Категория»).
+  const { categories, charts } = useCatalog();
+  const categoryOf = (project: string, name: string) => {
+    const pub = charts.find((c) => c.project === project && c.name === name)?.publication;
+    return categories.find((c) => c.id === pub?.category_id)?.label;
+  };
 
   const [shown, setShown] = useState<Set<RequestStatus>>(
     () => new Set(STATUSES.filter((s) => !DEFAULT_HIDDEN.includes(s))),
@@ -206,7 +214,7 @@ export function OrdersTable({ title, filter, orderTo, orderDisabledReason, empty
                   className="cursor-pointer border-b border-slate-100 outline-none last:border-0 hover:bg-slate-50 focus-visible:bg-slate-50"
                 >
                   <Cell className="px-4 py-3 text-left text-slate-500">
-                    {findCategoryByChart(r.chart_project, r.chart_name)?.label ?? r.chart_project}
+                    {categoryOf(r.chart_project, r.chart_name) ?? r.chart_project}
                   </Cell>
                   <Cell className="px-4 py-3 text-left">
                     <span className="flex items-center gap-2 font-medium text-slate-800">

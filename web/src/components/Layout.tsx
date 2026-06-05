@@ -34,7 +34,9 @@ import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { useUser } from "../auth/UserContext";
 import { useTeam } from "../app/TeamContext";
-import { PRODUCT_CATEGORIES, findProductByChart, type ProductDef } from "./icons";
+import { chartLabel, inMenu, useCatalog } from "../app/CatalogContext";
+import type { CatalogChart } from "../api/types";
+import { categoryIcon } from "./icons";
 import { Spinner } from "./ui";
 
 const navItems = [
@@ -48,47 +50,54 @@ export function Layout() {
   const { pathname } = useLocation();
 
   // On a request detail/edit route the URL doesn't say which product it is, so
-  // fetch the order and map its chart to a product — that product's sidebar item
-  // then lights up (e.g. viewing an Ingress Gateway order highlights it).
+  // fetch the order and map its chart — that chart's sidebar item then lights
+  // up (e.g. viewing an Ingress Gateway order highlights it).
   const reqId = pathname.match(/^\/requests\/([^/]+)(?:\/edit)?$/)?.[1];
   const { data: reqForNav } = useAsync(
     () => (reqId ? api.getRequest(reqId) : Promise.resolve(null)),
     [reqId],
   );
   const navReq = reqForNav?.request;
-  const activeReqProduct = navReq ? findProductByChart(navReq.chart_project, navReq.chart_name) : undefined;
 
-  // Which products can actually be ordered: a mapped chart that exists in the
-  // registry, or a chart-less product backed by a static schema. Non-orderable
-  // products are disabled (greyed, non-clickable) in the sidebar. While the chart
-  // list is loading we stay optimistic for mapped products (don't disable) to
-  // avoid flicker and false-offs on a transient API hiccup.
-  const { data: charts } = useAsync(() => api.listCharts(), []);
-  const chartKeys = useMemo(
-    () => new Set((charts ?? []).map((c) => `${c.project}/${c.name}`)),
-    [charts],
+  // Sidebar product taxonomy is dynamic: catalog categories (admin-managed) ->
+  // published charts whose approved view declares an order form. Categories
+  // without a single such chart are hidden.
+  const { categories, charts } = useCatalog();
+  const menu = useMemo(
+    () =>
+      categories
+        .map((cat) => ({
+          ...cat,
+          charts: charts.filter((c) => inMenu(c) && c.publication!.category_id === cat.id),
+        }))
+        .filter((g) => g.charts.length > 0),
+    [categories, charts],
   );
-  const orderable = (p: ProductDef) =>
-    p.chart
-      ? charts === undefined || chartKeys.has(`${p.chart.project}/${p.chart.name}`)
-      : !!p.schema;
 
-  // A product is "active" on its own page (/products/:slug[/…]), while ordering
-  // its chart (/catalog/:project/:name/order — ordering is a product action), and
-  // on a request of its chart (/requests/:id). Browsing the chart itself
-  // (/catalog/:project/:name, no /order) is NOT a product — it belongs to "Чарты",
-  // so that top-level item lights up there instead.
-  const productActive = (p: { slug: string; chart?: { project: string; name: string } }) =>
-    pathname === `/products/${p.slug}` ||
-    pathname.startsWith(`/products/${p.slug}/`) ||
-    (!!p.chart && pathname === `/catalog/${p.chart.project}/${p.chart.name}/order`) ||
-    activeReqProduct?.slug === p.slug;
-  const activeCategory = PRODUCT_CATEGORIES.find((g) => g.products.some(productActive))?.id;
+  // A chart's menu item is "active" on its product page (/products/:project/:name),
+  // while ordering it (/catalog/:project/:name/order — ordering is a product
+  // action), and on a request of that chart (/requests/:id). Browsing the chart
+  // itself (/catalog/:project/:name, no /order) is NOT a product — it belongs to
+  // "Чарты", so that top-level item lights up there instead.
+  const chartActive = (c: CatalogChart) =>
+    pathname === `/products/${c.project}/${c.name}` ||
+    pathname === `/catalog/${c.project}/${c.name}/order` ||
+    (!!navReq && navReq.chart_project === c.project && navReq.chart_name === c.name);
+  const activeReqInMenu =
+    !!navReq && menu.some((g) => g.charts.some((c) => c.project === navReq.chart_project && c.name === navReq.chart_name));
+  const activeCategory = menu.find((g) => g.charts.some(chartActive))?.id;
 
   // Controlled category expansion: all categories open by default, user toggles
-  // persist, and the active category auto-expands (it can resolve async, after
-  // the request fetch, so defaultExpandedKeys alone wouldn't reopen it).
-  const [expanded, setExpanded] = useState(() => new Set<string>(PRODUCT_CATEGORIES.map((g) => g.id)));
+  // persist, and the active category auto-expands (menu resolves async, so
+  // defaultExpandedKeys alone wouldn't reopen it).
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [expandedInit, setExpandedInit] = useState(false);
+  useEffect(() => {
+    if (!expandedInit && menu.length > 0) {
+      setExpanded(new Set(menu.map((g) => g.id)));
+      setExpandedInit(true);
+    }
+  }, [expandedInit, menu]);
   useEffect(() => {
     if (activeCategory) {
       setExpanded((prev) => (prev.has(activeCategory) ? prev : new Set(prev).add(activeCategory)));
@@ -102,7 +111,7 @@ export function Layout() {
     if (to === "/catalog")
       return (pathname === "/catalog" || pathname.startsWith("/catalog/")) && !activeCategory;
     if (to === "/requests")
-      return (pathname === "/requests" || pathname.startsWith("/requests/")) && !activeReqProduct;
+      return (pathname === "/requests" || pathname.startsWith("/requests/")) && !activeReqInMenu;
     return pathname === to || pathname.startsWith(`${to}/`);
   };
 
@@ -148,16 +157,16 @@ export function Layout() {
 
         <div className="mx-3 border-t border-slate-100" />
 
-        {/* static product categories (order is placed from here) */}
+        {/* product categories (dynamic: published charts with an order view) */}
         {collapsed ? (
           <nav className="flex flex-col gap-0.5 px-2 py-3">
-            {PRODUCT_CATEGORIES.map((g) => {
-              const Icon = g.Icon;
-              const first = g.products.find(orderable);
+            {menu.map((g) => {
+              const Icon = categoryIcon(g.id);
+              const first = g.charts[0];
               return (
                 <Link
                   key={g.id}
-                  to={first ? `/products/${first.slug}` : "/catalog"}
+                  to={first ? `/products/${first.project}/${first.name}` : "/catalog"}
                   title={g.label}
                   aria-current={activeCategory === g.id ? "page" : undefined}
                   className="flex rounded-md px-3 py-2 text-slate-600 hover:bg-slate-50 aria-[current=page]:bg-brand-50 aria-[current=page]:text-brand-700"
@@ -174,8 +183,8 @@ export function Layout() {
             onExpandedChange={(keys) => setExpanded(new Set([...keys].map(String)))}
             className="px-2 py-3"
           >
-            {PRODUCT_CATEGORIES.map((g) => {
-              const Icon = g.Icon;
+            {menu.map((g) => {
+              const Icon = categoryIcon(g.id);
               return (
                 <Disclosure key={g.id} id={g.id} className="group">
                   <Heading>
@@ -195,31 +204,17 @@ export function Layout() {
                   </Heading>
                   <DisclosurePanel>
                     <ul className="ml-[22px] flex flex-col gap-0.5 border-l border-slate-100 py-1 pl-2">
-                      {g.products.map((p) =>
-                        orderable(p) ? (
-                          <li key={p.slug}>
-                            <Link
-                              to={`/products/${p.slug}`}
-                              aria-current={productActive(p) ? "page" : undefined}
-                              className="block whitespace-nowrap rounded-md px-2 py-1.5 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-700 aria-[current=page]:bg-brand-50 aria-[current=page]:font-medium aria-[current=page]:text-brand-700"
-                            >
-                              {p.label}
-                            </Link>
-                          </li>
-                        ) : (
-                          // Not orderable (no chart in the registry, no static schema):
-                          // show it greyed and non-clickable so the taxonomy still reads.
-                          <li key={p.slug}>
-                            <span
-                              title="Недоступен для заказа"
-                              aria-disabled="true"
-                              className="block cursor-not-allowed whitespace-nowrap rounded-md px-2 py-1.5 text-sm text-slate-300"
-                            >
-                              {p.label}
-                            </span>
-                          </li>
-                        ),
-                      )}
+                      {g.charts.map((c) => (
+                        <li key={`${c.project}/${c.name}`}>
+                          <Link
+                            to={`/products/${c.project}/${c.name}`}
+                            aria-current={chartActive(c) ? "page" : undefined}
+                            className="block whitespace-nowrap rounded-md px-2 py-1.5 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-700 aria-[current=page]:bg-brand-50 aria-[current=page]:font-medium aria-[current=page]:text-brand-700"
+                          >
+                            {chartLabel(c.name)}
+                          </Link>
+                        </li>
+                      ))}
                     </ul>
                   </DisclosurePanel>
                 </Disclosure>

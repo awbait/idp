@@ -5,11 +5,13 @@ import { useAsync } from "../hooks/useAsync";
 import { Button, Card, ErrorBox, Spinner } from "../components/ui";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { Markdown } from "../components/Markdown";
-import { findProductByChart } from "../components/icons";
+import { findCatalogChart, useCatalog } from "../app/CatalogContext";
 
 export function ChartDetailPage() {
   const { project = "", name = "" } = useParams();
   const { data: chart, error, loading } = useAsync(() => api.getChart(project, name), [project, name]);
+  const { categories, charts: catalogCharts } = useCatalog();
+  const pub = findCatalogChart(catalogCharts, project, name)?.publication;
 
   if (loading) return <Spinner />;
   if (error) return <ErrorBox error={error} />;
@@ -17,10 +19,10 @@ export function ChartDetailPage() {
 
   // No version picker — the catalog always uses the latest tag.
   const version = chart.latest_version;
-  // Order routes through the product page (e.g. /products/ingress) when the chart
-  // maps to one; otherwise straight to the generic order form.
-  const product = findProductByChart(chart.project, chart.name);
-  const orderTo = product ? `/products/${product.slug}` : `/catalog/${project}/${name}/order`;
+  // Заказ открыт только для публикаций с согласованной order-view; ведёт на
+  // страницу продукта (его список заказов).
+  const orderable = !!pub?.published && !!pub?.has_order_view;
+  const categoryLabel = categories.find((c) => c.id === pub?.category_id)?.label;
 
   return (
     <div className="flex flex-col gap-4">
@@ -36,13 +38,28 @@ export function ChartDetailPage() {
             {chart.project}/{chart.name}
           </h1>
           <p className="text-sm text-gray-600">{chart.description}</p>
-          <span className="mt-1 inline-block rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
-            v{version}
-          </span>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+            <span className="rounded bg-gray-100 px-2 py-0.5">v{version}</span>
+            {categoryLabel && <span className="rounded bg-gray-100 px-2 py-0.5">{categoryLabel}</span>}
+            {pub && (
+              <span className="rounded bg-brand-50 px-2 py-0.5 text-brand-700">
+                Владелец: {pub.owner_team}
+                {pub.created_by_name ? ` · Автор: ${pub.created_by_name}` : ""}
+              </span>
+            )}
+          </div>
         </div>
-        <Link to={orderTo}>
-          <Button variant="primary">Заказать</Button>
-        </Link>
+        {orderable ? (
+          <Link to={`/products/${project}/${name}`}>
+            <Button variant="primary">Заказать</Button>
+          </Link>
+        ) : (
+          <span title="Форма заказа не согласована для этого чарта">
+            <Button variant="primary" isDisabled>
+              Заказать
+            </Button>
+          </span>
+        )}
       </div>
 
       <Tabs>

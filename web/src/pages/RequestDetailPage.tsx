@@ -48,7 +48,8 @@ import { Card, ErrorBox, Spinner } from "../components/ui";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { StatusBadge, statusMeta } from "../components/StatusBadge";
 import { Breadcrumbs } from "../components/Breadcrumbs";
-import { findProductByChart, ProductIcon } from "../components/icons";
+import { ProductIcon } from "../components/icons";
+import { chartLabel } from "../app/CatalogContext";
 import { PRODUCT_TABS } from "../components/products/registry";
 import { SchemaForm, pruneEmpty, type View } from "../form/SchemaForm";
 import type { RequestDetail, RequestEvent, RequestMR } from "../api/types";
@@ -145,8 +146,7 @@ export function RequestDetailPage() {
     }
   }
 
-  const product = findProductByChart(r.chart_project, r.chart_name);
-  const productTabs = product ? PRODUCT_TABS[product.slug] ?? [] : [];
+  const productTabs = PRODUCT_TABS[r.chart_name] ?? [];
   // Persist the open tab in the URL (?tab=) so it survives live reloads (SSE),
   // page refresh and back/forward. Falls back to "info" for unknown values.
   const tabIds = ["info", ...productTabs.map((t) => t.id), "history"];
@@ -157,8 +157,8 @@ export function RequestDetailPage() {
       <Breadcrumbs
         items={[
           {
-            label: product?.label ?? `${r.chart_project}/${r.chart_name}`,
-            to: product ? `/products/${product.slug}` : `/catalog/${r.chart_project}/${r.chart_name}`,
+            label: chartLabel(r.chart_name),
+            to: `/products/${r.chart_project}/${r.chart_name}`,
           },
           { label: r.service_name },
         ]}

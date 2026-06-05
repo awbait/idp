@@ -1,6 +1,7 @@
 import type {
   Application,
   ApiError,
+  CatalogResponse,
   Chart,
   FieldError,
   ChartVersion,
@@ -72,6 +73,8 @@ export const api = {
 
   // catalog
   listCharts: () => req<Chart[]>("GET", "/charts"),
+  // Каталог одним запросом: Harbor-чарты + категории + оверлей публикаций.
+  getCatalog: () => req<CatalogResponse>("GET", "/catalog"),
   getChart: (project: string, name: string) =>
     req<Chart>("GET", `/charts/${enc(project)}/${enc(name)}`),
   getVersion: (project: string, name: string, version: string) =>

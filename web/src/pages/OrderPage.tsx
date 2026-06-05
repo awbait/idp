@@ -9,7 +9,7 @@ import { useTeam } from "../app/TeamContext";
 import { Button, Card, ErrorBox, Spinner, TextField } from "../components/ui";
 import { FormErrors } from "../components/FormErrors";
 import { Breadcrumbs } from "../components/Breadcrumbs";
-import { findProductByChart } from "../components/icons";
+import { chartLabel } from "../app/CatalogContext";
 import type { FieldError } from "../api/types";
 import { SchemaForm, pruneEmpty, collectErrors } from "../form/SchemaForm";
 
@@ -49,8 +49,8 @@ export function OrderPage() {
   const project = editing ? draft?.chart_project ?? "" : pParam;
   const name = editing ? draft?.chart_name ?? "" : nParam;
   // Friendly product label (e.g. "Ingress Gateway") for the title and the
-  // pre-filled display name; falls back to the chart coordinates.
-  const product = findProductByChart(project, name);
+  // pre-filled display name; derived from the chart name.
+  const label = name ? chartLabel(name) : "";
 
   const { data: chart, error: chartErr, loading: chartLoading } = useAsync(
     () => (project && name ? api.getChart(project, name) : Promise.resolve(null)),
@@ -61,7 +61,7 @@ export function OrderPage() {
   // Pre-fill the display name with the product's friendly label (e.g. "Ingress
   // Gateway"); user can edit or clear it (empty falls back to service_name).
   // In edit mode it's hydrated from the draft below.
-  const [displayName, setDisplayName] = useState(() => (id ? "" : product?.label ?? ""));
+  const [displayName, setDisplayName] = useState(() => (id ? "" : nParam ? chartLabel(nParam) : ""));
   // ArgoCD destination: cluster (default in-cluster) + target namespace.
   const [cluster, setCluster] = useState("in-cluster");
   const [namespace, setNamespace] = useState("");
@@ -205,7 +205,7 @@ export function OrderPage() {
         });
       }
       // Back to the product page (its orders list), where the new draft shows on top.
-      navigate(product ? `/products/${product.slug}` : "/requests");
+      navigate(project && name ? `/products/${project}/${name}` : "/requests");
     } catch (e) {
       fail(e);
     } finally {
@@ -276,8 +276,8 @@ export function OrderPage() {
       <Breadcrumbs
         items={[
           {
-            label: product?.label ?? `${chart.project}/${chart.name}`,
-            to: product ? `/products/${product.slug}` : `/catalog/${project}/${name}`,
+            label: label || `${chart.project}/${chart.name}`,
+            to: `/products/${project}/${name}`,
           },
           ...(editing
             ? [
@@ -289,7 +289,7 @@ export function OrderPage() {
       />
       <h1 className="text-xl font-semibold">
         {editing ? "Черновик: " : "Заказ "}
-        {product?.label ?? `${chart.project}/${chart.name}`}
+        {label || `${chart.project}/${chart.name}`}
       </h1>
 
       <Card className="flex flex-col gap-3">
