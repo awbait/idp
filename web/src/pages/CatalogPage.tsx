@@ -46,6 +46,20 @@ export function CatalogPage() {
                       {pub.owner_team}
                     </span>
                   )}
+                  {/* Статус оформления в каталоге: чарт без публикации можно
+                      оформить со страницы чарта («Опубликовать»). */}
+                  {!pub ? (
+                    <span
+                      title="Чарт ещё не оформлен в каталоге — откройте его и нажмите «Опубликовать»"
+                      className="rounded bg-gray-50 px-2 py-0.5 text-gray-400"
+                    >
+                      не опубликован
+                    </span>
+                  ) : !pub.published ? (
+                    <span className="rounded bg-amber-50 px-2 py-0.5 text-amber-700">
+                      {pub.status === "PENDING" ? "на согласовании" : "view не согласована"}
+                    </span>
+                  ) : null}
                   {c.allowed_teams && c.allowed_teams.length > 0 && (
                     <span className="rounded bg-amber-50 px-2 py-0.5 text-amber-700">
                       teams: {c.allowed_teams.join(", ")}
