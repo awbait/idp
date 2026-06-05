@@ -66,5 +66,5 @@ foreach ($dir in $chartDirs) {
     }
     if (-not $pushed) { throw "helm push failed for $name (Harbor reachable on $HarborHost?)" }
     Remove-Item $tgz -ErrorAction SilentlyContinue
-    Write-Host "[charts] pushed oci://$HarborHost/$Project/$name`:$ver" -ForegroundColor Green
+    Write-Host "[charts] pushed oci://$HarborHost/$Project/${name}:$ver" -ForegroundColor Green
 }
