@@ -12,6 +12,7 @@ import (
 	"idp/internal/gitlab"
 	"idp/internal/harbor"
 	"idp/internal/provisioning"
+	"idp/internal/publications"
 	"idp/internal/status"
 	"idp/internal/store"
 	"github.com/go-chi/chi/v5"
@@ -24,6 +25,7 @@ type Server struct {
 	Auth    auth.Authenticator
 	Catalog *catalog.Service
 	Prov    *provisioning.Service
+	Pubs    *publications.Service
 	Status  *status.Service
 	Store   store.Store
 	Cache   cache.Cache
@@ -71,11 +73,28 @@ func (s *Server) Router() http.Handler {
 			r.Get("/charts", s.handleListCharts)
 			r.Get("/charts/{project}/{name}", s.handleGetChart)
 			r.Get("/charts/{project}/{name}/changelog/aggregated", s.handleAggregatedChangelog)
+			r.Get("/charts/{project}/{name}/view", s.handleGetChartView) // активная approved-view (static wins over {version})
 			r.Get("/charts/{project}/{name}/{version}", s.handleGetVersion)
 			r.Get("/charts/{project}/{name}/{version}/values", s.handleGetValues)
 			r.Get("/charts/{project}/{name}/{version}/readme", s.handleGetReadme)
 			r.Get("/charts/{project}/{name}/{version}/changelog", s.handleGetChangelog)
 			r.Get("/charts/{project}/{name}/{version}/schema", s.handleGetSchema)
+
+			// catalog metadata: категории + публикации поверх Harbor-листинга
+			r.Get("/catalog", s.handleCatalog)
+			r.Get("/categories", s.handleListCategories)
+			r.Post("/categories", s.handleCreateCategory)        // admin
+			r.Patch("/categories/{id}", s.handleUpdateCategory)  // admin
+			r.Delete("/categories/{id}", s.handleDeleteCategory) // admin
+
+			// chart publications: метаданные + view-конструктор + согласование
+			r.Get("/publications", s.handleListPublications)
+			r.Post("/publications", s.handleCreatePublication)
+			r.Get("/publications/{id}", s.handleGetPublication)
+			r.Patch("/publications/{id}", s.handlePatchPublication)
+			r.Post("/publications/{id}/submit", s.handleSubmitPublication)
+			r.Post("/publications/{id}/approve", s.handleApprovePublication) // admin
+			r.Post("/publications/{id}/reject", s.handleRejectPublication)   // admin
 
 			// requests
 			r.Get("/requests", s.handleListRequests)

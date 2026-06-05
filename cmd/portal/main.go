@@ -24,6 +24,7 @@ import (
 	"idp/internal/harbor"
 	"idp/internal/observability"
 	"idp/internal/provisioning"
+	"idp/internal/publications"
 	"idp/internal/status"
 	"idp/internal/store"
 )
@@ -76,6 +77,11 @@ func run(ctx context.Context, cfg *config.Config, log *slog.Logger) error {
 		st = store.NewMemory()
 	}
 	defer st.Close()
+
+	// Базовые категории + approved-публикация ingress-gateway (идемпотентно).
+	if err := store.SeedPublications(ctx, st); err != nil {
+		return fmt.Errorf("seed publications: %w", err)
+	}
 
 	// --- upstreams (Harbor, GitLab and ArgoCD each have a real client + a fake) ---
 	var hb harbor.Port
@@ -138,6 +144,7 @@ func run(ctx context.Context, cfg *config.Config, log *slog.Logger) error {
 	bus := events.New()
 	catalogSvc := catalog.New(hb, c)
 	provSvc := provisioning.New(st, gl, argo, catalogSvc, gitops, bus, cfg.ArgoCDCluster, cfg.GitLabDefaultBranch, cfg.GitLabAutoMerge)
+	pubsSvc := publications.New(st)
 	statusSvc := status.New(argo)
 
 	// --- auth ---
@@ -163,7 +170,7 @@ func run(ctx context.Context, cfg *config.Config, log *slog.Logger) error {
 
 	// --- HTTP ---
 	srv := &api.Server{
-		Auth: authn, Catalog: catalogSvc, Prov: provSvc, Status: statusSvc,
+		Auth: authn, Catalog: catalogSvc, Prov: provSvc, Pubs: pubsSvc, Status: statusSvc,
 		Store: st, Cache: c, Bus: bus, Log: log, ArgoCDURL: cfg.ArgoCDURL,
 		Harbor: hb, GitLab: gl, ArgoCD: argo,
 		System: api.SystemInfo{

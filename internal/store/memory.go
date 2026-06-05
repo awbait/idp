@@ -16,6 +16,10 @@ type Memory struct {
 	mrs       map[string]*models.RequestMR
 	events    []*models.RequestEvent
 	eventSeq  int64
+	categories map[string]*models.Category
+	pubs       map[string]*models.ChartPublication
+	pubEvents  []*models.PublicationEvent
+	pubEventSeq int64
 	now       func() time.Time
 	lastStamp time.Time
 }
@@ -25,9 +29,11 @@ var _ Store = (*Memory)(nil)
 // NewMemory returns an empty in-memory store.
 func NewMemory() *Memory {
 	return &Memory{
-		requests: map[string]*models.Request{},
-		mrs:      map[string]*models.RequestMR{},
-		now:      time.Now,
+		requests:   map[string]*models.Request{},
+		mrs:        map[string]*models.RequestMR{},
+		categories: map[string]*models.Category{},
+		pubs:       map[string]*models.ChartPublication{},
+		now:        time.Now,
 	}
 }
 

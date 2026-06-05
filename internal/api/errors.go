@@ -7,6 +7,7 @@ import (
 
 	"idp/internal/auth"
 	"idp/internal/provisioning"
+	"idp/internal/publications"
 	"idp/pkg/models"
 )
 
@@ -31,15 +32,19 @@ func writeErr(w http.ResponseWriter, code int, errCode, msg string) {
 // writeDomainErr maps domain/store errors to HTTP responses per the spec table.
 func writeDomainErr(w http.ResponseWriter, err error) {
 	var ve *provisioning.ValidationError
+	var pve *publications.ValidationError
 	switch {
 	case errors.As(err, &ve):
 		writeJSON(w, http.StatusUnprocessableEntity,
 			errorBody{Error: "validation_failed", Message: ve.Message, Details: ve.Fields})
+	case errors.As(err, &pve):
+		writeErr(w, http.StatusUnprocessableEntity, "validation_failed", pve.Message)
 	case errors.Is(err, models.ErrNotFound):
 		writeErr(w, http.StatusNotFound, "not_found", "")
-	case errors.Is(err, models.ErrConflict), errors.Is(err, models.ErrStaleVersion), errors.Is(err, provisioning.ErrOpenMR):
+	case errors.Is(err, models.ErrConflict), errors.Is(err, models.ErrStaleVersion),
+		errors.Is(err, provisioning.ErrOpenMR), errors.Is(err, publications.ErrPendingLocked):
 		writeErr(w, http.StatusConflict, "conflict", msgOf(err))
-	case errors.Is(err, provisioning.ErrForbidden):
+	case errors.Is(err, provisioning.ErrForbidden), errors.Is(err, publications.ErrForbidden):
 		writeErr(w, http.StatusForbidden, "forbidden", "")
 	case errors.Is(err, provisioning.ErrUpstream):
 		writeErr(w, http.StatusBadGateway, "upstream_unavailable", msgOf(err))

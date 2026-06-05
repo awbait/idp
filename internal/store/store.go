@@ -19,6 +19,13 @@ type RequestFilter struct {
 	IncludeDeleted bool
 }
 
+// PublicationFilter narrows ListPublications.
+type PublicationFilter struct {
+	Status models.PublicationStatus
+	Team   string // owner_team
+	Chart  string // chart_name
+}
+
 // Store is the portal's persistence port.
 type Store interface {
 	// Requests
@@ -42,6 +49,22 @@ type Store interface {
 	// Events / audit
 	AddEvent(ctx context.Context, e *models.RequestEvent) error
 	ListEvents(ctx context.Context, requestID string) ([]*models.RequestEvent, error)
+
+	// Catalog categories
+	CreateCategory(ctx context.Context, c *models.Category) error // ErrConflict on dup id
+	UpdateCategory(ctx context.Context, c *models.Category) error
+	DeleteCategory(ctx context.Context, id string) error // ErrConflict when referenced by publications
+	ListCategories(ctx context.Context) ([]*models.Category, error)
+
+	// Chart publications (catalog metadata + view documents)
+	CreatePublication(ctx context.Context, p *models.ChartPublication) error // ErrConflict on dup chart
+	GetPublication(ctx context.Context, id string) (*models.ChartPublication, error)
+	GetPublicationByChart(ctx context.Context, project, name string) (*models.ChartPublication, error)
+	ListPublications(ctx context.Context, f PublicationFilter) ([]*models.ChartPublication, error)
+	UpdatePublication(ctx context.Context, p *models.ChartPublication) error // optimistic lock; ErrStaleVersion
+
+	AddPublicationEvent(ctx context.Context, e *models.PublicationEvent) error
+	ListPublicationEvents(ctx context.Context, publicationID string) ([]*models.PublicationEvent, error)
 
 	Ping(ctx context.Context) error
 	Close()

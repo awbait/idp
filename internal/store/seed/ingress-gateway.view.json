@@ -1,0 +1,60 @@
+{
+  "$comment": "Presentation projections over the ingress-gateway chart's values.schema.json. The chart's schema stays the single source of truth for validation; views only pick which fields to render and add per-field UI hints. They never copy field definitions.",
+  "views": {
+    "order": {
+      "$comment": "Первичный заказ: naming-теги + ровно один Gateway, без xroutes. Роуты добавляются позже в карточке заказа (вид routes) через PATCH того же values.",
+      "identity": "/gateways/0/name",
+      "include": ["naming", "gateways"],
+      "overrides": {
+        "gateways": {
+          "ui:widget": "single",
+          "title": "Gateway",
+          "ui:view": {
+            "exclude": ["hpa"]
+          }
+        }
+      }
+    },
+    "routes": {
+      "$comment": "Редактор роутов в карточке уже созданного гейтвея. include — список xroutes того же инстанса; overrides.xroutes.ui:view — презентация одного маршрута: enabled всегда true (скрыт), parentRefs[].gateway подставляется автоматически (скрыт), hostnames скрыт целиком — чарт сам выводит hostname из listener'а, на который ссылается route через parentRefs[].sectionName (если у listener'а есть hostname — подставит, нет — оставит пустым). sectionName рендерится селектором из listener'ов (опции наполняются в UI на лету).",
+      "include": ["xroutes"],
+      "overrides": {
+        "xroutes": {
+          "ui:view": {
+            "exclude": ["enabled", "hostnames"],
+            "overrides": {
+              "parentRefs": {
+                "ui:view": { "exclude": ["gateway"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "listeners": {
+      "$comment": "Редактор listener'ов Gateway (gateways[0].listeners) в карточке. Последний удалить нельзя (minItems:1 в схеме).",
+      "include": ["gateways"],
+      "overrides": {
+        "gateways": {
+          "ui:widget": "single",
+          "title": "Gateway",
+          "ui:view": { "include": ["listeners"] }
+        }
+      }
+    },
+    "resources": {
+      "$comment": "Правка ресурсов istio-proxy у Gateway (gateways[0].resources) из карточки заказа. Скрытое в форме заказа поле resources здесь раскрывается.",
+      "include": ["gateways"],
+      "overrides": {
+        "gateways": {
+          "ui:widget": "single",
+          "title": "Gateway",
+          "ui:view": {
+            "include": ["resources"],
+            "overrides": { "resources": { "ui:widget": "edit" } }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,123 @@
+package api_test
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"idp/pkg/models"
+)
+
+// adminReq builds a request authenticated as a dev admin.
+func adminReq(method, path string, body any) *http.Request {
+	r := devReq(method, path, "core", body)
+	r.Header.Set("X-Dev-Role", string(models.RoleAdmin))
+	return r
+}
+
+// TestHTTPPublicationsFlow прогоняет полный цикл публикации через HTTP:
+// категория (admin) → регистрация чарта → черновик view → submit → approve →
+// активная view и оверлей в /catalog.
+func TestHTTPPublicationsFlow(t *testing.T) {
+	srv, _, _ := newServer(t)
+	h := srv.Router()
+
+	do := func(r *http.Request) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		return rec
+	}
+
+	// категории: member нельзя, admin можно
+	if rec := do(devReq("POST", "/api/v1/categories", "core",
+		map[string]any{"id": "network", "label": "Сеть"})); rec.Code != http.StatusForbidden {
+		t.Fatalf("member create category: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := do(adminReq("POST", "/api/v1/categories",
+		map[string]any{"id": "network", "label": "Сеть", "sort": 20})); rec.Code != http.StatusCreated {
+		t.Fatalf("admin create category: %d %s", rec.Code, rec.Body.String())
+	}
+
+	// регистрация чарта владельцем
+	rec := do(devReq("POST", "/api/v1/publications", "core", map[string]any{
+		"chart": "platform/ingress-gateway", "category_id": "network", "owner_team": "core",
+	}))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create publication: %d %s", rec.Code, rec.Body.String())
+	}
+	var pub models.ChartPublication
+	_ = json.Unmarshal(rec.Body.Bytes(), &pub)
+
+	// view ещё не согласована
+	if rec := do(devReq("GET", "/api/v1/charts/platform/ingress-gateway/view", "core", nil)); rec.Code != http.StatusNotFound {
+		t.Fatalf("view before approve: %d", rec.Code)
+	}
+
+	// черновик + submit
+	view := map[string]any{"views": map[string]any{"order": map[string]any{"include": []string{"gateways"}}}}
+	if rec := do(devReq("PATCH", "/api/v1/publications/"+pub.ID, "core",
+		map[string]any{"view": view})); rec.Code != http.StatusOK {
+		t.Fatalf("patch view: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := do(devReq("POST", "/api/v1/publications/"+pub.ID+"/submit", "core", nil)); rec.Code != http.StatusOK {
+		t.Fatalf("submit: %d %s", rec.Code, rec.Body.String())
+	}
+
+	// approve: member 403, admin ok
+	if rec := do(devReq("POST", "/api/v1/publications/"+pub.ID+"/approve", "core", nil)); rec.Code != http.StatusForbidden {
+		t.Fatalf("member approve: %d", rec.Code)
+	}
+	if rec := do(adminReq("POST", "/api/v1/publications/"+pub.ID+"/approve", nil)); rec.Code != http.StatusOK {
+		t.Fatalf("admin approve: %d %s", rec.Code, rec.Body.String())
+	}
+
+	// активная view отдаётся
+	rec = do(devReq("GET", "/api/v1/charts/platform/ingress-gateway/view", "core", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("view after approve: %d %s", rec.Code, rec.Body.String())
+	}
+	var gotView struct {
+		Views map[string]json.RawMessage `json:"views"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &gotView); err != nil || gotView.Views["order"] == nil {
+		t.Fatalf("view body: %v %s", err, rec.Body.String())
+	}
+
+	// каталог: чарт несёт оверлей публикации
+	rec = do(devReq("GET", "/api/v1/catalog", "core", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("catalog: %d %s", rec.Code, rec.Body.String())
+	}
+	var cat struct {
+		Categories []models.Category `json:"categories"`
+		Charts     []struct {
+			models.Chart
+			Publication *struct {
+				CategoryID   string `json:"category_id"`
+				OwnerTeam    string `json:"owner_team"`
+				Published    bool   `json:"published"`
+				HasOrderView bool   `json:"has_order_view"`
+			} `json:"publication"`
+		} `json:"charts"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &cat); err != nil {
+		t.Fatalf("catalog body: %v", err)
+	}
+	if len(cat.Categories) != 1 || cat.Categories[0].ID != "network" {
+		t.Fatalf("catalog categories: %+v", cat.Categories)
+	}
+	found := false
+	for _, c := range cat.Charts {
+		if c.Project == "platform" && c.Name == "ingress-gateway" {
+			found = true
+			if c.Publication == nil || !c.Publication.Published || !c.Publication.HasOrderView ||
+				c.Publication.OwnerTeam != "core" || c.Publication.CategoryID != "network" {
+				t.Fatalf("publication overlay: %+v", c.Publication)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("ingress-gateway not in catalog")
+	}
+}
