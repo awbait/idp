@@ -398,37 +398,71 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
         </Card>
       )}
 
-      {/* Конструктор: слева документ, справа предпросмотр. */}
+      {/* Конструктор: слева документ (+ схема чарта рядом, read-only), справа предпросмотр. */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold text-slate-800">view-документ</h2>
-          <div className="overflow-hidden rounded-md border border-slate-200">
-            <Editor
-              height="480px"
-              defaultLanguage="json"
-              value={text}
-              onChange={(v) => setText(v ?? "")}
-              options={{
-                minimap: { enabled: false },
-                fontSize: 13,
-                automaticLayout: true,
-                readOnly: !editable,
-              }}
-            />
-          </div>
-          {syntaxErr ? (
-            <p className="text-xs text-red-600">Синтаксис: {syntaxErr}</p>
-          ) : issues.length > 0 ? (
-            <ul className="flex flex-col gap-1 text-xs text-red-600">
-              {issues.map((i, idx) => (
-                <li key={idx}>
-                  <code className="rounded bg-red-50 px-1">{i.path || "/"}</code> {i.message}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-xs text-emerald-600">Документ валиден.</p>
-          )}
+          <Tabs>
+            <TabList aria-label="Документы" className="flex gap-1 border-b border-gray-200">
+              <EditorTab id="view">view-документ</EditorTab>
+              <EditorTab id="schema">values.schema.json</EditorTab>
+            </TabList>
+            <TabPanel id="view" className="flex flex-col gap-2 pt-3 outline-none">
+              <div className="overflow-hidden rounded-md border border-slate-200">
+                <Editor
+                  height="480px"
+                  defaultLanguage="json"
+                  value={text}
+                  onChange={(v) => setText(v ?? "")}
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 13,
+                    automaticLayout: true,
+                    readOnly: !editable,
+                  }}
+                />
+              </div>
+              {syntaxErr ? (
+                <p className="text-xs text-red-600">Синтаксис: {syntaxErr}</p>
+              ) : issues.length > 0 ? (
+                <ul className="flex flex-col gap-1 text-xs text-red-600">
+                  {issues.map((i, idx) => (
+                    <li key={idx}>
+                      <code className="rounded bg-red-50 px-1">{i.path || "/"}</code> {i.message}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-emerald-600">Документ валиден.</p>
+              )}
+            </TabPanel>
+            {/* Схема чарта — источник полей для include/exclude/overrides; только чтение. */}
+            <TabPanel id="schema" className="flex flex-col gap-2 pt-3 outline-none">
+              {schema ? (
+                <>
+                  <div className="overflow-hidden rounded-md border border-slate-200">
+                    <Editor
+                      height="480px"
+                      defaultLanguage="json"
+                      value={JSON.stringify(schema, null, 2)}
+                      options={{
+                        minimap: { enabled: false },
+                        fontSize: 13,
+                        automaticLayout: true,
+                        readOnly: true,
+                        domReadOnly: true,
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    values.schema.json из чарта{version ? ` (v${version})` : ""} — только чтение;
+                    схема меняется только новой версией чарта.
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-gray-500">Схема values.schema.json недоступна.</p>
+              )}
+            </TabPanel>
+          </Tabs>
         </Card>
 
         <Card className="flex flex-col gap-2">
@@ -448,6 +482,17 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
   );
 }
 
+function EditorTab({ id, children }: { id: string; children: React.ReactNode }) {
+  return (
+    <Tab
+      id={id}
+      className="-mb-px cursor-pointer border-b-2 border-transparent px-3 py-2 text-sm font-medium text-gray-500 outline-none transition-colors hover:text-gray-700 selected:border-brand-600 selected:text-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500"
+    >
+      {children}
+    </Tab>
+  );
+}
+
 // Предпросмотр форм по каждой view документа — рендерим реальным SchemaForm с
 // реальной схемой чарта; значения локальные, никуда не отправляются.
 function PreviewTabs({ schema, views }: { schema: Record<string, any>; views: Record<string, View> }) {
@@ -457,13 +502,9 @@ function PreviewTabs({ schema, views }: { schema: Record<string, any>; views: Re
     <Tabs>
       <TabList aria-label="Предпросмотр view" className="flex gap-1 border-b border-gray-200">
         {names.map((n) => (
-          <Tab
-            key={n}
-            id={n}
-            className="-mb-px cursor-pointer border-b-2 border-transparent px-3 py-2 text-sm font-medium text-gray-500 outline-none transition-colors hover:text-gray-700 selected:border-brand-600 selected:text-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500"
-          >
+          <EditorTab key={n} id={n}>
             {n}
-          </Tab>
+          </EditorTab>
         ))}
       </TabList>
       {names.map((n) => (
