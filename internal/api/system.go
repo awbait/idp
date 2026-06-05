@@ -75,7 +75,7 @@ func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
 		return nil
 	}
 	checks := []check{
-		{"keycloak", "integration", s.System.AuthMode, s.System.OIDCIssuer, authProbe},
+		{"keycloak", "integration", s.System.AuthMode, issuerBase(s.System.OIDCIssuer), authProbe},
 		{"harbor", "integration", s.System.HarborMode, s.System.HarborURL, s.Harbor.Healthz},
 		{"gitlab", "integration", s.System.GitLabMode, s.System.GitLabURL, s.GitLab.Healthz},
 		{"argocd", "integration", s.System.ArgoCDMode, s.System.ArgoCDURL, s.ArgoCD.Healthz},
@@ -109,4 +109,11 @@ func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, SystemStatus{Healthy: healthy, Components: comps})
+}
+
+// issuerBase strips the Keycloak realm suffix ("…/realms/<name>") from the OIDC
+// issuer so the status page links to the IdP root, not the realm endpoint.
+func issuerBase(issuer string) string {
+	base, _, _ := strings.Cut(issuer, "/realms/")
+	return base
 }

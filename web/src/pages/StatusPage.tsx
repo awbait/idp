@@ -6,13 +6,16 @@ import type { ComponentStatus } from "../api/types";
 
 // Friendly labels for each component the backend reports.
 const LABELS: Record<string, string> = {
-  keycloak: "Keycloak — аутентификация (OIDC)",
-  harbor: "Harbor — реестр чартов",
-  gitlab: "GitLab — GitOps-репозитории и MR",
-  argocd: "Argo CD — деплой",
+  keycloak: "Keycloak",
+  harbor: "Harbor",
+  gitlab: "GitLab",
+  argocd: "Argo CD",
   store: "Хранилище заказов (БД)",
   cache: "Кэш",
 };
+
+// Display names for the storage backends (shown under the row name).
+const BACKEND_LABELS: Record<string, string> = { postgres: "postgresql" };
 
 export function StatusPage() {
   const { data, error, loading, reload } = useAsync(() => api.getSystemStatus(), []);
@@ -71,22 +74,16 @@ function Section({ title, items }: { title: string; items: ComponentStatus[] }) 
 
 function Row({ c }: { c: ComponentStatus }) {
   const ok = c.status === "ok";
-  // "fake"/"dev" modes aren't a real external dependency — mark the mode muted.
-  const fake = c.mode === "fake" || c.mode === "dev";
   return (
     <div className="flex items-start justify-between gap-4 px-4 py-3">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <Dot ok={ok} />
           <span className="font-medium text-slate-800">{LABELS[c.name] ?? c.name}</span>
-          <span
-            className={`rounded px-1.5 py-0.5 text-xs font-medium ${
-              fake ? "bg-slate-100 text-slate-500" : "bg-brand-50 text-brand-700"
-            }`}
-          >
-            {c.mode}
-          </span>
         </div>
+        {c.kind === "storage" && (
+          <p className="mt-0.5 pl-5 text-xs text-slate-400">{BACKEND_LABELS[c.mode] ?? c.mode}</p>
+        )}
         {c.url && (
           <a
             href={c.url}
