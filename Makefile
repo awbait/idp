@@ -47,8 +47,9 @@ down:
 # Same stack but with a real GitLab CE + real Argo CD (the KinD stand).
 # Bring the stand up first (`make stand-up`) and put ARGOCD_TOKEN in
 # deployments/.env. After GitLab is healthy, run `make gitlab-seed` once.
+# Detached (GitLab boots for minutes): watch with `docker compose ps` / logs.
 up-upstreams:
-	docker compose --env-file deployments/.env -f deployments/docker-compose.yml -f deployments/docker-compose.upstreams.yml up --build
+	docker compose --env-file deployments/.env -f deployments/docker-compose.yml -f deployments/docker-compose.upstreams.yml up --build -d
 
 down-upstreams:
 	docker compose -f deployments/docker-compose.yml -f deployments/docker-compose.upstreams.yml down -v
