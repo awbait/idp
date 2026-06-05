@@ -10,11 +10,9 @@ const LABELS: Record<string, string> = {
   harbor: "Harbor",
   gitlab: "GitLab",
   argocd: "Argo CD",
-  store: "Хранилище заказов (БД)",
-  cache: "Кэш",
 };
 
-// Display names for the storage backends (shown under the row name).
+// Storage rows are titled by their backend name directly.
 const BACKEND_LABELS: Record<string, string> = { postgres: "postgresql" };
 
 export function StatusPage() {
@@ -79,11 +77,10 @@ function Row({ c }: { c: ComponentStatus }) {
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <Dot ok={ok} />
-          <span className="font-medium text-slate-800">{LABELS[c.name] ?? c.name}</span>
+          <span className="font-medium text-slate-800">
+            {c.kind === "storage" ? (BACKEND_LABELS[c.mode] ?? c.mode) : (LABELS[c.name] ?? c.name)}
+          </span>
         </div>
-        {c.kind === "storage" && (
-          <p className="mt-0.5 pl-5 text-xs text-slate-400">{BACKEND_LABELS[c.mode] ?? c.mode}</p>
-        )}
         {c.url && (
           <a
             href={c.url}
