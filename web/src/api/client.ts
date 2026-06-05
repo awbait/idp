@@ -4,6 +4,7 @@ import type {
   CatalogResponse,
   Category,
   Chart,
+  ChartCheckResult,
   ChartPublication,
   FieldError,
   ChartVersion,
@@ -79,6 +80,8 @@ export const api = {
   listCharts: () => req<Chart[]>("GET", "/charts"),
   // Каталог одним запросом: Harbor-чарты + категории + оверлей публикаций.
   getCatalog: () => req<CatalogResponse>("GET", "/catalog"),
+  // Проверка чарта по произвольному пути в Harbor (project/name) перед публикацией.
+  checkChart: (path: string) => req<ChartCheckResult>("POST", "/charts/check", { path }),
   getChart: (project: string, name: string) =>
     req<Chart>("GET", `/charts/${enc(project)}/${enc(name)}`),
   getVersion: (project: string, name: string, version: string) =>

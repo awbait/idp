@@ -71,6 +71,7 @@ func (s *Server) Router() http.Handler {
 
 			// catalog
 			r.Get("/charts", s.handleListCharts)
+			r.Post("/charts/check", s.handleCheckChart) // проверка чарта по произвольному пути
 			r.Get("/charts/{project}/{name}", s.handleGetChart)
 			r.Get("/charts/{project}/{name}/changelog/aggregated", s.handleAggregatedChangelog)
 			r.Get("/charts/{project}/{name}/view", s.handleGetChartView) // активная approved-view (static wins over {version})

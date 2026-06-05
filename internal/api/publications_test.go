@@ -9,6 +9,100 @@ import (
 	"idp/pkg/models"
 )
 
+// TestHTTPCheckChart — проверка чарта по пути: фикстурный чарт комплектен,
+// несуществующий — ok=false, кривой путь — 422.
+func TestHTTPCheckChart(t *testing.T) {
+	srv, _, _ := newServer(t)
+	h := srv.Router()
+
+	do := func(body any) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, devReq("POST", "/api/v1/charts/check", "core", body))
+		return rec
+	}
+
+	rec := do(map[string]any{"path": "platform/ingress-gateway"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("check: %d %s", rec.Code, rec.Body.String())
+	}
+	var res struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+		Files []struct {
+			Name     string `json:"name"`
+			Required bool   `json:"required"`
+			Found    bool   `json:"found"`
+		} `json:"files"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &res)
+	if !res.OK || len(res.Files) != 4 {
+		t.Fatalf("fixture chart must pass: %+v", res)
+	}
+	for _, f := range res.Files {
+		if !f.Found {
+			t.Fatalf("fixture file %s not found: %+v", f.Name, res)
+		}
+	}
+
+	rec = do(map[string]any{"path": "platform/nope"})
+	_ = json.Unmarshal(rec.Body.Bytes(), &res)
+	if rec.Code != http.StatusOK || res.OK || res.Error == "" {
+		t.Fatalf("missing chart: %d %+v", rec.Code, res)
+	}
+
+	if rec := do(map[string]any{"path": "justname"}); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("bad path: %d", rec.Code)
+	}
+	if rec := do(map[string]any{"path": "a/b/c"}); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("nested path: %d", rec.Code)
+	}
+}
+
+// TestHTTPCatalogIncludesOrphanPublication — публикация чарта вне Harbor-листинга
+// видна в каталоге с пометкой missing.
+func TestHTTPCatalogIncludesOrphanPublication(t *testing.T) {
+	srv, _, _ := newServer(t)
+	h := srv.Router()
+	do := func(r *http.Request) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		return rec
+	}
+
+	if rec := do(adminReq("POST", "/api/v1/categories",
+		map[string]any{"id": "network", "label": "Сеть"})); rec.Code != http.StatusCreated {
+		t.Fatalf("category: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := do(devReq("POST", "/api/v1/publications", "core", map[string]any{
+		"chart": "elsewhere/ghost", "category_id": "network", "owner_team": "core",
+	})); rec.Code != http.StatusCreated {
+		t.Fatalf("create publication: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec := do(devReq("GET", "/api/v1/catalog", "core", nil))
+	var cat struct {
+		Charts []struct {
+			Project     string          `json:"project"`
+			Name        string          `json:"name"`
+			Missing     bool            `json:"missing"`
+			Publication json.RawMessage `json:"publication"`
+		} `json:"charts"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &cat)
+	found := false
+	for _, c := range cat.Charts {
+		if c.Project == "elsewhere" && c.Name == "ghost" {
+			found = true
+			if !c.Missing || len(c.Publication) == 0 {
+				t.Fatalf("orphan must be missing+with publication: %+v", c)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("orphan publication not in catalog: %s", rec.Body.String())
+	}
+}
+
 // adminReq builds a request authenticated as a dev admin.
 func adminReq(method, path string, body any) *http.Request {
 	r := devReq(method, path, "core", body)

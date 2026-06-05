@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useTeam } from "../app/TeamContext";
 import { useCatalog } from "../app/CatalogContext";
+import { AddChartDialog } from "../components/AddChartDialog";
 import { Card, ErrorBox, Spinner } from "../components/ui";
 
 export function CatalogPage() {
@@ -19,7 +20,10 @@ export function CatalogPage() {
 
   return (
     <div>
-      <h1 className="mb-4 text-xl font-semibold">Чарты</h1>
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Чарты</h1>
+        <AddChartDialog />
+      </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {visible.map((c) => {
           const pub = c.publication;
@@ -36,8 +40,19 @@ export function CatalogPage() {
                 </div>
                 <p className="mt-1 text-sm text-gray-600">{c.description}</p>
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                  <span className="rounded bg-gray-100 px-2 py-0.5">v{c.latest_version}</span>
-                  <span>{c.versions.length} versions</span>
+                  {c.missing ? (
+                    <span
+                      title="Публикация ссылается на чарт, которого больше нет в Harbor"
+                      className="rounded bg-red-50 px-2 py-0.5 text-red-700"
+                    >
+                      нет в Harbor
+                    </span>
+                  ) : (
+                    <>
+                      <span className="rounded bg-gray-100 px-2 py-0.5">v{c.latest_version}</span>
+                      <span>{c.versions.length} versions</span>
+                    </>
+                  )}
                   {pub && (
                     <span
                       title={`Владелец: ${pub.owner_team}${pub.created_by_name ? ` · Автор: ${pub.created_by_name}` : ""}`}

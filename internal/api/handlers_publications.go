@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"idp/internal/auth"
+	"idp/internal/catalog"
 	"idp/internal/publications"
 	"idp/internal/store"
 	"idp/internal/views"
@@ -225,24 +226,28 @@ type publicationSummary struct {
 type catalogChart struct {
 	models.Chart
 	Publication *publicationSummary `json:"publication,omitempty"`
+	// Missing: публикация ссылается на чарт, которого (уже) нет в Harbor.
+	Missing bool `json:"missing,omitempty"`
 }
 
-// handleCatalog — каталог одним запросом: живой Harbor-листинг + категории +
-// наложенные метаданные публикаций. Чарты без публикации остаются видимыми
-// (живой каталог), просто без категории/владельца и без формы заказа.
+// handleCatalog — каталог одним запросом: живой Harbor-листинг настроенных
+// проектов + категории + наложенные метаданные публикаций. Чарты без публикации
+// остаются видимыми (живой каталог); публикации, чьи чарты лежат вне настроенных
+// проектов (добавлены по пути), дотягиваются из Harbor поштучно.
 func (s *Server) handleCatalog(w http.ResponseWriter, r *http.Request) {
-	u := auth.UserFrom(r.Context())
-	charts, err := s.Catalog.ListCharts(r.Context(), u)
+	ctx := r.Context()
+	u := auth.UserFrom(ctx)
+	charts, err := s.Catalog.ListCharts(ctx, u)
 	if err != nil {
 		writeDomainErr(w, err)
 		return
 	}
-	cats, err := s.Pubs.ListCategories(r.Context())
+	cats, err := s.Pubs.ListCategories(ctx)
 	if err != nil {
 		writeDomainErr(w, err)
 		return
 	}
-	pubs, err := s.Pubs.List(r.Context(), store.PublicationFilter{})
+	pubs, err := s.Pubs.List(ctx, store.PublicationFilter{})
 	if err != nil {
 		writeDomainErr(w, err)
 		return
@@ -261,13 +266,69 @@ func (s *Server) handleCatalog(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	out := make([]catalogChart, 0, len(charts))
+	listed := make(map[string]bool, len(charts))
 	for _, c := range charts {
+		listed[c.Project+"/"+c.Name] = true
 		out = append(out, catalogChart{Chart: c, Publication: byChart[c.Project+"/"+c.Name]})
+	}
+	// Публикации чартов вне Harbor-листинга: добавлены по произвольному пути —
+	// дотягиваем метаданные поштучно; пропавший из Harbor чарт показываем с
+	// пометкой missing (владельцу видно, что публикация осиротела).
+	for _, p := range pubs {
+		key := p.ChartProject + "/" + p.ChartName
+		if listed[key] {
+			continue
+		}
+		entry := catalogChart{
+			Chart:       models.Chart{Project: p.ChartProject, Name: p.ChartName},
+			Publication: byChart[key],
+		}
+		if ch, cerr := s.Catalog.GetChart(ctx, p.ChartProject, p.ChartName); cerr == nil {
+			if !catalog.VisibleTo(ch, u) {
+				continue
+			}
+			entry.Chart = *ch
+		} else {
+			entry.Missing = true
+		}
+		out = append(out, entry)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"categories": cats,
 		"charts":     out,
 	})
+}
+
+type checkChartReq struct {
+	Path string `json:"path"` // "project/name"
+}
+
+// handleCheckChart проверяет чарт по произвольному пути в Harbor перед
+// публикацией: существование + комплектность файлов последней версии.
+func (s *Server) handleCheckChart(w http.ResponseWriter, r *http.Request) {
+	var body checkChartReq
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON")
+		return
+	}
+	path := strings.Trim(strings.TrimSpace(body.Path), "/")
+	project, name, ok := strings.Cut(path, "/")
+	if !ok || project == "" || name == "" {
+		writeErr(w, http.StatusUnprocessableEntity, "validation_failed",
+			`путь должен иметь вид "project/name"`)
+		return
+	}
+	if strings.Contains(name, "/") {
+		writeErr(w, http.StatusUnprocessableEntity, "validation_failed",
+			"вложенные пути (project/a/b) пока не поддерживаются — укажите project/name")
+		return
+	}
+	res, err := s.Catalog.CheckChart(r.Context(), project, name)
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, "upstream_unavailable", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
 }
 
 // hasOrderView сообщает, содержит ли view-документ проекцию views.order

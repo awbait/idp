@@ -3,6 +3,8 @@ package catalog
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"idp/internal/cache"
@@ -129,6 +131,72 @@ func (s *Service) GetChangelog(ctx context.Context, project, name, version strin
 		return e, nil
 	}
 	return nil, models.ErrNotFound
+}
+
+// FileCheck — наличие одного файла комплекта чарта (для проверки при добавлении).
+type FileCheck struct {
+	Name     string `json:"name"`
+	Required bool   `json:"required"`
+	Found    bool   `json:"found"`
+}
+
+// CheckResult — отчёт проверки чарта по пути в Harbor: существует ли и есть ли
+// необходимые файлы. OK=false с Error — нормальный исход проверки (не HTTP-ошибка).
+type CheckResult struct {
+	OK    bool          `json:"ok"`
+	Error string        `json:"error,omitempty"`
+	Chart *models.Chart `json:"chart,omitempty"`
+	Files []FileCheck   `json:"files,omitempty"`
+}
+
+// requiredChartFiles — комплект, который проверяем у последней версии чарта.
+// values.yaml и values.schema.json обязательны (схема — единственный источник
+// формы заказа); README и CHANGELOG — желательны, но не блокируют.
+var requiredChartFiles = []struct {
+	name     string
+	required bool
+	fetch    func(s *Service, ctx context.Context, p, n, v string) ([]byte, error)
+}{
+	{"values.yaml", true, (*Service).GetValues},
+	{"values.schema.json", true, (*Service).GetSchema},
+	{"README.md", false, (*Service).GetReadme},
+	{"CHANGELOG.md", false, func(s *Service, ctx context.Context, p, n, v string) ([]byte, error) {
+		return s.blob(ctx, "changelog", p, n, v, s.hb.GetChangelog)
+	}},
+}
+
+// CheckChart проверяет чарт по произвольному пути (project/name): существование
+// в Harbor и комплектность файлов последней версии. Возвращает отчёт; ошибкой
+// завершается только недоступность самого Harbor.
+func (s *Service) CheckChart(ctx context.Context, project, name string) (*CheckResult, error) {
+	chart, err := s.hb.GetChart(ctx, project, name)
+	if err != nil {
+		if errors.Is(err, models.ErrNotFound) {
+			return &CheckResult{Error: fmt.Sprintf("чарт %s/%s не найден в Harbor", project, name)}, nil
+		}
+		return nil, err
+	}
+	if chart.LatestVersion == "" {
+		return &CheckResult{Chart: chart, Error: "у чарта нет ни одной версии"}, nil
+	}
+	res := &CheckResult{OK: true, Chart: chart}
+	for _, f := range requiredChartFiles {
+		_, ferr := f.fetch(s, ctx, project, name, chart.LatestVersion)
+		found := ferr == nil
+		if ferr != nil && !errors.Is(ferr, models.ErrNotFound) {
+			// Битый артефакт (не «файла нет», а «не смогли прочитать») — отчёт, не 502.
+			res.Error = fmt.Sprintf("не удалось прочитать артефакт: %v", ferr)
+			res.OK = false
+		}
+		res.Files = append(res.Files, FileCheck{Name: f.name, Required: f.required, Found: found})
+		if f.required && !found {
+			res.OK = false
+		}
+	}
+	if !res.OK && res.Error == "" {
+		res.Error = "в чарте нет обязательных файлов"
+	}
+	return res, nil
 }
 
 // GetAggregatedChangelog parses the whole CHANGELOG.md (from the latest version's

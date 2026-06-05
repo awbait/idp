@@ -156,6 +156,21 @@ export interface PublicationSummary {
 // Чарт каталога: Harbor-данные + оверлей публикации (может отсутствовать).
 export interface CatalogChart extends Chart {
   publication?: PublicationSummary | null;
+  // Публикация ссылается на чарт, которого (уже) нет в Harbor.
+  missing?: boolean;
+}
+
+// Отчёт проверки чарта по пути (POST /charts/check).
+export interface ChartFileCheck {
+  name: string;
+  required: boolean;
+  found: boolean;
+}
+export interface ChartCheckResult {
+  ok: boolean;
+  error?: string;
+  chart?: Chart;
+  files?: ChartFileCheck[];
 }
 
 export interface CatalogResponse {
