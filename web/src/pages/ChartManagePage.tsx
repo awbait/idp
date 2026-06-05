@@ -1,8 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import Editor, { DiffEditor } from "@monaco-editor/react";
-import { Tab, TabList, TabPanel, Tabs } from "react-aria-components";
-import { IconAlertCircle, IconCheck } from "@tabler/icons-react";
+import {
+  Button as AriaButton,
+  ListBox,
+  ListBoxItem,
+  Popover,
+  Select as AriaSelect,
+  SelectValue,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
+} from "react-aria-components";
+import { IconAlertCircle, IconCheck, IconChevronDown } from "@tabler/icons-react";
 import { api, HttpError } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { useUser, canModify } from "../auth/UserContext";
@@ -178,9 +189,6 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
   const isOwner = canModify(user, pub.owner_team);
   const editable = isOwner && !pending;
 
-  // Метаданные.
-  const [categoryId, setCategoryId] = useState<string | null>(pub.category_id);
-  const [ownerTeam, setOwnerTeam] = useState<string | null>(pub.owner_team);
   // Черновик view-документа в редакторе.
   const [text, setText] = useState(() =>
     pub.view_json ? JSON.stringify(pub.view_json, null, 2) : VIEW_TEMPLATE,
@@ -224,11 +232,7 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
     setBusy("save");
     setErr(null);
     try {
-      await api.updatePublication(pub.id, {
-        category_id: categoryId ?? undefined,
-        owner_team: ownerTeam ?? undefined,
-        view: parsed,
-      });
+      await api.updatePublication(pub.id, { view: parsed });
       reload();
       reloadCatalog();
       return true;
@@ -237,6 +241,18 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
       return false;
     } finally {
       setBusy(null);
+    }
+  }
+
+  // Категория/владелец правятся прямо в чипах шапки и сохраняются сразу.
+  async function onMetaChange(patch: { category_id?: string; owner_team?: string }) {
+    setErr(null);
+    try {
+      await api.updatePublication(pub.id, patch);
+      reload();
+      reloadCatalog();
+    } catch (e) {
+      setErr(e instanceof HttpError ? e.message : (e as Error).message);
     }
   }
 
@@ -295,26 +311,57 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
 
   const st = STATUS_LABELS[pub.status];
   const viewNames = Object.keys(parsed?.views ?? {});
+  const categoryLabel = categories.find((c) => c.id === pub.category_id)?.label ?? pub.category_id;
+  const ownerOptions = [...new Set([...(user?.teams ?? []), pub.owner_team])];
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Управление: {chartLabel(name)}</h1>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-            <span className={`rounded px-2 py-0.5 ${st.cls}`}>{st.label}</span>
-            <span className="rounded bg-gray-100 px-2 py-0.5 text-gray-500">
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <Chip className={st.cls}>{st.label}</Chip>
+            <Chip className="bg-slate-100 text-slate-600">
               {project}/{name}
-              {version ? ` · v${version}` : ""}
-            </span>
-            <span className="rounded bg-brand-50 px-2 py-0.5 text-brand-700">
-              Владелец: {pub.owner_team}
-              {pub.created_by_name ? ` · Автор: ${pub.created_by_name}` : ""}
-            </span>
+              {version && <span className="text-slate-400">v{version}</span>}
+            </Chip>
+            {editable ? (
+              <ChipSelect
+                label="Категория"
+                value={pub.category_id}
+                options={categories.map((c) => ({ id: c.id, label: c.label }))}
+                onChange={(id) => onMetaChange({ category_id: id })}
+              />
+            ) : (
+              <Chip className="bg-slate-100 text-slate-600">
+                <span className="text-slate-400">Категория:</span>
+                {categoryLabel}
+              </Chip>
+            )}
+            {editable && ownerOptions.length > 1 ? (
+              <ChipSelect
+                label="Владелец"
+                value={pub.owner_team}
+                options={ownerOptions.map((t) => ({ id: t, label: t }))}
+                onChange={(t) => onMetaChange({ owner_team: t })}
+              />
+            ) : (
+              <Chip className="bg-brand-50 text-brand-700">
+                <span className="text-brand-400">Владелец:</span>
+                {pub.owner_team}
+              </Chip>
+            )}
+            {pub.created_by_name && (
+              <Chip className="bg-slate-100 text-slate-600">
+                <span className="text-slate-400">Автор:</span>
+                {pub.created_by_name}
+              </Chip>
+            )}
             {pub.approved_view_json && (
-              <span className="rounded bg-emerald-50 px-2 py-0.5 text-emerald-700">
+              <Chip className="bg-emerald-50 text-emerald-700">
+                <IconCheck size={12} stroke={2.5} />
                 view опубликована
-              </span>
+              </Chip>
             )}
           </div>
         </div>
@@ -386,35 +433,6 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
               Отклонить
             </Button>
           </div>
-        </Card>
-      )}
-
-      {/* Метаданные. */}
-      {editable && (
-        <Card className="flex max-w-lg flex-col gap-3">
-          <Select
-            label="Категория"
-            selectedKey={categoryId}
-            onSelectionChange={setCategoryId}
-            options={categories.map((c) => ({ id: c.id, label: c.label }))}
-          />
-          {(user?.teams.length ?? 0) > 0 ? (
-            <Select
-              label="Группа-владелец"
-              selectedKey={ownerTeam}
-              onSelectionChange={setOwnerTeam}
-              options={[...new Set([...(user?.teams ?? []), pub.owner_team])].map((t) => ({
-                id: t,
-                label: t,
-              }))}
-            />
-          ) : (
-            <TextField
-              label="Группа-владелец"
-              value={ownerTeam ?? ""}
-              onChange={(v: string) => setOwnerTeam(v)}
-            />
-          )}
         </Card>
       )}
 
@@ -510,6 +528,57 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
         </Card>
       </div>
     </div>
+  );
+}
+
+// Chip, единый стиль бейджей шапки.
+function Chip({ className = "", children }: { className?: string; children: React.ReactNode }) {
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${className}`}>
+      {children}
+    </span>
+  );
+}
+
+// ChipSelect, селект в форме чипа: компактная правка категории/владельца прямо
+// в шапке, без отдельной карточки метаданных.
+function ChipSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: { id: string; label: string }[];
+  onChange: (id: string) => void;
+}) {
+  return (
+    <AriaSelect
+      selectedKey={value}
+      onSelectionChange={(k) => k !== value && onChange(String(k))}
+      aria-label={label}
+      className="inline-flex"
+    >
+      <AriaButton className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 outline-none transition-colors hover:bg-slate-200 focus-visible:ring-2 focus-visible:ring-brand-500 data-[pressed]:bg-slate-200">
+        <span className="font-normal text-slate-400">{label}:</span>
+        <SelectValue />
+        <IconChevronDown size={12} stroke={2} className="text-slate-400" aria-hidden />
+      </AriaButton>
+      <Popover className="min-w-[var(--trigger-width)] rounded-md border border-slate-200 bg-white shadow-lg entering:animate-in entering:fade-in">
+        <ListBox className="max-h-60 overflow-auto p-1 outline-none">
+          {options.map((o) => (
+            <ListBoxItem
+              key={o.id}
+              id={o.id}
+              className="cursor-pointer rounded px-2 py-1 text-xs outline-none focus:bg-brand-50 selected:bg-brand-100"
+            >
+              {o.label}
+            </ListBoxItem>
+          ))}
+        </ListBox>
+      </Popover>
+    </AriaSelect>
   );
 }
 
