@@ -1,0 +1,27 @@
+# golangci-lint v2 config. Run: golangci-lint run ./...
+# Docs: https://golangci-lint.run
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  # "standard" = errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  enable:
+    - misspell
+    - unconvert
+    - bodyclose
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # Test files may skip error checks and use deliberately misspelled fixtures.
+      - path: _test\.go
+        linters:
+          - errcheck
+          - misspell

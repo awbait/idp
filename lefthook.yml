@@ -1,0 +1,32 @@
+# Lefthook git hooks for the IDP repo.
+# Install once after clone:  lefthook install   (or `make hooks`)
+# Docs: https://lefthook.dev
+#
+# The gate runs on pre-push so commits stay fast; push is blocked if any
+# command fails. Each command is scoped by `glob`/`root`, so a push that
+# touches only the frontend skips the Go checks and vice versa.
+pre-push:
+  parallel: true
+  commands:
+    backend-lint:
+      glob: "*.go"
+      run: golangci-lint run --allow-parallel-runners ./...
+    backend-test:
+      glob: "*.go"
+      run: go test ./...
+    collector-lint:
+      root: "collector/"
+      glob: "*.go"
+      run: golangci-lint run --allow-parallel-runners ./...
+    collector-test:
+      root: "collector/"
+      glob: "*.go"
+      run: go test ./...
+    web-typecheck:
+      root: "web/"
+      glob: "*.{ts,tsx}"
+      run: bun run typecheck
+    web-lint:
+      root: "web/"
+      glob: "*.{ts,tsx,css,json}"
+      run: bunx biome lint ./src --diagnostic-level=error

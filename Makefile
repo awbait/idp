@@ -1,4 +1,4 @@
-.PHONY: build run test vet tidy cover up down docker \
+.PHONY: build run test vet lint tidy cover hooks up down docker \
 	stand-up stand-down stand-charts stand-appset stand-token stand-reset seed-import
 
 build:
@@ -30,6 +30,15 @@ test:
 
 vet:
 	go vet ./...
+
+# Lint both Go modules (same as the lefthook pre-push gate).
+lint:
+	golangci-lint run ./...
+	cd collector && golangci-lint run ./...
+
+# Install git hooks (lefthook). Run once after clone.
+hooks:
+	lefthook install
 
 tidy:
 	go mod tidy
