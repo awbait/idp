@@ -14,7 +14,6 @@ import {
   IconTrash,
   IconX,
 } from "@tabler/icons-react";
-import { TabList, TabPanel, Tabs } from "react-aria-components";
 import { api, HttpError } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { canModify, useUser } from "../auth/UserContext";
@@ -26,18 +25,8 @@ import { Breadcrumbs } from "../components/Breadcrumbs";
 import { ProductIcon } from "../components/icons";
 import { chartLabel, findCatalogChart, useCatalog } from "../app/CatalogContext";
 import { isNewer } from "../lib/semver";
-import { productTabs } from "../components/products/genericView";
-import { GenericInfoActions, GenericListTab } from "../components/products/GenericProductTabs";
-import {
-  DetailActions,
-  DetailTab,
-  Field,
-  fmtDateTime,
-  HistoryTab,
-  Meta,
-  ValuesModalButton,
-} from "./requestDetailParts";
-import type { RequestDetail, ViewDocument } from "../api/types";
+import { DetailActions, fmtDateTime, Meta, ProductView } from "./requestDetailParts";
+import type { ViewDocument } from "../api/types";
 
 export function RequestDetailPage() {
   const { id = "" } = useParams();
@@ -46,6 +35,15 @@ export function RequestDetailPage() {
   const { user } = useUser();
   const { charts } = useCatalog();
   const { data, error, loading, reload } = useAsync(() => api.getRequest(id), [id]);
+  // The chart's approved view document drives the product tabs/actions. Loaded
+  // here (was inside the tabs) so ProductView stays presentational.
+  const { data: viewDoc } = useAsync<ViewDocument | null>(
+    () =>
+      data
+        ? api.getChartView(data.request.chart_project, data.request.chart_name)
+        : Promise.resolve(null),
+    [data?.request.chart_project, data?.request.chart_name],
+  );
 
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
@@ -311,8 +309,9 @@ export function RequestDetailPage() {
         </Meta>
       </Card>
 
-      <ProductTabs
+      <ProductView
         request={r}
+        doc={viewDoc ?? { views: {} }}
         events={events}
         mrs={mrs}
         argocdUrl={data.argocd_url}
@@ -330,105 +329,5 @@ export function RequestDetailPage() {
         }
       />
     </div>
-  );
-}
-
-// ProductTabs builds the tab strip from the chart's view document: Общая
-// информация, one tab per product view, История действий.
-function ProductTabs({
-  request: r,
-  events,
-  mrs,
-  argocdUrl,
-  modifiable,
-  reload,
-  activeTab,
-  onTab,
-}: {
-  request: RequestDetail["request"];
-  events: NonNullable<RequestDetail["events"]>;
-  mrs: NonNullable<RequestDetail["merge_requests"]>;
-  argocdUrl?: string;
-  modifiable: boolean;
-  reload: () => void;
-  activeTab: string;
-  onTab: (key: string) => void;
-}) {
-  const { data: doc } = useAsync<ViewDocument | null>(
-    () => api.getChartView(r.chart_project, r.chart_name),
-    [r.chart_project, r.chart_name],
-  );
-  const view = doc ?? { views: {} };
-  const tabs = productTabs(view);
-  const tabIds = ["info", ...tabs.map((t) => t.id), "history"];
-  const active = tabIds.includes(activeTab) ? activeTab : "info";
-
-  return (
-    <Tabs selectedKey={active} onSelectionChange={(key) => onTab(String(key))}>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200">
-        <TabList aria-label="Разделы заказа" className="flex gap-1">
-          <DetailTab id="info">Общая информация</DetailTab>
-          {tabs.map((t) => (
-            <DetailTab key={t.id} id={t.id}>
-              {t.title ?? t.id}
-            </DetailTab>
-          ))}
-          <DetailTab id="history">История действий</DetailTab>
-        </TabList>
-        <ValuesModalButton request={r} />
-      </div>
-
-      <TabPanel id="info" className="pt-5 outline-none">
-        <InfoTab
-          request={r}
-          argocdUrl={argocdUrl}
-          modifiable={modifiable}
-          doc={view}
-          onChanged={reload}
-        />
-      </TabPanel>
-      {tabs.map((t) => (
-        <TabPanel key={t.id} id={t.id} className="pt-5 outline-none">
-          <Card>
-            <GenericListTab request={r} modifiable={modifiable} reload={reload} doc={view} tab={t} />
-          </Card>
-        </TabPanel>
-      ))}
-      <TabPanel id="history" className="pt-5 outline-none">
-        <HistoryTab events={events} mrs={mrs} />
-      </TabPanel>
-    </Tabs>
-  );
-}
-
-function InfoTab({
-  request: r,
-  argocdUrl,
-  modifiable,
-  doc,
-  onChanged,
-}: {
-  request: RequestDetail["request"];
-  argocdUrl?: string;
-  modifiable: boolean;
-  doc: ViewDocument;
-  onChanged: () => void;
-}) {
-  return (
-    <Card className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-gray-700">Общая информация</h2>
-        {modifiable && <GenericInfoActions request={r} doc={doc} onChanged={onChanged} />}
-      </div>
-      <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-        <Field label="Service name" value={r.service_name} />
-        <Field label="Chart" value={`${r.chart_project}/${r.chart_name}`} />
-        <Field label="Version" value={r.chart_version} />
-        <Field label="Team" value={r.team} />
-        <Field label="Cluster" value={r.cluster} />
-        <Field label="Namespace" value={r.namespace} />
-        <Field label="ArgoCD App" value={r.argocd_app_name} href={argocdUrl} />
-      </div>
-    </Card>
   );
 }

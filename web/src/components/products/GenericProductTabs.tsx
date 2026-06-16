@@ -31,6 +31,12 @@ import {
 
 type Values = Record<string, any>;
 
+// PersistValues overrides how value edits are saved. The real product page omits
+// it and writes through the API (api.updateRequest + reload); the chart-manage
+// preview passes one that writes to local state, so the same components render
+// identically without touching the backend.
+export type PersistValues = (values: Values) => Promise<void> | void;
+
 
 // actionLabel is the text of an action's menu item: its explicit label, else a
 // generic fallback built from the view id.
@@ -74,19 +80,32 @@ export function GenericListTab({
   reload,
   doc,
   tab,
+  schema: schemaProp,
+  persist,
 }: {
   request: OrderRequest;
   modifiable: boolean;
   reload: () => void;
   doc: ViewDocument;
   tab: ViewTab;
+  // Preloaded schema (preview): when set, the component skips its own fetch.
+  schema?: Values;
+  // Local save adapter (preview): when set, edits are not written via the API.
+  persist?: PersistValues;
 }) {
   // Schema is loaded for the order's version, so the form matches what the order
-  // was created on (not the latest chart).
-  const { data: schema, loading, error } = useAsync(
-    () => api.getSchema(request.chart_project, request.chart_name, request.chart_version),
-    [request.chart_project, request.chart_name, request.chart_version],
+  // was created on (not the latest chart). In preview a schema is passed in, so
+  // we skip the fetch entirely.
+  const fetched = useAsync(
+    () =>
+      schemaProp
+        ? Promise.resolve(null)
+        : api.getSchema(request.chart_project, request.chart_name, request.chart_version),
+    [schemaProp, request.chart_project, request.chart_name, request.chart_version],
   );
+  const schema = schemaProp ?? fetched.data;
+  const loading = !schemaProp && fetched.loading;
+  const error = schemaProp ? null : fetched.error;
   const resolved = useMemo(() => resolveTab(schema, tab, doc), [schema, tab, doc]);
   const label = tab.title ?? tab.id;
 
@@ -114,6 +133,8 @@ export function GenericListTab({
       addLabel={tab.addLabel ?? `Добавить ${label}`}
       extraActions={actionViews(doc, `tab:${tab.id}`)}
       doc={doc}
+      schema={schemaProp}
+      persist={persist}
     />
   );
 }
@@ -127,6 +148,8 @@ function ListEditor({
   addLabel,
   extraActions,
   doc,
+  schema,
+  persist,
 }: {
   request: OrderRequest;
   modifiable: boolean;
@@ -136,6 +159,8 @@ function ListEditor({
   addLabel: string;
   extraActions: ActionPlacement[];
   doc: ViewDocument;
+  schema?: Values;
+  persist?: PersistValues;
 }) {
   const full = useMemo(() => parseValues(request.values_yaml), [request.values_yaml]);
   const items: Values[] = Array.isArray(getAt(full, target.itemsPath)) ? getAt(full, target.itemsPath) : [];
@@ -152,8 +177,13 @@ function ListEditor({
   async function commit(next: Values[]) {
     const copy = parseValues(request.values_yaml);
     setAt(copy, target.itemsPath, next);
-    await api.updateRequest(request.id, { values: pruneEmpty(copy) });
-    reload();
+    const pruned = pruneEmpty(copy);
+    if (persist) {
+      await persist(pruned);
+    } else {
+      await api.updateRequest(request.id, { values: pruned });
+      reload();
+    }
   }
   async function saveItem(item: Values) {
     const next = editIndex !== null ? items.map((x, i) => (i === editIndex ? item : x)) : [...items, item];
@@ -297,6 +327,8 @@ function ListEditor({
           isOpen
           onClose={() => setAction(null)}
           onSaved={reload}
+          schema={schema}
+          persist={persist}
         />
       )}
     </div>
@@ -428,10 +460,14 @@ export function GenericInfoActions({
   request,
   doc,
   onChanged,
+  schema,
+  persist,
 }: {
   request: OrderRequest;
   doc: ViewDocument;
   onChanged: () => void;
+  schema?: Values;
+  persist?: PersistValues;
 }) {
   const actions = actionViews(doc, "info").filter((a) => doc.views?.[a.view]);
   const [open, setOpen] = useState<string | null>(null);
@@ -466,6 +502,8 @@ export function GenericInfoActions({
           isOpen
           onClose={() => setOpen(null)}
           onSaved={onChanged}
+          schema={schema}
+          persist={persist}
         />
       )}
     </>
@@ -486,6 +524,8 @@ function ViewFormModal({
   isOpen,
   onClose,
   onSaved,
+  schema: schemaProp,
+  persist,
 }: {
   request: OrderRequest;
   project: string;
@@ -496,11 +536,16 @@ function ViewFormModal({
   isOpen: boolean;
   onClose: () => void;
   onSaved: () => void;
+  schema?: Values;
+  persist?: PersistValues;
 }) {
-  const { data: schema, loading, error } = useAsync(
-    () => (isOpen ? api.getSchema(project, name, version) : Promise.resolve(null)),
-    [isOpen, project, name, version],
+  const fetched = useAsync(
+    () => (isOpen && !schemaProp ? api.getSchema(project, name, version) : Promise.resolve(null)),
+    [isOpen, schemaProp, project, name, version],
   );
+  const schema = schemaProp ?? fetched.data;
+  const loading = !schemaProp && fetched.loading;
+  const error = schemaProp ? null : fetched.error;
   const [value, setValue] = useState<Values>({});
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -515,7 +560,9 @@ function ViewFormModal({
     setSaving(true);
     setErr(null);
     try {
-      await api.updateRequest(request.id, { values: pruneEmpty(value) });
+      const pruned = pruneEmpty(value);
+      if (persist) await persist(pruned);
+      else await api.updateRequest(request.id, { values: pruned });
       onClose();
       onSaved();
     } catch (e) {

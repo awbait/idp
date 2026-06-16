@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import Editor, { DiffEditor } from "@monaco-editor/react";
+import yaml from "js-yaml";
 import {
   Button as AriaButton,
   Dialog,
@@ -8,9 +9,6 @@ import {
   Heading,
   ListBox,
   ListBoxItem,
-  Menu,
-  MenuItem,
-  MenuTrigger,
   Modal,
   ModalOverlay,
   Popover,
@@ -46,16 +44,19 @@ import { useTheme } from "../app/ThemeContext";
 import { useToast } from "../app/ToastContext";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { Button, Card, Chip, ErrorBox, Select, Spinner, TextField } from "../components/ui";
-import { SchemaForm, type View } from "../form/SchemaForm";
-import {
-  actionViews,
-  computeCell,
-  getAt,
-  productTabs,
-  resolveTab,
-  type ActionPlacement,
-} from "../components/products/genericView";
-import type { ChartPublication, PublicationStatus, ViewDocument, ViewIssue, ViewTab } from "../api/types";
+import { StatusBadge } from "../components/StatusBadge";
+import { ProductIcon } from "../components/icons";
+import { pruneEmpty, type View } from "../form/SchemaForm";
+import { OrderMetaCard, OrderValuesCard } from "../components/OrderFormParts";
+import { Meta, ProductView } from "./requestDetailParts";
+import type { PersistValues } from "../components/products/GenericProductTabs";
+import type {
+  ChartPublication,
+  OrderRequest,
+  PublicationStatus,
+  ViewDocument,
+  ViewIssue,
+} from "../api/types";
 
 type Values = Record<string, unknown>;
 
@@ -791,6 +792,9 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
               schema={schema as Record<string, any>}
               doc={parsed!}
               label={chartLabel(name)}
+              project={project}
+              name={name}
+              version={version}
             />
           )}
         </Card>
@@ -1070,21 +1074,81 @@ function readPointer(v: unknown, ptr: string): string {
 }
 
 
-// Предпросмотр: полноценная форма нового заказа (view "order") и кликабельный
-// мок страницы заказанного продукта. Всё рендерится реальным SchemaForm по
-// реальной схеме чарта; значения локальные, никуда не отправляются.
+// Предпросмотр строится теми же компонентами, что и реальные страницы (форма
+// заказа из OrderFormParts, страница продукта из ProductView), поэтому он один в
+// один совпадает с тем, что увидит пользователь. Значения локальные: правки в
+// предпросмотре идут в стейт (persist), а не в API.
 function PreviewPane({
   schema,
   doc,
   label,
+  project,
+  name,
+  version,
 }: {
   schema: Record<string, any>;
   doc: ViewDocument;
   label: string;
+  project: string;
+  name: string;
+  version: string;
 }) {
-  // Значения формы заказа шарятся с моком продукта: заполнил форму, открыл
-  // вкладку продукта и видишь свой заказ.
-  const [orderValues, setOrderValues] = useState<Values>({});
+  const { user } = useUser();
+  const orderView = doc.views?.order as (View & { identity?: string }) | undefined;
+  const identity = orderView?.identity;
+
+  // Состояние заказа: общее для формы и страницы продукта (заполнил форму,
+  // переключил вкладку и видишь свой заказ).
+  const [values, setValues] = useState<Values>({});
+  const [displayName, setDisplayName] = useState(label);
+  const [serviceName, setServiceName] = useState("");
+  const [cluster, setCluster] = useState("in-cluster");
+  const [namespace, setNamespace] = useState("");
+  const [mode, setMode] = useState<"form" | "raw">("form");
+  const [raw, setRaw] = useState("");
+
+  // Та же логика переключения form/raw, что и на странице заказа.
+  function switchMode(next: "form" | "raw") {
+    if (next === mode) return;
+    if (next === "raw") {
+      setRaw(yaml.dump(pruneEmpty(values)));
+    } else {
+      try {
+        setValues((yaml.load(raw) as Values) ?? {});
+      } catch {
+        /* keep previous form values if YAML is invalid */
+      }
+    }
+    setMode(next);
+  }
+
+  const team = user?.teams[0] ?? "team";
+  const svcName = (identity ? readPointer(values, identity) : serviceName) || "demo-service";
+
+  // Синтетический заказ: позволяет рендерить предпросмотр реальными компонентами
+  // продукта без сохранённого заказа. id фиктивный, запись идёт через persist.
+  const request: OrderRequest = {
+    id: "preview",
+    created_by: user?.sub ?? "",
+    created_by_name: user?.name ?? "",
+    team,
+    chart_project: project,
+    chart_name: name,
+    chart_version: version,
+    service_name: svcName,
+    display_name: displayName,
+    cluster,
+    namespace: namespace || svcName,
+    values_yaml: yaml.dump(pruneEmpty(values)),
+    status: "HEALTHY",
+    argocd_app_name: `${team}-${svcName}`,
+    version: 1,
+    created_at: "",
+    updated_at: "",
+    drifted: false,
+    imported: false,
+  };
+
   return (
     <Tabs className="flex min-h-0 flex-1 flex-col">
       <TabList aria-label="Предпросмотр" className="flex gap-1 border-b border-gray-200">
@@ -1095,259 +1159,102 @@ function PreviewPane({
           Страница продукта
         </EditorTab>
       </TabList>
-      <TabPanel id="order" className="flex min-h-0 flex-1 flex-col pt-3 outline-none">
-        <OrderFormPreview
-          schema={schema}
-          view={doc.views?.order as (View & { identity?: string }) | undefined}
-          label={label}
-          values={orderValues}
-          onChange={setOrderValues}
-        />
+      <TabPanel
+        id="order"
+        className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1 pt-3 outline-none"
+      >
+        {orderView ? (
+          <>
+            <OrderMetaCard
+              identity={identity}
+              displayName={displayName}
+              onDisplayName={setDisplayName}
+              serviceName={serviceName}
+              onServiceName={setServiceName}
+              cluster={cluster}
+              onCluster={setCluster}
+              namespace={namespace}
+              onNamespace={setNamespace}
+              team={team}
+              version={version}
+              latest
+              identityName={identity ? readPointer(values, identity) : ""}
+            />
+            <OrderValuesCard
+              schema={schema}
+              view={orderView}
+              values={values}
+              onValues={setValues}
+              mode={mode}
+              onSwitchMode={switchMode}
+              raw={raw}
+              onRaw={setRaw}
+            />
+          </>
+        ) : (
+          <p className="text-sm text-gray-500">
+            В документе нет view "order", форма заказа не строится.
+          </p>
+        )}
       </TabPanel>
-      <TabPanel id="product" className="flex min-h-0 flex-1 flex-col pt-3 outline-none">
-        <ProductPageMock schema={schema} doc={doc} label={label} orderValues={orderValues} />
+      <TabPanel
+        id="product"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-1 pt-3 outline-none"
+      >
+        <ProductPagePreview
+          request={request}
+          doc={doc}
+          schema={schema}
+          persist={(v) => setValues(v as Values)}
+        />
       </TabPanel>
     </Tabs>
   );
 }
 
-// Форма нового заказа, как её увидит пользователь: верхние поля заказа +
-// SchemaForm c проекцией view "order".
-function OrderFormPreview({
-  schema,
-  view,
-  label,
-  values,
-  onChange,
-}: {
-  schema: Record<string, any>;
-  view?: View & { identity?: string };
-  label: string;
-  values: Values;
-  onChange: (v: Values) => void;
-}) {
-  const [displayName, setDisplayName] = useState(label);
-  const [namespace, setNamespace] = useState("");
-  const [svcName, setSvcName] = useState("");
-  if (!view) {
-    return <p className="text-sm text-gray-500">В документе нет view "order", форма заказа не строится.</p>;
-  }
-  const identity = view.identity;
-  const identityName = identity ? readPointer(values, identity) : "";
-  return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
-        <div className="flex flex-col gap-3 rounded-md border border-slate-200 p-3">
-          {identity ? (
-            <p className="text-sm text-gray-600">
-              Имя сервиса:{" "}
-              <span className="font-medium text-gray-800">{identityName || "(пусто)"}</span>{" "}
-              <span className="text-xs text-gray-400">из поля формы (identity: {identity})</span>
-            </p>
-          ) : (
-            <TextField
-              label="Имя сервиса"
-              value={svcName}
-              onChange={(v: string) => setSvcName(v)}
-              placeholder="my-service"
-            />
-          )}
-          <TextField
-            label="Отображаемое имя"
-            value={displayName}
-            onChange={(v: string) => setDisplayName(v)}
-          />
-          <TextField
-            label="Namespace"
-            value={namespace}
-            onChange={(v: string) => setNamespace(v)}
-            placeholder="по умолчанию: имя сервиса"
-          />
-        </div>
-        <SchemaForm schema={schema} view={view} value={values} onChange={onChange} />
-      </div>
-    </div>
-  );
-}
-
-// Мок страницы заказанного продукта: шапка с псевдостатусом, вкладки из tabs
-// (таблицы по ui:table) и кнопки «Действия» из actions. Раскладка строится тем
-// же движком, что и реальная страница продукта; значения берутся из формы заказа.
-function ProductPageMock({
-  schema,
+// ProductPagePreview shows the order's product page exactly as RequestDetailPage
+// renders it: the same header + meta card layout and the shared ProductView
+// (tabs, tables, "Действия"). Edits write to local state via persist.
+function ProductPagePreview({
+  request,
   doc,
-  label,
-  orderValues,
-}: {
-  schema: Record<string, any>;
-  doc: ViewDocument;
-  label: string;
-  orderValues: Values;
-}) {
-  const tabs = productTabs(doc);
-  const infoActions = actionViews(doc, "info");
-  const identity = (doc.views?.order as { identity?: string } | undefined)?.identity;
-  const serviceName = (identity && readPointer(orderValues, identity)) || "demo-service";
-  return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-slate-200 p-3">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <p className="text-xs text-slate-400">{label}</p>
-            <p className="text-sm font-semibold text-slate-800">{serviceName}</p>
-          </div>
-          <Chip className="bg-emerald-50 text-emerald-700">
-            <IconCheck size={12} stroke={2.5} />
-            HEALTHY
-          </Chip>
-        </div>
-        <Tabs className="mt-2">
-          <TabList aria-label="Вкладки продукта" className="flex gap-1 border-b border-gray-200">
-            <EditorTab id="__info">Общая информация</EditorTab>
-            {tabs.map((t) => (
-              <EditorTab key={t.id} id={t.id}>
-                {t.title ?? t.id}
-              </EditorTab>
-            ))}
-          </TabList>
-          <TabPanel id="__info" className="pt-3 outline-none">
-            <div className="flex flex-col gap-3">
-              {infoActions.length > 0 && (
-                <div className="flex justify-end">
-                  <MockActions actions={infoActions} />
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <MockField label="Сервис" value={serviceName} />
-                <MockField label="Статус" value="HEALTHY" />
-                <MockField label="Кластер" value="in-cluster" />
-                <MockField label="Namespace" value={serviceName} />
-                <MockField label="Команда" value="team" />
-                <MockField label="ArgoCD App" value={`team-${serviceName}`} />
-              </div>
-            </div>
-          </TabPanel>
-          {tabs.map((t) => (
-            <TabPanel key={t.id} id={t.id} className="pt-3 outline-none">
-              <MockTabTable schema={schema} doc={doc} tab={t} orderValues={orderValues} />
-            </TabPanel>
-          ))}
-        </Tabs>
-      </div>
-    </div>
-  );
-}
-
-// MockTabTable previews one tab as the real product page would: a table by
-// ui:table over the order form's values, with a "Действия" button (Добавить +
-// any actions placed on this tab). Read-only - it shows the layout, not CRUD.
-function MockTabTable({
   schema,
-  doc,
-  tab,
-  orderValues,
+  persist,
 }: {
-  schema: Record<string, any>;
+  request: OrderRequest;
   doc: ViewDocument;
-  tab: ViewTab;
-  orderValues: Values;
+  schema: Record<string, any>;
+  persist: PersistValues;
 }) {
-  const resolved = resolveTab(schema, tab, doc);
-  const label = tab.title ?? tab.id;
-  const extra = actionViews(doc, `tab:${tab.id}`);
-  if (!resolved) {
-    return <MockStub>Вкладка «{label}» не сконфигурирована: проверьте «items» и «form».</MockStub>;
-  }
-  if (resolved.columns.length === 0) {
-    return <MockStub>Таблица «{label}» не сконфигурирована: добавьте «ui:table» (колонки).</MockStub>;
-  }
-  const items: Values[] = Array.isArray(getAt(orderValues, resolved.itemsPath))
-    ? getAt(orderValues, resolved.itemsPath)
-    : [];
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-end gap-2">
-        <MockActions actions={extra} addLabel={tab.addLabel ?? `Добавить ${label}`} />
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+          <ProductIcon name={request.chart_name} size={22} />
+        </span>
+        <h1 className="truncate text-xl font-semibold">
+          {request.display_name || request.service_name}
+        </h1>
       </div>
-      {items.length === 0 ? (
-        <p className="text-sm text-slate-500">Пока пусто.</p>
-      ) : (
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase tracking-wide text-slate-400">
-            <tr>
-              {resolved.columns.map((c) => (
-                <th key={c.label} className="py-1 pr-4 font-medium">
-                  {c.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((it, i) => (
-              <tr key={i} className="border-t border-slate-100">
-                {resolved.columns.map((c, ci) => {
-                  const v = computeCell(it, orderValues, c);
-                  const text = v == null || v === "" ? "-" : Array.isArray(v) ? (v.length ? v.join(", ") : "-") : String(v);
-                  return (
-                    <td
-                      key={c.label}
-                      className={`py-1.5 pr-4 ${ci === 0 ? "font-medium text-slate-800" : "text-slate-600"}`}
-                    >
-                      {text}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
-  );
-}
-
-// MockActions renders a non-functional "Действия" button + menu, so the preview
-// shows which items the real page would offer.
-function MockActions({ actions, addLabel }: { actions: ActionPlacement[]; addLabel?: string }) {
-  if (!addLabel && actions.length === 0) return null;
-  const item = "cursor-pointer px-3 py-1.5 text-sm text-slate-700 outline-none focus:bg-slate-50";
-  return (
-    <MenuTrigger>
-      <AriaButton className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-200 bg-surface px-3 py-1.5 text-sm font-medium text-brand-600 outline-none hover:bg-brand-50 focus-visible:ring-2 focus-visible:ring-brand-500">
-        Действия
-      </AriaButton>
-      <Popover className="min-w-56 rounded-md border border-slate-200 bg-surface py-1 shadow-lg outline-none entering:animate-in entering:fade-in">
-        <Menu className="outline-none">
-          {addLabel && (
-            <MenuItem id="__add" className={item}>
-              {addLabel}
-            </MenuItem>
-          )}
-          {actions.map((a) => (
-            <MenuItem key={a.view} id={a.view} className={item}>
-              {a.label ?? `Редактировать ${a.view}`}
-            </MenuItem>
-          ))}
-        </Menu>
-      </Popover>
-    </MenuTrigger>
-  );
-}
-
-function MockStub({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="flex items-start gap-1.5 text-sm text-amber-600">
-      <IconInfoCircle size={16} stroke={1.8} className="mt-0.5 shrink-0" />
-      <span>{children}</span>
-    </p>
-  );
-}
-
-function MockField({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs text-slate-400">{label}</p>
-      <p className="text-slate-800">{value}</p>
+      <Card className="grid grid-cols-3 gap-4">
+        <Meta label="Создатель">
+          <span className="text-sm text-gray-800">{request.created_by_name || "-"}</span>
+        </Meta>
+        <Meta label="Создан">
+          <span className="text-sm text-gray-800">-</span>
+        </Meta>
+        <Meta label="Статус">
+          <StatusBadge status={request.status} />
+        </Meta>
+      </Card>
+      <ProductView
+        request={request}
+        doc={doc}
+        modifiable
+        reload={() => {}}
+        schema={schema}
+        persist={persist}
+      />
     </div>
   );
 }

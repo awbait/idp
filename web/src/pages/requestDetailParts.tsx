@@ -13,6 +13,9 @@ import {
   ModalOverlay,
   Popover,
   Tab,
+  TabList,
+  TabPanel,
+  Tabs,
 } from "react-aria-components";
 import Editor from "@monaco-editor/react";
 import {
@@ -41,7 +44,13 @@ import {
 import { Card } from "../components/ui";
 import { StatusBadge, statusMeta } from "../components/StatusBadge";
 import { useTheme } from "../app/ThemeContext";
-import type { RequestDetail, RequestEvent, RequestMR } from "../api/types";
+import { productTabs } from "../components/products/genericView";
+import {
+  GenericInfoActions,
+  GenericListTab,
+  type PersistValues,
+} from "../components/products/GenericProductTabs";
+import type { OrderRequest, RequestDetail, RequestEvent, RequestMR, ViewDocument } from "../api/types";
 
 export function Meta({
   label,
@@ -251,6 +260,139 @@ const EVENT_META: Record<string, { label: string; Icon: TablerIcon; tint: string
   git_pulled: { label: "Обновлено из Git", Icon: IconGitFork, tint: "sky" },
   imported: { label: "Импортировано из Git", Icon: IconGitFork, tint: "sky" },
 };
+
+// ProductView is the view-driven body of the product (order) page: the tab strip
+// (Общая информация + one tab per product view + История действий) and the
+// values.yaml button. It is shared by RequestDetailPage (live order, writes via
+// the API) and the chart-manage preview (synthetic order, writes to local state
+// via `persist` and uses the in-editor `schema`), so both render identically.
+export function ProductView({
+  request: r,
+  doc,
+  events = [],
+  mrs = [],
+  argocdUrl,
+  modifiable,
+  reload,
+  schema,
+  persist,
+  activeTab,
+  onTab,
+}: {
+  request: OrderRequest;
+  doc: ViewDocument;
+  events?: NonNullable<RequestDetail["events"]>;
+  mrs?: NonNullable<RequestDetail["merge_requests"]>;
+  argocdUrl?: string;
+  modifiable: boolean;
+  reload: () => void;
+  // Preview only: preloaded schema + local save adapter (no API).
+  schema?: Record<string, any>;
+  persist?: PersistValues;
+  // Controlled active tab (RequestDetailPage syncs it to the URL). When omitted,
+  // ProductView keeps its own tab state (preview).
+  activeTab?: string;
+  onTab?: (key: string) => void;
+}) {
+  const [internalTab, setInternalTab] = useState("info");
+  const tabs = productTabs(doc);
+  const tabIds = ["info", ...tabs.map((t) => t.id), "history"];
+  const controlled = onTab !== undefined;
+  const requested = controlled ? (activeTab ?? "") : internalTab;
+  const active = tabIds.includes(requested) ? requested : "info";
+  const setActive = controlled ? onTab! : setInternalTab;
+
+  return (
+    <Tabs selectedKey={active} onSelectionChange={(key) => setActive(String(key))}>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200">
+        <TabList aria-label="Разделы заказа" className="flex gap-1">
+          <DetailTab id="info">Общая информация</DetailTab>
+          {tabs.map((t) => (
+            <DetailTab key={t.id} id={t.id}>
+              {t.title ?? t.id}
+            </DetailTab>
+          ))}
+          <DetailTab id="history">История действий</DetailTab>
+        </TabList>
+        <ValuesModalButton request={r} />
+      </div>
+
+      <TabPanel id="info" className="pt-5 outline-none">
+        <InfoTab
+          request={r}
+          argocdUrl={argocdUrl}
+          modifiable={modifiable}
+          doc={doc}
+          onChanged={reload}
+          schema={schema}
+          persist={persist}
+        />
+      </TabPanel>
+      {tabs.map((t) => (
+        <TabPanel key={t.id} id={t.id} className="pt-5 outline-none">
+          <Card>
+            <GenericListTab
+              request={r}
+              modifiable={modifiable}
+              reload={reload}
+              doc={doc}
+              tab={t}
+              schema={schema}
+              persist={persist}
+            />
+          </Card>
+        </TabPanel>
+      ))}
+      <TabPanel id="history" className="pt-5 outline-none">
+        <HistoryTab events={events} mrs={mrs} />
+      </TabPanel>
+    </Tabs>
+  );
+}
+
+function InfoTab({
+  request: r,
+  argocdUrl,
+  modifiable,
+  doc,
+  onChanged,
+  schema,
+  persist,
+}: {
+  request: OrderRequest;
+  argocdUrl?: string;
+  modifiable: boolean;
+  doc: ViewDocument;
+  onChanged: () => void;
+  schema?: Record<string, any>;
+  persist?: PersistValues;
+}) {
+  return (
+    <Card className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-gray-700">Общая информация</h2>
+        {modifiable && (
+          <GenericInfoActions
+            request={r}
+            doc={doc}
+            onChanged={onChanged}
+            schema={schema}
+            persist={persist}
+          />
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+        <Field label="Service name" value={r.service_name} />
+        <Field label="Chart" value={`${r.chart_project}/${r.chart_name}`} />
+        <Field label="Version" value={r.chart_version} />
+        <Field label="Team" value={r.team} />
+        <Field label="Cluster" value={r.cluster} />
+        <Field label="Namespace" value={r.namespace} />
+        <Field label="ArgoCD App" value={r.argocd_app_name} href={argocdUrl} />
+      </div>
+    </Card>
+  );
+}
 
 export function HistoryTab({
   events,

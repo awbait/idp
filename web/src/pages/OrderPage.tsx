@@ -1,19 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import Editor from "@monaco-editor/react";
 import yaml from "js-yaml";
 import { api, HttpError } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { useUser } from "../auth/UserContext";
 import { useTeam } from "../app/TeamContext";
-import { Button, Card, ErrorBox, Spinner, TextField } from "../components/ui";
+import { Button, Card, ErrorBox, Spinner } from "../components/ui";
 import { FormErrors } from "../components/FormErrors";
 import { Breadcrumbs } from "../components/Breadcrumbs";
+import { OrderMetaCard, OrderValuesCard } from "../components/OrderFormParts";
 import { chartLabel } from "../app/CatalogContext";
-import { useTheme } from "../app/ThemeContext";
 import { isNewer } from "../lib/semver";
 import type { ChangelogEntry, FieldError } from "../api/types";
-import { SchemaForm, pruneEmpty, collectErrors } from "../form/SchemaForm";
+import { pruneEmpty, collectErrors } from "../form/SchemaForm";
 
 type Values = Record<string, unknown>;
 
@@ -45,8 +44,6 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
   const { user } = useUser();
   // Team is chosen globally (topbar); the order form doesn't ask for it.
   const { team: activeTeam } = useTeam();
-  const { theme } = useTheme();
-  const monacoTheme = theme === "light" ? "light" : "vs-dark";
 
   // In edit mode, load the draft we're continuing. Its chart coordinates and
   // pinned version drive the rest of the page.
@@ -386,103 +383,36 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
           )}
         </Card>
       ) : (
-      <Card className="flex flex-col gap-3">
-        <TextField
-          label="Отображаемое имя"
-          description="Произвольное имя для отображения. Можно изменить позже; на деплой не влияет."
-          placeholder={identity ? "Напр. Public Gateway" : "payments-db"}
-          value={displayName}
-          onChange={setDisplayName}
+        <OrderMetaCard
+          identity={identity}
+          displayName={displayName}
+          onDisplayName={setDisplayName}
+          serviceName={serviceName}
+          onServiceName={setServiceName}
+          cluster={cluster}
+          onCluster={setCluster}
+          namespace={namespace}
+          onNamespace={setNamespace}
+          team={editing ? draft?.team : activeTeam ?? undefined}
+          version={effectiveVersion ?? undefined}
+          latest={!editing}
+          identityName={identityName}
+          showErrors={showErrors}
         />
-        {!identity && (
-          <TextField
-            label="Service name"
-            isRequired
-            placeholder="payments-db"
-            value={serviceName}
-            onChange={setServiceName}
-            errorText={showErrors && !serviceName ? "Обязательное поле" : undefined}
-          />
-        )}
-        <TextField
-          label="Кластер"
-          description="Кластер назначения ArgoCD (destination.name)."
-          isRequired
-          placeholder="in-cluster"
-          value={cluster}
-          onChange={setCluster}
-          errorText={showErrors && !cluster ? "Обязательное поле" : undefined}
-        />
-        <TextField
-          label="Namespace"
-          description="Namespace назначения в кластере (destination.namespace)."
-          isRequired
-          placeholder="my-namespace"
-          value={namespace}
-          onChange={setNamespace}
-          errorText={showErrors && !namespace ? "Обязательное поле" : undefined}
-        />
-        <p className="text-xs text-gray-500">
-          Команда <span className="font-medium text-gray-700">{editing ? draft?.team : activeTeam}</span> · версия{" "}
-          <span className="font-medium text-gray-700">{effectiveVersion}</span>
-          {!editing && " (последняя)"}
-          {identity && (
-            <>
-              {" "}· идентификатор:{" "}
-              <span className="font-medium text-gray-700">{identityName || "—"}</span> (из имени Gateway)
-            </>
-          )}
-        </p>
-      </Card>
       )}
 
-      <Card>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-700">Values</h2>
-          <div className="flex gap-1 rounded-md bg-gray-100 p-0.5 text-xs">
-            <button
-              onClick={() => switchMode("form")}
-              className={`rounded px-2 py-1 ${mode === "form" ? "bg-surface shadow" : "text-gray-500"}`}
-            >
-              Form
-            </button>
-            <button
-              onClick={() => switchMode("raw")}
-              className={`rounded px-2 py-1 ${mode === "raw" ? "bg-surface shadow" : "text-gray-500"}`}
-            >
-              Raw YAML
-            </button>
-          </div>
-        </div>
-
-        {mode === "form" ? (
-          schema ? (
-            <SchemaForm
-              schema={schema}
-              value={values}
-              onChange={setValues}
-              view={orderView}
-              errors={clientErrors}
-              showErrors={showErrors}
-            />
-          ) : (
-            <p className="text-sm text-gray-500">
-              No schema for this version — switch to Raw YAML.
-            </p>
-          )
-        ) : (
-          <div className="overflow-hidden rounded-md border border-gray-200">
-            <Editor
-              height="320px"
-              defaultLanguage="yaml"
-              theme={monacoTheme}
-              value={raw}
-              onChange={(v) => setRaw(v ?? "")}
-              options={{ minimap: { enabled: false }, fontSize: 13, automaticLayout: true }}
-            />
-          </div>
-        )}
-      </Card>
+      <OrderValuesCard
+        schema={schema}
+        view={orderView}
+        values={values}
+        onValues={setValues}
+        mode={mode}
+        onSwitchMode={switchMode}
+        raw={raw}
+        onRaw={setRaw}
+        errors={clientErrors}
+        showErrors={showErrors}
+      />
 
       {submitErr && (
         <FormErrors
