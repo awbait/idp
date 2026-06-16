@@ -1,0 +1,93 @@
+# Test fixtures for verifying the collector on the kind stand:
+#  - team-a / team-b carry the scan label -> must appear in the snapshot
+#  - other has no label -> must be skipped (proves label filtering)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-a
+  labels:
+    idp.scan: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-b
+  labels:
+    idp.scan: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: other
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: api-sa
+  namespace: team-a
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: team-a
+  labels:
+    app: api
+    tier: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: api }
+  template:
+    metadata:
+      labels: { app: api }
+    spec:
+      serviceAccountName: api-sa
+      containers:
+        - name: api
+          image: registry.k8s.io/pause:3.9
+          ports:
+            - { name: http, containerPort: 8080, protocol: TCP }
+            - { name: grpc, containerPort: 9090, protocol: TCP }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+  namespace: team-b
+  labels:
+    app: db
+spec:
+  serviceName: db
+  replicas: 1
+  selector:
+    matchLabels: { app: db }
+  template:
+    metadata:
+      labels: { app: db }
+    spec:
+      containers:
+        - name: db
+          image: registry.k8s.io/pause:3.9
+          ports:
+            - { name: pg, containerPort: 5432, protocol: TCP }
+---
+# Must NOT appear in the snapshot (namespace has no idp.scan label).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hidden
+  namespace: other
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: hidden }
+  template:
+    metadata:
+      labels: { app: hidden }
+    spec:
+      containers:
+        - name: hidden
+          image: registry.k8s.io/pause:3.9
+          ports:
+            - { containerPort: 1234, protocol: TCP }
