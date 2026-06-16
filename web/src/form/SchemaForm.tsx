@@ -27,6 +27,16 @@ const ValidationCtx = createContext<Validation>({
   mark: () => {},
 });
 
+// Read-only ("ui:readOnly") support with set-once semantics: a field marked
+// readOnly is editable on the create form but locked once the order exists.
+// LockActiveCtx says whether the form honors ui:readOnly at all (true when
+// editing/upgrading a live order; false on the new-order form). LockedCtx marks
+// that we're inside a locked subtree, so a locked object/array disables all its
+// descendants too.
+const LockActiveCtx = createContext<boolean>(false);
+const LockedCtx = createContext<boolean>(false);
+const isReadOnly = (s: Schema) => s["ui:readOnly"] === true;
+
 function emptyVal(v: unknown): boolean {
   return v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
 }
@@ -237,6 +247,7 @@ export function SchemaForm({
   view,
   errors,
   showErrors,
+  lockReadOnly = false,
 }: {
   schema: Schema;
   value: Values;
@@ -244,6 +255,9 @@ export function SchemaForm({
   view?: View;
   errors?: Map<string, string>;
   showErrors?: boolean;
+  // Honor ui:readOnly fields as disabled (set on edit/upgrade of a live order;
+  // leave false on the create form so the field can be set once).
+  lockReadOnly?: boolean;
 }) {
   const [touched, setTouched] = useState<Set<string>>(new Set());
   const mark = useCallback(
@@ -261,7 +275,9 @@ export function SchemaForm({
   }
   return (
     <ValidationCtx.Provider value={validation}>
-      <ObjectFields schema={s} root={root} value={value} onChange={onChange} view={view} path="" />
+      <LockActiveCtx.Provider value={lockReadOnly}>
+        <ObjectFields schema={s} root={root} value={value} onChange={onChange} view={view} path="" />
+      </LockActiveCtx.Provider>
     </ValidationCtx.Provider>
   );
 }
@@ -344,8 +360,13 @@ function Field({
   hideLabel?: boolean;
 }) {
   const validation = useContext(ValidationCtx);
+  const lockActive = useContext(LockActiveCtx);
+  const ancestorLocked = useContext(LockedCtx);
   const s = deref(schema, root);
   if (isHidden(s)) return null;
+  // Locked = inside a locked subtree, or this field is ui:readOnly and the form
+  // honors it (edit/upgrade). Locked objects/arrays lock their whole subtree.
+  const locked = ancestorLocked || (lockActive && isReadOnly(s));
   const label = s.title ?? name;
   const desc = s.description as string | undefined;
   // Inline error for leaf fields: shown once touched or after a submit attempt.
@@ -354,11 +375,13 @@ function Field({
     validation.mark(path);
     onChange(v);
   };
+  // Wrap nested (object/array/variant) renders so descendants inherit the lock.
+  const sub = (node: React.ReactNode) => <LockedCtx.Provider value={locked}>{node}</LockedCtx.Provider>;
 
   if (s["ui:widget"] === "single" && s.type === "array")
-    return <SingleField name={name} schema={s} root={root} required={required} value={value} onChange={onChange} path={path} />;
+    return sub(<SingleField name={name} schema={s} root={root} required={required} value={value} onChange={onChange} path={path} />);
 
-  if (s.oneOf) return <VariantField name={name} schema={s} root={root} required={required} value={value} onChange={onChange} path={path} />;
+  if (s.oneOf) return sub(<VariantField name={name} schema={s} root={root} required={required} value={value} onChange={onChange} path={path} />);
 
   if (s.enum) {
     return (
@@ -366,6 +389,7 @@ function Field({
         label={label}
         description={desc}
         isRequired={required}
+        isDisabled={locked}
         errorText={err}
         hideLabel={hideLabel}
         selectedKey={value != null ? String(value) : (s.default != null ? String(s.default) : null)}
@@ -378,7 +402,7 @@ function Field({
   switch (s.type) {
     case "boolean":
       return (
-        <Checkbox label={label} isRequired={required} isSelected={Boolean(value ?? s.default ?? false)} onChange={(v) => change(v)} />
+        <Checkbox label={label} isRequired={required} isDisabled={locked} isSelected={Boolean(value ?? s.default ?? false)} onChange={(v) => change(v)} />
       );
     case "number":
     case "integer":
@@ -387,6 +411,7 @@ function Field({
           label={label}
           description={desc}
           isRequired={required}
+          isDisabled={locked}
           errorText={err}
           hideLabel={hideLabel}
           type="number"
@@ -395,10 +420,10 @@ function Field({
         />
       );
     case "array":
-      return <ArrayField name={name} schema={s} root={root} required={required} value={value} onChange={onChange} path={path} />;
+      return sub(<ArrayField name={name} schema={s} root={root} required={required} value={value} onChange={onChange} path={path} />);
     case "object":
       if (s.properties)
-        return (
+        return sub(
           <Section label={label} desc={desc} required={required}>
             <ObjectFields
               schema={s}
@@ -408,10 +433,10 @@ function Field({
               view={s["ui:view"] as View | undefined}
               path={path}
             />
-          </Section>
+          </Section>,
         );
       if (s.additionalProperties && typeof s.additionalProperties === "object")
-        return <MapField name={name} label={label} desc={desc} value={value} onChange={onChange} />;
+        return sub(<MapField name={name} label={label} desc={desc} value={value} onChange={onChange} />);
       return null;
     default:
       return (
@@ -419,6 +444,7 @@ function Field({
           label={label}
           description={desc}
           isRequired={required}
+          isDisabled={locked}
           errorText={err}
           hideLabel={hideLabel}
           placeholder={s.default != null ? String(s.default) : undefined}
@@ -496,6 +522,7 @@ function VariantField({
   onChange: (v: unknown) => void;
   path?: string;
 }) {
+  const locked = useContext(LockedCtx);
   const options: Schema[] = schema.oneOf.map((o: Schema) => deref(o, root));
   const sel = matchVariant(value, options, root);
   const selected = options[sel];
@@ -504,6 +531,7 @@ function VariantField({
       <div className="flex flex-col gap-3">
         <Select
           label="Вариант"
+          isDisabled={locked}
           selectedKey={String(sel)}
           onSelectionChange={(k) => onChange(seedDefaults(options[Number(k)], root) ?? {})}
           options={options.map((o, i) => ({ id: String(i), label: o.title ?? `Вариант ${i + 1}` }))}
@@ -535,15 +563,18 @@ function ArrayField({
   onChange: (v: unknown) => void;
   path?: string;
 }) {
+  const locked = useContext(LockedCtx);
   const items: unknown[] = Array.isArray(value) ? value : [];
   const itemSchema = deref(schema.items ?? {}, root);
   const isObjectItem = itemSchema.type === "object" && itemSchema.properties;
   const minItems = typeof schema.minItems === "number" ? schema.minItems : 0;
-  const atMin = items.length <= minItems; // can't remove below the schema minimum
+  // Can't remove below the schema minimum, and not at all when the array is locked.
+  const noRemove = items.length <= minItems || locked;
+  const removeHint = locked ? "Только для чтения" : "Нельзя удалить последний элемент";
   const update = (next: unknown[]) => onChange(next.length ? next : undefined);
   const setAt = (i: number, v: unknown) => update(items.map((x, idx) => (idx === i ? v : x)));
   const removeAt = (i: number) => {
-    if (atMin) return;
+    if (noRemove) return;
     update(items.filter((_, idx) => idx !== i));
   };
 
@@ -571,12 +602,12 @@ function ArrayField({
                     </span>
                   </AriaButton>
                 </Heading>
-                <Hint text={atMin ? "Нельзя удалить последний элемент" : "Удалить"}>
+                <Hint text={noRemove ? removeHint : "Удалить"}>
                   <Button
                     variant="danger"
                     aria-label="Удалить"
-                    className={atMin ? "opacity-50" : ""}
-                    onPress={() => !atMin && removeAt(i)}
+                    className={noRemove ? "opacity-50" : ""}
+                    onPress={() => !noRemove && removeAt(i)}
                   >
                     <IconTrash size={16} stroke={1.8} />
                   </Button>
@@ -611,12 +642,12 @@ function ArrayField({
                   hideLabel
                 />
               </div>
-              <Hint text={atMin ? "Нельзя удалить последний элемент" : "Удалить"}>
+              <Hint text={noRemove ? removeHint : "Удалить"}>
                 <Button
                   variant="danger"
                   aria-label="Удалить"
-                  className={atMin ? "opacity-50" : ""}
-                  onPress={() => !atMin && removeAt(i)}
+                  className={noRemove ? "opacity-50" : ""}
+                  onPress={() => !noRemove && removeAt(i)}
                 >
                   <IconX size={16} stroke={2} />
                 </Button>
@@ -625,11 +656,13 @@ function ArrayField({
           ),
         )}
 
-        <div>
-          <Button variant="secondary" onPress={() => update([...items, newArrayItem(schema, root)])}>
-            + Добавить
-          </Button>
-        </div>
+        {!locked && (
+          <div>
+            <Button variant="secondary" onPress={() => update([...items, newArrayItem(schema, root)])}>
+              + Добавить
+            </Button>
+          </div>
+        )}
       </div>
     </Section>
   );
@@ -707,6 +740,7 @@ function MapField({
   value: unknown;
   onChange: (v: unknown) => void;
 }) {
+  const locked = useContext(LockedCtx);
   const init =
     value && typeof value === "object" && !Array.isArray(value)
       ? Object.entries(value as Values).map(([k, v]) => ({ k, v: String(v) }))
@@ -727,13 +761,15 @@ function MapField({
         {rows.map((r, i) => (
           <div key={i} className="flex items-center gap-2">
             <input
-              className="w-1/3 rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-brand-500"
+              disabled={locked}
+              className="w-1/3 rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
               placeholder="ключ"
               value={r.k}
               onChange={(e) => push(rows.map((x, idx) => (idx === i ? { ...x, k: e.target.value } : x)))}
             />
             <input
-              className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-brand-500"
+              disabled={locked}
+              className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
               placeholder="значение"
               value={r.v}
               onChange={(e) => push(rows.map((x, idx) => (idx === i ? { ...x, v: e.target.value } : x)))}
@@ -741,17 +777,20 @@ function MapField({
             <Button
               variant="danger"
               aria-label="Удалить"
+              isDisabled={locked}
               onPress={() => push(rows.filter((_, idx) => idx !== i))}
             >
               <IconX size={16} stroke={2} />
             </Button>
           </div>
         ))}
-        <div>
-          <Button variant="secondary" onPress={() => push([...rows, { k: "", v: "" }])}>
-            + Добавить
-          </Button>
-        </div>
+        {!locked && (
+          <div>
+            <Button variant="secondary" onPress={() => push([...rows, { k: "", v: "" }])}>
+              + Добавить
+            </Button>
+          </div>
+        )}
       </div>
     </Section>
   );

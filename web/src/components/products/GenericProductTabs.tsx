@@ -430,6 +430,7 @@ function ItemModal({
                   view={view}
                   errors={errors}
                   showErrors={showErrors}
+                  lockReadOnly={initial !== null}
                 />
                 {err && <p className="mt-3 text-xs text-red-600">{err}</p>}
               </div>
@@ -598,7 +599,7 @@ function ViewFormModal({
                 ) : error ? (
                   <ErrorBox error={error} />
                 ) : schema ? (
-                  <SchemaForm schema={schema} value={value} onChange={setValue} view={view} />
+                  <SchemaForm schema={schema} value={value} onChange={setValue} view={view} lockReadOnly />
                 ) : (
                   <p className="text-sm text-gray-500">Нет схемы.</p>
                 )}

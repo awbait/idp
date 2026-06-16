@@ -75,6 +75,7 @@ export function TextField({
   // array rows where the field's meaning comes from the surrounding list.
   hideLabel?: boolean;
   isRequired?: boolean;
+  isDisabled?: boolean;
   type?: string;
   placeholder?: string;
 }) {
@@ -84,6 +85,7 @@ export function TextField({
       value={value}
       onChange={onChange}
       isRequired={rest.isRequired}
+      isDisabled={rest.isDisabled}
       isInvalid={invalid}
       aria-label={hideLabel ? label : undefined}
       className="flex flex-col gap-1"
@@ -98,7 +100,7 @@ export function TextField({
         type={rest.type}
         placeholder={rest.placeholder}
         onBlur={onBlur}
-        className={`rounded-md border px-2 py-1.5 text-sm outline-none focus:ring-1 ${
+        className={`rounded-md border px-2 py-1.5 text-sm outline-none focus:ring-1 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 ${
           invalid
             ? "border-red-500 focus:border-red-500 focus:ring-red-500"
             : "border-gray-300 focus:border-brand-500 focus:ring-brand-500"
@@ -147,6 +149,7 @@ export function Select<T extends string>({
   onSelectionChange,
   options,
   isRequired,
+  isDisabled,
   errorText,
   hideLabel,
   placeholder = "Выберите…",
@@ -157,6 +160,7 @@ export function Select<T extends string>({
   onSelectionChange: (key: T) => void;
   options: { id: T; label: string }[];
   isRequired?: boolean;
+  isDisabled?: boolean;
   errorText?: string;
   // Render without a visible label (label becomes the aria-label).
   hideLabel?: boolean;
@@ -170,6 +174,7 @@ export function Select<T extends string>({
       selectedKey={selectedKey}
       onSelectionChange={(k) => onSelectionChange(k as T)}
       isRequired={isRequired}
+      isDisabled={isDisabled}
       isInvalid={invalid}
       placeholder={placeholder}
       aria-label={hideLabel ? label : undefined}
@@ -182,7 +187,7 @@ export function Select<T extends string>({
         </Label>
       )}
       <AriaButton
-        className={`flex items-center justify-between rounded-md border px-2 py-1.5 text-sm outline-none ${
+        className={`flex items-center justify-between rounded-md border px-2 py-1.5 text-sm outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 ${
           invalid ? "border-red-500" : "border-gray-300 focus:border-brand-500"
         }`}
       >

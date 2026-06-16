@@ -9,7 +9,8 @@
         "gateways": {
           "ui:widget": "single",
           "title": "Gateway",
-          "ui:view": { "exclude": ["hpa"] }
+          "$comment": "name = identity: settable on create, locked (ui:readOnly) on edit/upgrade so the deploy identity can't change.",
+          "ui:view": { "exclude": ["hpa"], "overrides": { "name": { "ui:readOnly": true } } }
         }
       }
     },

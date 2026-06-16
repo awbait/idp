@@ -111,6 +111,7 @@ export function OrderValuesCard({
   onRaw,
   errors,
   showErrors = false,
+  lockReadOnly = false,
 }: {
   schema: JSONSchema | null;
   view?: View;
@@ -122,6 +123,8 @@ export function OrderValuesCard({
   onRaw: (s: string) => void;
   errors?: Map<string, string>;
   showErrors?: boolean;
+  // Lock ui:readOnly fields (set on edit/upgrade of a live order).
+  lockReadOnly?: boolean;
 }) {
   const { theme } = useTheme();
   const monacoTheme = theme === "light" ? "light" : "vs-dark";
@@ -154,6 +157,7 @@ export function OrderValuesCard({
             view={view}
             errors={errors}
             showErrors={showErrors}
+            lockReadOnly={lockReadOnly}
           />
         ) : (
           <p className="text-sm text-gray-500">No schema for this version - switch to Raw YAML.</p>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { TabList, TabPanel, Tabs } from "react-aria-components";
 import yaml from "js-yaml";
 import { api, HttpError } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
@@ -10,9 +11,16 @@ import { FormErrors } from "../components/FormErrors";
 import { NotFound } from "../components/NotFound";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { OrderMetaCard, OrderValuesCard } from "../components/OrderFormParts";
+import { DetailTab } from "./requestDetailParts";
+import {
+  GenericInfoActions,
+  GenericListTab,
+  type PersistValues,
+} from "../components/products/GenericProductTabs";
+import { actionViews, productTabs } from "../components/products/genericView";
 import { chartLabel, findCatalogChart, useCatalog } from "../app/CatalogContext";
 import { isNewer, upgradeTargets } from "../lib/semver";
-import type { ChangelogEntry, FieldError } from "../api/types";
+import type { ChangelogEntry, FieldError, OrderRequest, ViewDocument } from "../api/types";
 import { pruneEmpty, collectErrors } from "../form/SchemaForm";
 
 type Values = Record<string, unknown>;
@@ -121,12 +129,13 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
       if (!project || !name || !effectiveVersion) return null;
       const schema = await api.getSchema(project, name, effectiveVersion);
       const ui = await api.getChartView(project, name).catch(() => null);
-      return { schema, view: ui?.views?.order };
+      return { schema, doc: ui, view: ui?.views?.order };
     },
     [project, name, effectiveVersion],
   );
   const schema = form?.schema ?? null;
   const orderView = form?.view;
+  const viewDoc = form?.doc ?? null;
   // A view may declare which values field supplies the deploy identity
   // (service_name). When set, we source the name from the form instead of a
   // separate "Service name" input — e.g. the gateway's own name field.
@@ -438,7 +447,19 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
         onRaw={setRaw}
         errors={clientErrors}
         showErrors={showErrors}
+        lockReadOnly={upgrade}
       />
+
+      {/* На обновлении даём редактировать и остальные секции (вкладки + действия),
+          как на странице продукта, но в одни и те же values и одним MR. */}
+      {upgrade && schema && viewDoc && draft && (
+        <UpgradeExtras
+          request={{ ...draft, chart_version: targetVersion, values_yaml: yaml.dump(pruneEmpty(values)) }}
+          doc={viewDoc}
+          schema={schema as Record<string, any>}
+          onValues={setValues}
+        />
+      )}
 
       {submitErr && (
         <FormErrors
@@ -477,5 +498,65 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
         </Button>
       </div>
     </div>
+  );
+}
+
+// UpgradeExtras renders the product's other sections (list tabs + the info-menu
+// actions) on the upgrade page, so listeners/routes/resources can be edited too,
+// not just the order form. It edits the same local values via persist (no API)
+// and reuses the exact product-page components, so it matches the live page; the
+// whole thing is submitted as one upgrade MR by the parent.
+function UpgradeExtras({
+  request,
+  doc,
+  schema,
+  onValues,
+}: {
+  request: OrderRequest;
+  doc: ViewDocument;
+  schema: Record<string, any>;
+  onValues: (v: Values) => void;
+}) {
+  const tabs = productTabs(doc);
+  const persist: PersistValues = (v) => onValues(v as Values);
+  const hasInfoActions = actionViews(doc, "info").some((a) => doc.views?.[a.view]);
+  if (tabs.length === 0 && !hasInfoActions) return null;
+  return (
+    <Card className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-gray-700">Конфигурация</h2>
+        <GenericInfoActions
+          request={request}
+          doc={doc}
+          onChanged={() => {}}
+          schema={schema}
+          persist={persist}
+        />
+      </div>
+      {tabs.length > 0 && (
+        <Tabs>
+          <TabList aria-label="Разделы" className="flex gap-1 border-b border-gray-200">
+            {tabs.map((t) => (
+              <DetailTab key={t.id} id={t.id}>
+                {t.title ?? t.id}
+              </DetailTab>
+            ))}
+          </TabList>
+          {tabs.map((t) => (
+            <TabPanel key={t.id} id={t.id} className="pt-4 outline-none">
+              <GenericListTab
+                request={request}
+                modifiable
+                reload={() => {}}
+                doc={doc}
+                tab={t}
+                schema={schema}
+                persist={persist}
+              />
+            </TabPanel>
+          ))}
+        </Tabs>
+      )}
+    </Card>
   );
 }
