@@ -237,9 +237,19 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<null | "save" | "submit" | "approve" | "reject" | "withdraw">(null);
   const [rejectComment, setRejectComment] = useState("");
-  // Модалка «вышла новая версия» показывается при входе на страницу (когда
-  // viewOutdated станет известен) и до первого закрытия.
-  const [outdatedDismissed, setOutdatedDismissed] = useState(false);
+  // Модалка «вышла новая версия» показывается один раз на каждую новую версию
+  // из Harbor: в localStorage запоминаем (per-user, per-chart) версию, на которой
+  // пользователь закрыл модалку; при следующей версии покажем снова.
+  const seenKey = user ? `chart-version-nudge:${user.sub}:${project}/${name}` : null;
+  const [seenVersion, setSeenVersion] = useState<string | null>(null);
+  useEffect(() => {
+    if (!seenKey) return;
+    try {
+      setSeenVersion(localStorage.getItem(seenKey));
+    } catch {
+      /* localStorage недоступен - покажем модалку как обычно */
+    }
+  }, [seenKey]);
   const { success, error } = useToast();
   // Отклонённый черновик: при входе на страницу один раз показываем причину тостом.
   const firedReject = useRef(false);
@@ -421,6 +431,18 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
     !!pub.approved_view_version &&
     !!version &&
     version !== pub.approved_view_version;
+  // Модалку показываем, только если эту версию пользователь ещё не закрывал.
+  const showOutdated = viewOutdated && version !== seenVersion;
+  function dismissOutdated() {
+    setSeenVersion(version);
+    if (seenKey) {
+      try {
+        localStorage.setItem(seenKey, version);
+      } catch {
+        /* нет localStorage - переживём, просто не запомним показ */
+      }
+    }
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -430,22 +452,49 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {/* При статусе «Согласовано» показываем только «Опубликовано» (статус-чип
                 его бы дублировал). В остальных статусах показываем статус черновика. */}
-            {pub.status !== "APPROVED" && (
-              <span className="group/status relative inline-flex">
+            {pub.status !== "APPROVED" &&
+              (pub.status === "REJECTED" && pub.review_comment ? (
+                // Чип отклонения кликабелен: причину показываем в модалке.
+                <DialogTrigger>
+                  <AriaButton
+                    className={`inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs font-medium outline-none transition-[filter] hover:brightness-95 focus-visible:ring-2 focus-visible:ring-brand-500 ${st.cls}`}
+                  >
+                    <st.Icon size={13} stroke={1.8} />
+                    {st.label}
+                  </AriaButton>
+                  <ModalOverlay
+                    isDismissable
+                    className="fixed inset-0 z-10 flex items-start justify-center bg-black/20 p-4 pt-24 entering:animate-in entering:fade-in"
+                  >
+                    <Modal className="w-full max-w-lg rounded-lg border border-slate-200 bg-surface shadow-xl">
+                      <Dialog className="outline-none">
+                        {({ close }) => (
+                          <div className="flex flex-col items-center gap-3 p-5 text-center">
+                            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500">
+                              <IconAlertCircle size={26} stroke={1.8} />
+                            </span>
+                            <Heading slot="title" className="text-base font-semibold text-slate-800">
+                              Публикация отклонена
+                            </Heading>
+                            <p className="text-sm text-slate-600">
+                              Администратор отклонил черновик. Причина:
+                            </p>
+                            <p className="w-full whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-700">
+                              {pub.review_comment}
+                            </p>
+                            <Button onPress={close}>Понятно</Button>
+                          </div>
+                        )}
+                      </Dialog>
+                    </Modal>
+                  </ModalOverlay>
+                </DialogTrigger>
+              ) : (
                 <Chip className={st.cls}>
                   <st.Icon size={13} stroke={1.8} />
                   {st.label}
                 </Chip>
-                {pub.status === "REJECTED" && pub.review_comment && (
-                  <span
-                    role="tooltip"
-                    className="pointer-events-none invisible absolute bottom-full left-0 z-50 mb-1.5 w-max max-w-xs rounded-md border border-slate-200 bg-surface px-2.5 py-1.5 text-xs font-normal text-slate-700 opacity-0 shadow-lg transition-opacity duration-150 group-hover/status:visible group-hover/status:opacity-100"
-                  >
-                    Причина: {pub.review_comment}
-                  </span>
-                )}
-              </span>
-            )}
+              ))}
             {/* Действующая согласованная форма заказа. При «Согласовано» это
                 единственный «зелёный» чип; при черновике/ревью/отклонении показывает,
                 что старая форма заказа всё ещё работает. */}
@@ -536,8 +585,8 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
       {/* О новой версии чарта сообщаем модалкой при входе (один раз, до закрытия),
           а не постоянным баннером. */}
       <ModalOverlay
-        isOpen={viewOutdated && !outdatedDismissed}
-        onOpenChange={(open) => !open && setOutdatedDismissed(true)}
+        isOpen={showOutdated}
+        onOpenChange={(open) => !open && dismissOutdated()}
         isDismissable
         className="fixed inset-0 z-10 flex items-start justify-center bg-black/20 p-4 pt-24 entering:animate-in entering:fade-in"
       >

@@ -274,9 +274,15 @@ export function Layout() {
             <IconActivity size={20} stroke={1.7} />
           </Link>
           <ThemeMenu />
-          <IconButton label="Документация">
+          <Link
+            to="/docs"
+            aria-label="Документация"
+            title="Документация"
+            aria-current={pathname.startsWith("/docs") ? "page" : undefined}
+            className="rounded-md p-2 text-slate-500 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-brand-500 aria-[current=page]:bg-brand-50 aria-[current=page]:text-brand-700"
+          >
             <IconHelp size={20} stroke={1.7} />
-          </IconButton>
+          </Link>
           <IconButton label="Уведомления">
             <IconBell size={20} stroke={1.7} />
           </IconButton>
