@@ -227,33 +227,18 @@ export function RequestDetailPage() {
         </div>
       )}
       {showUpgradeNudge && (
-        <div className="flex items-start justify-between gap-3 rounded-md border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
-          <div className="flex items-start gap-2">
-            <IconArrowUpCircle size={18} stroke={1.8} className="mt-0.5 shrink-0 text-brand-600" />
-            <div>
-              <p className="font-medium">Доступно обновление продукта до версии {upgradeTo}</p>
-              <p className="mt-0.5 text-brand-700">
-                Заказ развёрнут на версии {r.chart_version}. Автор согласовал форму для {upgradeTo} - откройте форму
-                на новой версии, проверьте значения и обновите.
-              </p>
-            </div>
+        <div className="flex items-center justify-between gap-3 rounded-md border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
+          <div className="flex items-center gap-2">
+            <IconArrowUpCircle size={18} stroke={1.8} className="shrink-0 text-brand-600" />
+            <p className="font-medium">Доступно обновление продукта до версии {upgradeTo}</p>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <button
-              onClick={() => setUpgradeOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-on-accent outline-none hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500"
-            >
-              <IconArrowUpCircle size={14} stroke={1.8} />
-              Обновить
-            </button>
-            <button
-              onClick={dismissUpgradeNudge}
-              aria-label="Скрыть"
-              className="rounded-md p-1 text-brand-400 outline-none hover:bg-brand-100 hover:text-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500"
-            >
-              <IconX size={16} stroke={2} />
-            </button>
-          </div>
+          <button
+            onClick={dismissUpgradeNudge}
+            aria-label="Скрыть"
+            className="shrink-0 rounded-md p-1 text-brand-400 outline-none hover:bg-brand-100 hover:text-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500"
+          >
+            <IconX size={16} stroke={2} />
+          </button>
         </div>
       )}
       <div className="flex items-start justify-between gap-3">
