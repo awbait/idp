@@ -177,7 +177,7 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
       return (
         <NotFound
           title="Обновление недоступно"
-          message="Этой версии для обновления не существует или она не разрешена. Доступны только версии выше текущей, согласованные автором."
+          message="Этой версии для обновления не существует или она не разрешена."
           backTo={id ? `/requests/${id}` : "/requests"}
           backLabel="К заказу"
         />

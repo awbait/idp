@@ -417,7 +417,7 @@ function UpgradeDialog({
                 </Heading>
                 <p className="mt-1 text-sm text-gray-600">
                   Текущая версия: <span className="font-medium text-gray-800">{currentVersion}</span>.
-                  Выберите версию для обновления (доступны только версии выше текущей).
+                  Выберите версию для обновления.
                 </p>
               </div>
               <Select
