@@ -48,6 +48,14 @@ func isUniqueViolation(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
+// isInvalidUUID reports a Postgres invalid_text_representation error (22P02),
+// raised when a malformed UUID is compared against a uuid column. A value that
+// cannot be a valid id can never match a row, so we treat it as "not found".
+func isInvalidUUID(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "22P02"
+}
+
 func (p *Postgres) CreateRequest(ctx context.Context, r *models.Request) error {
 	if r.Version == 0 {
 		r.Version = 1
@@ -74,7 +82,7 @@ func scanRequest(row pgx.Row) (*models.Request, error) {
 	err := row.Scan(&r.ID, &r.CreatedBy, &r.CreatedByName, &r.Team, &r.ChartProject, &r.ChartName,
 		&r.ChartVersion, &r.ServiceName, &r.DisplayName, &r.Cluster, &r.Namespace, &r.ValuesYAML, &r.Status, &r.ArgoCDAppName,
 		&r.Version, &r.CreatedAt, &r.UpdatedAt, &r.DeletedAt, &r.Drifted, &r.DriftDetail, &r.Imported)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) || isInvalidUUID(err) {
 		return nil, models.ErrNotFound
 	}
 	if err != nil {

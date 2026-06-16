@@ -18,6 +18,8 @@ import { ProductPage } from "./pages/ProductPage";
 import { ChartManagePage } from "./pages/ChartManagePage";
 import { AdminPublicationsPage } from "./pages/AdminPublicationsPage";
 import { StatusPage } from "./pages/StatusPage";
+import { DocsPage } from "./pages/DocsPage";
+import { NotFound } from "./components/NotFound";
 
 const router = createBrowserRouter([
   {
@@ -37,8 +39,13 @@ const router = createBrowserRouter([
       { path: "requests/:id", element: <RequestDetailPage /> },
       { path: "applications", element: <ApplicationsPage /> },
       { path: "status", element: <StatusPage /> },
+      { path: "*", element: <NotFound /> },
     ],
   },
+  // Docs open standalone (no portal sidebar/topbar); they have a "Портал"
+  // button to return. Kept outside the Layout route on purpose.
+  { path: "/docs", element: <DocsPage /> },
+  { path: "/docs/:slug", element: <DocsPage /> },
 ]);
 
 createRoot(document.getElementById("root")!).render(

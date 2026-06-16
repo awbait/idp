@@ -19,6 +19,7 @@ import { api, HttpError } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { canModify, useUser } from "../auth/UserContext";
 import { Card, ErrorBox, Spinner } from "../components/ui";
+import { NotFound } from "../components/NotFound";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { StatusBadge } from "../components/StatusBadge";
 import { Breadcrumbs } from "../components/Breadcrumbs";
@@ -68,6 +69,15 @@ export function RequestDetailPage() {
   }, [id]);
 
   if (loading) return <Spinner />;
+  if (error instanceof HttpError && error.status === 404)
+    return (
+      <NotFound
+        title="Заказ не найден"
+        message="Заказ удалён или такого идентификатора не существует."
+        backTo="/requests"
+        backLabel="К моим заказам"
+      />
+    );
   if (error) return <ErrorBox error={error} />;
   if (!data) return null;
 
