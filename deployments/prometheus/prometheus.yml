@@ -1,0 +1,22 @@
+# Prometheus scrape config for the IDP portal.
+# The portal exposes /metrics (promhttp) on its HTTP port. Two targets cover both
+# run modes: `host.docker.internal:8080` for the dev loop (portal from source via
+# `make run`) and `portal:8080` for the full containerized stack (`make up`).
+# Whichever portal is not running simply reports `up=0`; the console_* series come
+# from the live one.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: idp-portal
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:8080
+          - portal:8080
+
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090

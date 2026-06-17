@@ -1,0 +1,14 @@
+apiVersion: 1
+
+# Load dashboards baked into the image from /var/lib/grafana/dashboards.
+providers:
+  - name: idp
+    orgId: 1
+    folder: IDP
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

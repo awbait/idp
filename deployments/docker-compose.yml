@@ -79,3 +79,33 @@ services:
       - portal
     ports:
       - "8088:80"
+
+  # --- Observability (optional): `make obs` starts just these two. ---
+  # Prometheus scrapes the portal's /metrics (host-run via `make run`, or the
+  # `portal` service in the full stack). host-gateway lets the container reach a
+  # host-run portal at host.docker.internal on Linux too.
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  # Grafana with the Prometheus datasource and IDP dashboard auto-provisioned.
+  # Anonymous viewer access is on for the dev stack (no login prompt).
+  grafana:
+    image: grafana/grafana:11.2.0
+    depends_on:
+      - prometheus
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_DEFAULT_THEME: light
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"

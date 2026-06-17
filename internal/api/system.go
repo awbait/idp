@@ -44,15 +44,18 @@ type SystemStatus struct {
 // whole status response.
 const checkTimeout = 5 * time.Second
 
-// handleSystemStatus probes every integration (Harbor/GitLab/ArgoCD via Healthz)
-// and storage backend (store/cache via Ping) in parallel and reports their
-// health. Always returns 200 - the body's `healthy` flag carries the verdict so
-// the page can render partial failures rather than erroring out.
-func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
-	type check struct {
-		name, kind, mode, url string
-		probe                 func(context.Context) error
-	}
+// componentCheck describes one probe on the status page: its identity plus the
+// function that reports whether the component is reachable.
+type componentCheck struct {
+	name, kind, mode, url string
+	probe                 func(context.Context) error
+}
+
+// statusChecks builds the probe set for every integration (Harbor/GitLab/ArgoCD
+// via Healthz, Keycloak via its discovery doc) and storage backend (store/cache
+// via Ping). Shared by the status endpoint and the metrics refresher so both
+// report on exactly the same components.
+func (s *Server) statusChecks() []componentCheck {
 	// Keycloak: in oidc mode hit the issuer's discovery doc (validates reachability);
 	// in dev mode there is no external IdP, so report ok with mode "dev".
 	authProbe := func(ctx context.Context) error {
@@ -74,7 +77,7 @@ func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		return nil
 	}
-	checks := []check{
+	return []componentCheck{
 		{"keycloak", "integration", s.System.AuthMode, issuerBase(s.System.OIDCIssuer), authProbe},
 		{"harbor", "integration", s.System.HarborMode, s.System.HarborURL, s.Harbor.Healthz},
 		{"gitlab", "integration", s.System.GitLabMode, s.System.GitLabURL, s.GitLab.Healthz},
@@ -82,12 +85,20 @@ func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
 		{"store", "storage", s.System.StoreBackend, "", s.Store.Ping},
 		{"cache", "storage", s.System.CacheBackend, "", s.Cache.Ping},
 	}
+}
+
+// handleSystemStatus probes every integration (Harbor/GitLab/ArgoCD via Healthz)
+// and storage backend (store/cache via Ping) in parallel and reports their
+// health. Always returns 200 - the body's `healthy` flag carries the verdict so
+// the page can render partial failures rather than erroring out.
+func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
+	checks := s.statusChecks()
 
 	comps := make([]ComponentStatus, len(checks))
 	var wg sync.WaitGroup
 	for i, c := range checks {
 		wg.Add(1)
-		go func(i int, c check) {
+		go func(i int, c componentCheck) {
 			defer wg.Done()
 			ctx, cancel := context.WithTimeout(r.Context(), checkTimeout)
 			defer cancel()

@@ -1,4 +1,4 @@
-.PHONY: build run run-oidc web infra test vet lint tidy cover hooks up down docker \
+.PHONY: build run run-oidc web infra obs test vet lint tidy cover hooks up down docker \
 	up-upstreams down-upstreams gitlab-seed \
 	stand-up stand-down stand-charts stand-appset stand-token stand-reset seed-import
 
@@ -13,6 +13,12 @@ build:
 # (targets below) so backend/frontend changes hot-reload.
 infra:
 	docker compose -f deployments/docker-compose.yml up -d postgres redis keycloak
+
+# Observability: Prometheus (scrapes the portal's /metrics) + Grafana with the
+# IDP dashboard auto-provisioned. Works with the host-run portal (`make run`).
+# Prometheus on http://localhost:9090, Grafana on http://localhost:3000.
+obs:
+	docker compose -f deployments/docker-compose.yml up -d prometheus grafana
 
 # Backend, zero-infra: in-memory store/cache, fake upstreams, dev-auth (no
 # Keycloak needed). Fastest inner loop; state is lost on restart. Pair with `make web`.
