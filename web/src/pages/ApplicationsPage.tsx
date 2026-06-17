@@ -29,7 +29,7 @@ export function ApplicationsPage() {
             {apps.map((a) => (
               <tr key={a.name} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
                 <td className="px-4 py-2 font-medium text-gray-800">{a.name}</td>
-                <td className="px-4 py-2 text-gray-600">{a.labels?.["idp.team"] ?? "—"}</td>
+                <td className="px-4 py-2 text-gray-600">{a.labels?.["idp.team"] ?? "-"}</td>
                 <td className="px-4 py-2 text-gray-600">{a.cluster}</td>
                 <td className="px-4 py-2 text-gray-600">{a.sync_status}</td>
                 <td className="px-4 py-2">

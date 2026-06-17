@@ -55,7 +55,7 @@ function stripInline(s: string): string {
 }
 
 // Transliterate Cyrillic to Latin for readable slugs. Indexed by code point
-// (0x430..0x44f = а..я) to keep Cyrillic literals out of the source.
+// (0x430..0x44f = the lowercase Cyrillic block) to keep Cyrillic literals out of the source.
 const RU_LATIN = [
   "a", "b", "v", "g", "d", "e", "zh", "z", "i", "y", "k", "l", "m", "n", "o", "p",
   "r", "s", "t", "u", "f", "h", "ts", "ch", "sh", "sch", "", "y", "", "e", "yu", "ya",
@@ -65,7 +65,7 @@ function slugify(text: string): string {
   let out = "";
   for (const ch of text.toLowerCase()) {
     const code = ch.codePointAt(0) ?? 0;
-    if (code === 0x451) out += "e"; // ё
+    if (code === 0x451) out += "e"; // yo
     else if (code >= 0x430 && code <= 0x44f) out += RU_LATIN[code - 0x430];
     else if (/[a-z0-9]/.test(ch)) out += ch;
     else out += "-";

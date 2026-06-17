@@ -16,8 +16,8 @@ export function ChartDetailPage() {
   const { categories, charts: catalogCharts } = useCatalog();
   const { user } = useUser();
   const pub = findCatalogChart(catalogCharts, project, name)?.publication;
-  // «Управление» — владельцам/админам; «Опубликовать» (нет публикации) — любому
-  // участнику команды (группу-владельца он выберет при регистрации).
+  // "Manage" for owners/admins; "Publish" (no publication yet) for any team
+  // member (they pick the owner team at registration).
   const manageable = pub
     ? canModify(user, pub.owner_team)
     : user?.role === "admin" || (user?.teams.length ?? 0) > 0;
@@ -26,20 +26,20 @@ export function ChartDetailPage() {
   if (error) return <ErrorBox error={error} />;
   if (!chart) return null;
 
-  // Профиль показывает СОГЛАСОВАННУЮ версию (как каталог), а не живую из Harbor:
-  // версия, описание, иконка — снапшот на момент approve. Живая последняя нужна
-  // только чтобы понять, что в Harbor вышло обновление (нудж в «Управление»).
+  // The profile shows the APPROVED version (like the catalog), not the live one
+  // from Harbor: version, description, icon are the snapshot at approve time. The
+  // live latest is only used to tell if an update is out in Harbor (nudge to "Manage").
   const liveVersion = chart.latest_version;
   const published = !!pub?.published;
   const version = (published && pub?.approved_view_version) || liveVersion;
   const description = (published && pub?.approved_description) || chart.description;
   const iconUrl = published ? pub?.approved_icon_url : undefined;
-  // Заказ открыт только для публикаций с согласованной order-view; ведёт на
-  // страницу продукта (его список заказов).
+  // Ordering is open only for publications with an approved order-view; it leads
+  // to the product page (its order list).
   const orderable = !!pub?.published && !!pub?.has_order_view;
   const categoryLabel = categories.find((c) => c.id === pub?.category_id)?.label;
-  // В Harbor есть версия новее согласованной — владельцу пора актуализировать
-  // данные (подсветим кнопку «Управление» точкой).
+  // A version newer than the approved one is in Harbor: time for the owner to
+  // refresh the data (mark the "Manage" button with a dot).
   const viewOutdated =
     !!pub?.approved_view_version && isNewer(liveVersion, pub.approved_view_version);
 
@@ -94,7 +94,7 @@ export function ChartDetailPage() {
               <Button>{pub ? "Управление" : "Опубликовать"}</Button>
               {pub && viewOutdated && (
                 <span
-                  title="В Harbor есть новая версия чарта — актуализируйте данные"
+                  title="В Harbor есть новая версия чарта - актуализируйте данные"
                   className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-surface"
                 />
               )}

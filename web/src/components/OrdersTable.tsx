@@ -26,7 +26,7 @@ import { useCatalog } from "../app/CatalogContext";
 import { isNewer } from "../lib/semver";
 import type { OrderRequest, RequestStatus } from "../api/types";
 
-// Живые статусы заказа (create-MR влит): только их можно обновлять до новой версии.
+// Live order statuses (create-MR merged): only these can be upgraded to a new version.
 const LIVE_STATUSES: RequestStatus[] = ["MR_MERGED", "DEPLOYING", "HEALTHY", "DEGRADED", "ARGO_MISSING"];
 
 interface Props {
@@ -67,7 +67,7 @@ export function OrdersTable({ title, filter, orderTo, orderDisabledReason, empty
 
   // Live updates: a global SSE stream pushes a "status_changed" signal on any
   // request status change; we re-fetch the (team-scoped) list. Browser handles
-  // reconnect. One-way server->client — SSE, not WebSockets.
+  // reconnect. One-way server->client - SSE, not WebSockets.
   useEffect(() => {
     const es = new EventSource("/api/v1/requests/events");
     es.addEventListener("status_changed", () => reload());
@@ -79,14 +79,14 @@ export function OrdersTable({ title, filter, orderTo, orderDisabledReason, empty
   const { user } = useUser();
   const navigate = useNavigate();
 
-  // Лейбл категории заказа из публикации его чарта (для колонки «Категория»).
+  // Order's category label from its chart's publication (for the "Category" column).
   const { categories, charts } = useCatalog();
   const categoryOf = (project: string, name: string) => {
     const pub = charts.find((c) => c.project === project && c.name === name)?.publication;
     return categories.find((c) => c.id === pub?.category_id)?.label;
   };
-  // Благословлённая версия новее версии заказа → доступно обновление (только для
-  // живых, недрейфующих заказов).
+  // Approved version newer than the order's version -> an upgrade is available
+  // (only for live, non-drifted orders).
   const upgradeFor = (r: OrderRequest): string | null => {
     if (!LIVE_STATUSES.includes(r.status) || r.drifted) return null;
     const v = charts.find((c) => c.project === r.chart_project && c.name === r.chart_name)
@@ -241,7 +241,7 @@ export function OrdersTable({ title, filter, orderTo, orderDisabledReason, empty
                     </span>
                   </Cell>
                   <Cell className="px-4 py-3 text-left">
-                    {/* A draft can't be opened (no detail) — its name leads to the edit form. */}
+                    {/* A draft can't be opened (no detail) - its name leads to the edit form. */}
                     <span className="flex items-center gap-1.5">
                       <Link
                         to={isDraft ? `/requests/${r.id}/edit` : `/requests/${r.id}`}
@@ -283,7 +283,7 @@ export function OrdersTable({ title, filter, orderTo, orderDisabledReason, empty
                       })()}
                     </span>
                   </Cell>
-                  <Cell className="px-4 py-3 text-left text-slate-600">{r.display_name || "—"}</Cell>
+                  <Cell className="px-4 py-3 text-left text-slate-600">{r.display_name || "-"}</Cell>
                   <Cell className="px-4 py-3 text-left text-slate-500">{r.created_by_name}</Cell>
                   <Cell className="whitespace-nowrap px-4 py-3 text-right text-slate-600">
                     {fmtDateTime(r.created_at)}

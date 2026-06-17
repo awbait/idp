@@ -3,7 +3,7 @@
 //   views   - a library of forms (schema projections); "order" is the order form.
 //   tabs    - product tabs (list tables); each names an array (items pointer) and
 //             the form (a view id) used to add/edit one element, plus ui:table.
-//   actions - placement of form-views into a "Действия" menu (info or tab:<id>).
+//   actions - placement of form-views into an actions menu (info or tab:<id>).
 // A tab may also declare dynamic enums (applyEnums) and computed lookup columns
 // (computeCell). Save-time auto-fill of hidden fields is the chart's job, not the
 // portal's, so there is no prepare/onSave step here.
@@ -170,14 +170,14 @@ export function computeCell(item: any, full: any, col: TableColumn): any {
   return col.path != null ? cellValue(item, col.path) : undefined;
 }
 
-// A view placed into a "Действия" menu, with an optional custom menu label.
+// A view placed into an actions menu, with an optional custom menu label.
 export interface ActionPlacement {
   view: string;
   label?: string;
 }
 
-// actionViews returns the views placed at a given slot: "info" (the Общая
-// информация tab) or "tab:<id>" (a tab's Действия menu).
+// actionViews returns the views placed at a given slot: "info" (the general-info
+// tab) or "tab:<id>" (a tab's actions menu).
 export function actionViews(doc: ViewDocument | null | undefined, placement: string): ActionPlacement[] {
   return (doc?.actions ?? [])
     .filter((a) => a.in === placement)

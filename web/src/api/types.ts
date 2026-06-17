@@ -129,19 +129,19 @@ export interface SystemStatus {
   components: ComponentStatus[];
 }
 
-// --- публикации чартов (каталог с метаданными) ---
+// --- chart publications (catalog with metadata) ---
 
-// Жизненный цикл черновика view-документа публикации.
+// Lifecycle of a publication view-document draft.
 export type PublicationStatus = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED";
 
-// Категория каталога (группировка в каталоге и левом меню).
+// Catalog category (grouping in the catalog and left menu).
 export interface Category {
   id: string; // slug
   label: string;
   sort: number;
 }
 
-// Лёгкая проекция публикации в ответе /catalog (без тел view-документов).
+// Lightweight publication projection in the /catalog response (without view-document bodies).
 export interface PublicationSummary {
   id: string;
   category_id: string;
@@ -149,26 +149,26 @@ export interface PublicationSummary {
   created_by: string;
   created_by_name: string;
   status: PublicationStatus;
-  published: boolean; // есть действующая approved-view
-  has_order_view: boolean; // approved-view содержит views.order (форма заказа)
-  // «Благословлённая» версия чарта: до неё view проверен — заказы с версией ниже
-  // можно обновлять до неё.
+  published: boolean; // has an active approved view
+  has_order_view: boolean; // approved view contains views.order (order form)
+  // "Blessed" chart version: the view is verified up to it - orders on a lower
+  // version can be upgraded to it.
   approved_view_version?: string;
-  // Описание чарта на момент согласования (каталог показывает его, не живое).
+  // Chart description at approval time (catalog shows this, not the live one).
   approved_description?: string;
-  // Иконка чарта на момент согласования (каталог/профиль показывают её, не живую).
-  // Пусто — иконки у согласованной версии нет.
+  // Chart icon at approval time (catalog/profile show this, not the live one).
+  // Empty - the approved version has no icon.
   approved_icon_url?: string;
 }
 
-// Чарт каталога: Harbor-данные + оверлей публикации (может отсутствовать).
+// Catalog chart: Harbor data + publication overlay (may be absent).
 export interface CatalogChart extends Chart {
   publication?: PublicationSummary | null;
-  // Публикация ссылается на чарт, которого (уже) нет в Harbor.
+  // The publication references a chart that is (no longer) in Harbor.
   missing?: boolean;
 }
 
-// Отчёт проверки чарта по пути (POST /charts/check).
+// Chart check report by path (POST /charts/check).
 export interface ChartFileCheck {
   name: string;
   required: boolean;
@@ -186,10 +186,10 @@ export interface CatalogResponse {
   charts: CatalogChart[];
 }
 
-// Вычисляемая колонка через join по ссылке: собрать ключи keys из элемента
-// (сегмент "*" перебирает массив), найти в массиве in строки где row[match]
-// равно ключу, взять row[get]; значения уникальны и склеиваются. Пример:
-// hostname маршрута берётся из listener'а, на который он ссылается по sectionName.
+// Computed column via a join by reference: collect the keys from the element
+// (segment "*" iterates the array), find rows in the `in` array where row[match]
+// equals the key, take row[get]; values are deduped and joined. Example:
+// a route's hostname comes from the listener it references via sectionName.
 export interface ViewColumnLookup {
   keys: string;
   in: string;
@@ -197,54 +197,54 @@ export interface ViewColumnLookup {
   get: string;
 }
 
-// Колонка таблицы списочной вкладки. Либо path — путь к полю внутри элемента
-// массива ("name" или "parentRefs/0/sectionName"), либо lookup — вычисляемое
-// значение. label — заголовок (по умолчанию path).
+// Table column of a list tab. Either path - the path to a field inside the
+// array element ("name" or "parentRefs/0/sectionName"), or lookup - a computed
+// value. label - the header (defaults to path).
 export interface ViewTableColumn {
   path?: string;
   label?: string;
   lookup?: ViewColumnLookup;
 }
 
-// Правило динамического enum: наполнить enum поля элемента из соседнего массива
-// полных values заказа. at — JSON pointer внутри элемента до поля-селектора
-// (числовой сегмент = элемент массива); from — JSON pointer на массив-источник в
-// values; value — имя поля строки источника, дающее значение опции. Пример:
-// parentRefs[].sectionName выбирается из имён listener'ов этого Gateway.
+// Dynamic enum rule: populate an element field's enum from a sibling array in
+// the order's full values. at - JSON pointer inside the element to the selector
+// field (numeric segment = array element); from - JSON pointer to the source
+// array in values; value - the source row field name that yields the option
+// value. Example: parentRefs[].sectionName is picked from this Gateway's listener names.
 export interface ViewEnumRule {
   at: string;
   from: string;
   value: string;
 }
 
-// Вкладка продукта: таблица-список. items — JSON pointer на массив в values
-// заказа; form — id формы из views для добавления/редактирования одного элемента;
-// ui:table — колонки таблицы; enums — динамические enum'ы формы элемента.
+// Product tab: a list table. items - JSON pointer to an array in the order's
+// values; form - id of a form from views for adding/editing a single element;
+// ui:table - table columns; enums - dynamic enums of the element form.
 export interface ViewTab {
   id: string;
   title?: string;
   items: string;
   form: string;
-  // Текст пункта «Добавить ...» в кнопке «Действия» вкладки (по умолчанию
+  // Text of the "Add ..." item in the tab's "Actions" button (defaults to
   // "Добавить <title>").
   addLabel?: string;
   "ui:table"?: ViewTableColumn[];
   enums?: ViewEnumRule[];
 }
 
-// View-документ публикации чарта (бывший /schemas/{chart}.ui.json, теперь в БД,
-// отдаётся бэкендом). Три раздела:
-//   views   — библиотека форм (проекции поверх values.schema.json), включая
-//             обязательную "order" (форма заказа). Сам по себе view не вкладка.
-//   tabs    — вкладки продукта (таблицы-списки), каждая ссылается на массив и форму.
-//   actions — размещение форм-view в кнопке «Действия» (info или tab:<id>).
+// Chart publication view document (formerly /schemas/{chart}.ui.json, now in the
+// DB, served by the backend). Three sections:
+//   views   - form library (projections over values.schema.json), including the
+//             mandatory "order" (order form). A view by itself is not a tab.
+//   tabs    - product tabs (list tables), each referencing an array and a form.
+//   actions - placement of form views in the "Actions" button (info or tab:<id>).
 export interface ViewDocument {
   views?: Record<string, any>;
   tabs?: ViewTab[];
   actions?: { view: string; in: string; label?: string }[];
 }
 
-// Полная публикация (GET/PATCH /publications/*).
+// Full publication (GET/PATCH /publications/*).
 export interface ChartPublication {
   id: string;
   chart_project: string;
@@ -254,14 +254,14 @@ export interface ChartPublication {
   created_by: string;
   created_by_name: string;
   status: PublicationStatus;
-  // Несогласованная смена метаданных: live category_id/owner_team меняются только
-  // на approve, до тех пор предложенные значения живут здесь (пусто — нет правок).
+  // Unapproved metadata change: live category_id/owner_team change only on
+  // approve, until then the proposed values live here (empty - no edits).
   draft_category_id?: string;
   draft_owner_team?: string;
-  view_json?: ViewDocument | null; // черновик
-  approved_view_json?: ViewDocument | null; // активная согласованная версия
-  // Версия чарта, под которую согласован активный view («благословлённая»):
-  // если в Harbor вышла новее — автору пора обновить view.
+  view_json?: ViewDocument | null; // draft
+  approved_view_json?: ViewDocument | null; // active approved version
+  // Chart version the active view is approved for (the "blessed" one):
+  // if a newer one ships in Harbor - the author should update the view.
   approved_view_version?: string;
   approved_icon_url?: string;
   reviewed_by?: string;
@@ -287,7 +287,7 @@ export interface PublicationDetail {
   events: PublicationEvent[] | null;
 }
 
-// Проблема валидации view-документа (path — JSON pointer внутри документа).
+// View-document validation issue (path - JSON pointer inside the document).
 export interface ViewIssue {
   path: string;
   message: string;

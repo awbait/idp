@@ -3,9 +3,9 @@ import { IconPlus, IconShoppingCart } from "@tabler/icons-react";
 import { OrdersTable } from "../components/OrdersTable";
 import { chartLabel, findCatalogChart, useCatalog } from "../app/CatalogContext";
 
-// Страница продукта (= опубликованного чарта): список его заказов + «Заказать».
-// В меню попадают только чарты с согласованной order-view, но прямой переход по
-// URL возможен для любого чарта, тогда заказ просто недоступен.
+// Product page (= a published chart): its orders list + "Order".
+// Only charts with an approved order-view appear in the menu, but a direct URL
+// works for any chart - then ordering is simply unavailable.
 export function ProductPage() {
   const { project = "", name = "" } = useParams();
   const { charts, loading } = useCatalog();
@@ -24,8 +24,8 @@ export function ProductPage() {
     );
   }
 
-  // Заказ доступен при согласованной order-view. Пока каталог грузится, без
-  // кнопки, без ложного «недоступно».
+  // Ordering is available when the order-view is approved. While the catalog
+  // loads, show no button and no false "unavailable".
   const orderableKnown = !!chart;
   const orderable = !!chart?.publication?.published && !!chart?.publication?.has_order_view;
   const orderTo = orderable ? `/catalog/${project}/${name}/order` : undefined;

@@ -3,9 +3,9 @@ import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import type { CatalogChart, Category } from "../api/types";
 
-// Каталог (категории + чарты с оверлеем публикаций) загружается один раз и
-// раздаётся через контекст: из него строятся левое меню, страница каталога и
-// колонка «Категория» в списках заказов.
+// The catalog (categories + charts with a publication overlay) loads once and
+// is shared via context: it drives the left menu, the catalog page, and the
+// "Category" column in order lists.
 interface CatalogState {
   categories: Category[];
   charts: CatalogChart[];
@@ -43,7 +43,7 @@ export function useCatalog() {
   return useContext(CatalogCtx);
 }
 
-// Чарт каталога по координатам (project/name).
+// Catalog chart by coordinates (project/name).
 export function findCatalogChart(
   charts: CatalogChart[],
   project: string,
@@ -52,15 +52,15 @@ export function findCatalogChart(
   return charts.find((c) => c.project === project && c.name === name);
 }
 
-// Чарт попадает в левое меню, когда его публикация согласована и view-документ
-// содержит форму заказа (views.order).
+// A chart appears in the left menu when its publication is approved and the
+// view document contains an order form (views.order).
 export function inMenu(c: CatalogChart): boolean {
   return !!c.publication?.published && !!c.publication?.has_order_view;
 }
 
-// Дружелюбный лейбл чарта для меню/заголовков: "ingress-gateway" → "Ingress
-// Gateway". Постоянное человеческое имя появится в публикации позже; пока —
-// детерминированная косметика.
+// Friendly chart label for menu/headers: "ingress-gateway" -> "Ingress
+// Gateway". A permanent human name will come from the publication later; for
+// now - deterministic cosmetics.
 export function chartLabel(name: string): string {
   return name
     .split(/[-_]/)

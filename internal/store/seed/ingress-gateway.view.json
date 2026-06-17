@@ -1,8 +1,8 @@
 {
-  "$comment": "Presentation document for the ingress-gateway chart. Three sections: views (form projections over values.schema.json, including the required order form), tabs (product list tables), actions (forms placed into the Действия menu). The chart's schema stays the single source of truth for validation; views only pick fields.",
+  "$comment": "Presentation document for the ingress-gateway chart. Three sections: views (form projections over values.schema.json, including the required order form), tabs (product list tables), actions (forms placed into the Actions menu). The chart's schema stays the single source of truth for validation; views only pick fields.",
   "views": {
     "order": {
-      "$comment": "Первичный заказ: naming-теги + ровно один Gateway, без xroutes.",
+      "$comment": "Initial order: naming tags + exactly one Gateway, no xroutes.",
       "identity": "/gateways/0/name",
       "include": ["naming", "gateways"],
       "overrides": {
@@ -15,10 +15,10 @@
       }
     },
     "listener": {
-      "$comment": "Форма одного listener'а Gateway (все поля элемента)."
+      "$comment": "Form for a single Gateway listener (all element fields)."
     },
     "route": {
-      "$comment": "Форма одного route'а: enabled всегда true (скрыт), parentRefs[].gateway подставляется автоматически (скрыт), hostnames скрыт (чарт выводит его из listener'а через parentRefs[].sectionName).",
+      "$comment": "Form for a single route: enabled always true (hidden), parentRefs[].gateway set automatically (hidden), hostnames hidden (the chart derives it from the listener via parentRefs[].sectionName).",
       "exclude": ["enabled", "hostnames"],
       "overrides": {
         "parentRefs": {
@@ -27,7 +27,7 @@
       }
     },
     "resources": {
-      "$comment": "Форма ресурсов istio-proxy у Gateway (gateways[0].resources), скрытых в форме заказа.",
+      "$comment": "Form for the Gateway istio-proxy resources (gateways[0].resources), hidden in the order form.",
       "include": ["gateways"],
       "overrides": {
         "gateways": {
@@ -60,7 +60,7 @@
       "title": "Маршруты",
       "items": "/xroutes",
       "form": "route",
-      "$comment": "enums: sectionName выбирается из имён listener'ов этого Gateway. ui:table Hostnames вычисляется join'ом: по sectionName маршрута берётся hostname соответствующего listener'а (так же, как hostname выводит сам чарт).",
+      "$comment": "enums: sectionName is chosen from this Gateway's listener names. ui:table Hostnames is computed by a join: a route's sectionName maps to the hostname of the matching listener (the same way the chart derives the hostname).",
       "enums": [
         { "at": "/parentRefs/0/sectionName", "from": "/gateways/0/listeners", "value": "name" }
       ],
