@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -91,6 +92,24 @@ func safeReturnTo(p string) string {
 	return p
 }
 
+// resolveReturn places the validated return-to path on the same origin as the
+// post-login base. In split-origin dev (callback served on the API host, SPA on
+// the Vite host) a bare relative path would otherwise resolve against the API
+// origin, which does not serve the SPA. When postLogin is itself relative
+// (single-origin prod) the path is returned unchanged. rt is assumed already
+// validated by safeReturnTo, so the origin is always taken from trusted config.
+func resolveReturn(postLogin, rt string) string {
+	base, err := url.Parse(postLogin)
+	if err != nil || !base.IsAbs() {
+		return rt
+	}
+	ref, err := url.Parse(rt)
+	if err != nil {
+		return rt
+	}
+	return base.ResolveReference(ref).String()
+}
+
 func (o *OIDC) Login(w http.ResponseWriter, r *http.Request) {
 	state := randState()
 	http.SetCookie(w, &http.Cookie{
@@ -156,7 +175,7 @@ func (o *OIDC) Callback(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie("oauth_return"); err == nil && c.Value != "" {
 		if raw, derr := base64.RawURLEncoding.DecodeString(c.Value); derr == nil {
 			if rt := safeReturnTo(string(raw)); rt != "" {
-				dest = rt
+				dest = resolveReturn(o.postLogin, rt)
 			}
 		}
 		// Consume the one-shot cookie regardless of validity.

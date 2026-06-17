@@ -25,3 +25,25 @@ func TestSafeReturnTo(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveReturn(t *testing.T) {
+	cases := []struct {
+		postLogin string
+		rt        string
+		want      string
+	}{
+		// Split-origin dev: return-to path must land on the SPA origin, not the
+		// API origin the callback runs on.
+		{"http://10.10.100.33:5173/", "/", "http://10.10.100.33:5173/"},
+		{"http://10.10.100.33:5173/", "/orders/123", "http://10.10.100.33:5173/orders/123"},
+		{"http://host:5173/", "/orders/123?tab=values", "http://host:5173/orders/123?tab=values"},
+		// Single-origin prod: relative postLogin keeps the path relative.
+		{"/", "/orders/123", "/orders/123"},
+		{"", "/orders/123", "/orders/123"},
+	}
+	for _, c := range cases {
+		if got := resolveReturn(c.postLogin, c.rt); got != c.want {
+			t.Errorf("resolveReturn(%q, %q) = %q, want %q", c.postLogin, c.rt, got, c.want)
+		}
+	}
+}
