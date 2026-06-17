@@ -4,6 +4,9 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"idp/internal/argocd"
 	"idp/internal/auth"
 	"idp/internal/cache"
@@ -15,9 +18,6 @@ import (
 	"idp/internal/publications"
 	"idp/internal/status"
 	"idp/internal/store"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Server holds dependencies for the HTTP API.
@@ -50,7 +50,9 @@ func (s *Server) Router() http.Handler {
 	r.Use(middleware.Recoverer)
 
 	// public
-	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, http.StatusOK, map[string]string{"status": "ok"}) })
+	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
 	r.Get("/ready", s.handleReady)
 	r.Handle("/metrics", promhttp.Handler())
 
@@ -58,7 +60,7 @@ func (s *Server) Router() http.Handler {
 		// auth endpoints (unauthenticated)
 		r.Get("/auth/login", s.Auth.Login)
 		r.Get("/auth/callback", s.Auth.Callback)
-		r.Post("/auth/logout", s.Auth.Logout)
+		r.Get("/auth/logout", s.Auth.Logout)
 
 		// authenticated
 		r.Group(func(r chi.Router) {
@@ -96,8 +98,8 @@ func (s *Server) Router() http.Handler {
 			r.Post("/publications/{id}/validate", s.handleValidatePublication) // live-проверка из конструктора
 			r.Post("/publications/{id}/submit", s.handleSubmitPublication)
 			r.Post("/publications/{id}/withdraw", s.handleWithdrawPublication) // отозвать с согласования
-			r.Post("/publications/{id}/approve", s.handleApprovePublication) // admin
-			r.Post("/publications/{id}/reject", s.handleRejectPublication)   // admin
+			r.Post("/publications/{id}/approve", s.handleApprovePublication)   // admin
+			r.Post("/publications/{id}/reject", s.handleRejectPublication)     // admin
 
 			// requests
 			r.Get("/requests", s.handleListRequests)
