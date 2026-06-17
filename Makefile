@@ -42,7 +42,7 @@ run-oidc:
 
 # Frontend dev server (Vite) on :5173 with live reload; proxies /api -> :8080.
 web:
-	cd web && npm install && npm run dev
+	cd web && bun install && bun run dev
 
 test:
 	go test ./...

@@ -39,7 +39,7 @@ Upstream'ы (Harbor / GitLab / Argo CD) по умолчанию **fake** (in-mem
 
 - Docker + docker compose (Docker Desktop или engine + plugin)
 - Go 1.26+
-- Node.js 22+ (npm)
+- [bun](https://bun.sh) 1.x (фронтенд; npm не используется)
 - `make`, `git`
 
 ## Быстрый старт (dev-loop)
@@ -140,7 +140,7 @@ KinD-стендом. Он тяжёлый (GitLab ~4 ГБ ОЗУ) и **тольк
 SPA на **React + React Aria + Tailwind + Monaco** (Vite, TS) в [`web/`](./web):
 каталог, динамическая форма по `values.schema.json` (+ raw-YAML в Monaco), заказы
 с live-статусом по SSE, страница статуса. Dev-сервер: `make web` (или
-`cd web && npm install && npm run dev`).
+`cd web && bun install && bun run dev`). Пакетный менеджер - **bun** (не npm).
 
 ## Структура
 
