@@ -25,6 +25,9 @@
         "http://10.10.100.33:8080",
         "http://10.10.100.33:5173"
       ],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:5173/##http://10.10.100.33:5173/##http://localhost:8080/##http://10.10.100.33:8080/"
+      },
       "protocolMappers": [
         {
           "name": "groups",
