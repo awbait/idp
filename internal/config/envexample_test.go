@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// TestEnvExampleInSync enforces the CLAUDE.md "Конфигурация" rule: every env var
+// TestEnvExampleInSync enforces the CLAUDE.md config-sync rule: every env var
 // the Config struct reads must be documented in the root .env.example, and the
 // example must not list vars the code no longer reads. config.go is the source
 // of truth; this test is the backstop so the example never drifts.

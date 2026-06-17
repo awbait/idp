@@ -14,7 +14,7 @@ var transitions = map[models.RequestStatus]map[models.RequestStatus]bool{
 	// Once the create MR is merged (the instance exists in Git), the order can be
 	// edited (update -> MR_CREATED) or deleted (-> DELETE_REQUESTED) from any of
 	// MR_MERGED, DEPLOYING, HEALTHY, DEGRADED, ARGO_MISSING. Editing is NOT allowed
-	// from MR_CREATED (a create/update MR is still open — guardOpenMR also blocks it)
+	// from MR_CREATED (a create/update MR is still open - guardOpenMR also blocks it)
 	// nor DRAFT (which updates in place without an MR).
 	models.StatusMRMerged: {
 		models.StatusDeploying:       true,

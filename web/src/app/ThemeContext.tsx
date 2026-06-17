@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
-// Тема оформления: светлая, тёмная, РН (тёмная + жёлтый акцент Роснефти).
-// Значение применяется на <html data-theme>, токены цветов живут в index.css.
+// Color theme: light, dark, RN (dark + Rosneft's yellow accent).
+// The value is applied on <html data-theme>, color tokens live in index.css.
 export type Theme = "light" | "dark" | "rn";
 
 export const THEMES: Theme[] = ["light", "dark", "rn"];
@@ -18,7 +18,7 @@ function readTheme(): Theme {
     const t = localStorage.getItem(STORAGE_KEY) as Theme | null;
     if (t && THEMES.includes(t)) return t;
   } catch {
-    /* localStorage недоступен — светлая по умолчанию */
+    /* localStorage unavailable - default to light */
   }
   return "light";
 }
@@ -39,7 +39,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(STORAGE_KEY, t);
     } catch {
-      /* нет localStorage — тема не переживёт перезагрузку, не критично */
+      /* no localStorage - theme won't survive a reload, not critical */
     }
     setThemeState(t);
   };

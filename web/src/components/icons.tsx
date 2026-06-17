@@ -16,8 +16,8 @@ import {
 // Common shape of a Tabler icon component (size/stroke/className props).
 export type TablerIcon = ComponentType<{ size?: number | string; stroke?: number; className?: string }>;
 
-// Иконка категории каталога по её slug (категории живут в БД и управляются
-// админом; иконки, клиентская косметика с дефолтом для незнакомых slug'ов).
+// Catalog category icon by its slug (categories live in the DB and are managed
+// by an admin; icons are client-side cosmetics with a default for unknown slugs).
 const CATEGORY_ICONS: Record<string, TablerIcon> = {
   platform: IconStack3,
   databases: IconDatabase,

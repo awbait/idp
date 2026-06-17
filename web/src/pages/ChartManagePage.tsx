@@ -60,7 +60,7 @@ import type {
 
 type Values = Record<string, unknown>;
 
-// Шаблон view-документа для нового черновика.
+// View-document template for a new draft.
 const VIEW_TEMPLATE = `{
   "views": {
     "order": {
@@ -78,13 +78,13 @@ const STATUS_LABELS: Record<PublicationStatus, { label: string; cls: string; Ico
   REJECTED: { label: "Отклонено", cls: "bg-red-50 text-red-700", Icon: IconAlertCircle },
 };
 
-// Управление публикацией чарта: метаданные (категория, владелец) + конструктор
-// view-документа (Monaco + live-валидация + предпросмотр форм) + согласование.
+// Chart publication management: metadata (category, owner) + view-document
+// builder (Monaco + live validation + form preview) + review.
 export function ChartManagePage() {
   const { project = "", name = "" } = useParams();
   const { user } = useUser();
 
-  // Полная публикация (list -> match по project: фильтр API ключует по имени).
+  // Full publication (list -> match by project: the API filter keys by name).
   const {
     data: pub,
     loading: pubLoading,
@@ -98,10 +98,10 @@ export function ChartManagePage() {
     [project, name],
   );
 
-  // Полноэкранный спиннер/ошибка — только на первичной загрузке (data ещё нет).
-  // На фоновом перезапросе (reload после смены категории/владельца) useAsync
-  // держит прежний pub, поэтому ManagePublication остаётся смонтированным и не
-  // теряет незасохранённый черновик view.schema.json в редакторе.
+  // Full-screen spinner/error only on the first load (no data yet). On a
+  // background refetch (reload after changing category/owner) useAsync keeps the
+  // previous pub, so ManagePublication stays mounted and does not lose the
+  // unsaved view.schema.json draft in the editor.
   if (pubLoading && !pub) return <Spinner />;
   if (pubError && !pub) return <ErrorBox error={pubError} />;
 
@@ -126,7 +126,7 @@ export function ChartManagePage() {
   );
 }
 
-// Регистрация чарта в каталоге: категория + группа-владелец.
+// Register a chart in the catalog: category + owner team.
 function RegisterCard({
   project,
   name,
@@ -213,12 +213,12 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
   const { user } = useUser();
   const { categories, reload: reloadCatalog } = useCatalog();
   const { theme } = useTheme();
-  // Monaco живёт вне Tailwind-токенов: подбираем его тему под тему портала.
+  // Monaco lives outside Tailwind tokens: match its theme to the portal theme.
   const monacoTheme = theme === "light" ? "light" : "vs-dark";
   const project = pub.chart_project;
   const name = pub.chart_name;
 
-  // Схема чарта (последняя версия), для предпросмотра форм.
+  // Chart schema (latest version), for the form preview.
   const { data: chart } = useAsync(() => api.getChart(project, name), [project, name]);
   const version = chart?.latest_version ?? "";
   const { data: schema } = useAsync(
@@ -231,16 +231,16 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
   const isOwner = canModify(user, pub.owner_team);
   const editable = isOwner && !pending;
 
-  // Черновик view-документа в редакторе.
+  // View-document draft in the editor.
   const [text, setText] = useState(() =>
     pub.view_json ? JSON.stringify(pub.view_json, null, 2) : VIEW_TEMPLATE,
   );
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<null | "save" | "submit" | "approve" | "reject" | "withdraw">(null);
   const [rejectComment, setRejectComment] = useState("");
-  // Модалка «вышла новая версия» показывается один раз на каждую новую версию
-  // из Harbor: в localStorage запоминаем (per-user, per-chart) версию, на которой
-  // пользователь закрыл модалку; при следующей версии покажем снова.
+  // The "new version is out" modal shows once per new version from Harbor: in
+  // localStorage we remember (per-user, per-chart) the version at which the user
+  // dismissed the modal; on the next version we show it again.
   const seenKey = user ? `chart-version-nudge:${user.sub}:${project}/${name}` : null;
   const [seenVersion, setSeenVersion] = useState<string | null>(null);
   useEffect(() => {
@@ -248,11 +248,11 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
     try {
       setSeenVersion(localStorage.getItem(seenKey));
     } catch {
-      /* localStorage недоступен - покажем модалку как обычно */
+      /* localStorage unavailable - show the modal as usual */
     }
   }, [seenKey]);
   const { success, error } = useToast();
-  // Отклонённый черновик: при входе на страницу один раз показываем причину тостом.
+  // Rejected draft: on entering the page, show the reason once as a toast.
   const firedReject = useRef(false);
   useEffect(() => {
     if (firedReject.current) return;
@@ -262,9 +262,9 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
     }
   }, [error, pub.status, pub.review_comment]);
 
-  // Перетаскиваемый разделитель между панелью схем и предпросмотром: доля левой
-  // панели в % (применяется только на lg, где панели бок о бок). Тянем за
-  // разделитель — меняется ширина обеих.
+  // Draggable splitter between the schema panel and the preview: the left
+  // panel's share in % (applied only on lg, where the panels sit side by side).
+  // Drag the splitter and both widths change.
   const splitRef = useRef<HTMLDivElement>(null);
   const [splitPct, setSplitPct] = useState(50);
   const splitDragging = useRef(false);
@@ -295,8 +295,8 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
     };
   }, []);
 
-  // Live-валидация: локальный JSON.parse, сразу, серверная (формат + сверка со
-  // схемой чарта), с дебаунсом.
+  // Live validation: local JSON.parse immediately, server-side (format + check
+  // against the chart schema) debounced.
   const [issues, setIssues] = useState<ViewIssue[]>([]);
   const [syntaxErr, setSyntaxErr] = useState<string | null>(null);
   const parsed = useMemo<ViewDocument | null>(() => {
@@ -317,7 +317,7 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
       api
         .validatePublication(pub.id, parsed)
         .then((r) => setIssues(r.issues))
-        .catch(() => {}); // валидация, best effort, сеть мигнула, не страшно
+        .catch(() => {}); // validation, best effort, a network blip is fine
     }, 500);
     return () => clearTimeout(debounce.current);
   }, [parsed, pub.id]);
@@ -343,8 +343,8 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
     }
   }
 
-  // Категория/владелец правятся в чипах шапки, но это лишь черновик: live-значения
-  // (по ним работают каталог и права) меняются только после согласования.
+  // Category/owner are edited in the header chips, but it is only a draft: the
+  // live values (driving the catalog and permissions) change only after approval.
   async function onMetaChange(patch: { category_id?: string; owner_team?: string }) {
     setErr(null);
     try {
@@ -417,22 +417,22 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
   const ownerOptions = [
     ...new Set([...(user?.teams ?? []), pub.owner_team, pub.draft_owner_team].filter(Boolean) as string[]),
   ];
-  // Несогласованная смена метаданных: предложения, ждущие approve (показываются
-  // админу в карточке согласования).
+  // Unapproved metadata change: proposals awaiting approve (shown to the admin
+  // in the review card).
   const proposals: { label: string; from: string; to: string }[] = [];
   if (pub.draft_category_id)
     proposals.push({ label: "Категория", from: categoryLabel, to: catLabel(pub.draft_category_id) });
   if (pub.draft_owner_team)
     proposals.push({ label: "Владелец", from: pub.owner_team, to: pub.draft_owner_team });
 
-  // В Harbor вышла версия новее той, под которую согласован активный view, —
-  // автору пора обновить view под новую схему.
+  // A version newer than the one the active view was approved for is out in
+  // Harbor: time for the author to update the view for the new schema.
   const viewOutdated =
     !!pub.approved_view_json &&
     !!pub.approved_view_version &&
     !!version &&
     version !== pub.approved_view_version;
-  // Модалку показываем, только если эту версию пользователь ещё не закрывал.
+  // Show the modal only if the user has not dismissed this version yet.
   const showOutdated = viewOutdated && version !== seenVersion;
   function dismissOutdated() {
     setSeenVersion(version);
@@ -440,7 +440,7 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
       try {
         localStorage.setItem(seenKey, version);
       } catch {
-        /* нет localStorage - переживём, просто не запомним показ */
+        /* no localStorage - fine, we just won't remember the dismissal */
       }
     }
   }
@@ -451,11 +451,11 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
         <div>
           <h1 className="text-xl font-semibold">Управление: {chartLabel(name)}</h1>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            {/* При статусе «Согласовано» показываем только «Опубликовано» (статус-чип
-                его бы дублировал). В остальных статусах показываем статус черновика. */}
+            {/* At status "Approved" show only "Published" (the status chip would
+                duplicate it). In other statuses show the draft status. */}
             {pub.status !== "APPROVED" &&
               (pub.status === "REJECTED" && pub.review_comment ? (
-                // Чип отклонения кликабелен: причину показываем в модалке.
+                // The rejection chip is clickable: the reason shows in a modal.
                 <DialogTrigger>
                   <AriaButton
                     className={`inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs font-medium outline-none transition-[filter] hover:brightness-95 focus-visible:ring-2 focus-visible:ring-brand-500 ${st.cls}`}
@@ -496,9 +496,9 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
                   {st.label}
                 </Chip>
               ))}
-            {/* Действующая согласованная форма заказа. При «Согласовано» это
-                единственный «зелёный» чип; при черновике/ревью/отклонении показывает,
-                что старая форма заказа всё ещё работает. */}
+            {/* The active approved order form. At "Approved" it is the only
+                "green" chip; at draft/review/rejected it shows that the old
+                order form still works. */}
             {pub.approved_view_json && (
               <Chip className="bg-emerald-50 text-emerald-700">
                 <IconCheck size={12} stroke={2.5} />
@@ -508,8 +508,8 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
             <Chip className="bg-slate-100 text-slate-600">
               <IconTag size={13} stroke={1.8} className="text-slate-400" />
               <span className="text-slate-400">Версия:</span>
-              {/* В управлении (и только тут) показываем, что в Harbor вышла новая
-                  версия: согласованная -> новая, иначе просто текущая. */}
+              {/* In manage (and only here) we show that a new version is out in
+                  Harbor: approved -> new, otherwise just the current one. */}
               {viewOutdated ? (
                 <span className="inline-flex items-center gap-1">
                   v{pub.approved_view_version}
@@ -583,8 +583,8 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
         )}
       </div>
 
-      {/* О новой версии чарта сообщаем модалкой при входе (один раз, до закрытия),
-          а не постоянным баннером. */}
+      {/* We announce a new chart version with a modal on entry (once, until
+          dismissed), not a persistent banner. */}
       <ModalOverlay
         isOpen={showOutdated}
         onOpenChange={(open) => !open && dismissOutdated()}
@@ -626,7 +626,7 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
       )}
       {err && <p className="text-sm text-red-600">{err}</p>}
 
-      {/* Согласование (admin, pending): смена метаданных + diff view. */}
+      {/* Review (admin, pending): metadata change + diff view. */}
       {pending && isAdmin && (
         <Card className="flex flex-col gap-3 border-amber-200">
           <h2 className="text-sm font-semibold text-slate-800">Согласование</h2>
@@ -674,10 +674,10 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
         </Card>
       )}
 
-      {/* Конструктор: слева документ (+ схема чарта рядом, read-only), справа предпросмотр.
-          Растягивается на всю свободную высоту страницы (без внешнего скролла): редактор
-          и предпросмотр заполняют колонку, скролл — только внутренний. Между панелями —
-          перетаскиваемый разделитель (на lg), доля левой панели = --split. */}
+      {/* Builder: the document on the left (+ chart schema alongside, read-only), preview on
+          the right. Stretches to all the page's free height (no outer scroll): the editor
+          and preview fill the column, scroll is internal only. Between the panels is a
+          draggable splitter (on lg), the left panel's share = --split. */}
       <div
         ref={splitRef}
         className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:gap-0"
@@ -739,7 +739,7 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
                 <FormatHelp />
               </div>
             </TabPanel>
-            {/* Схема чарта, источник полей для include/exclude/overrides; только чтение. */}
+            {/* Chart schema, the source of fields for include/exclude/overrides; read-only. */}
             <TabPanel id="schema" className="flex min-h-0 flex-1 flex-col gap-2 pt-3 outline-none">
               {schema ? (
                 <>
@@ -803,8 +803,8 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
   );
 }
 
-// ProposalChip, янтарный чип «было → стало (на согласовании)»: показывает
-// несогласованную смену категории/владельца там, где правка недоступна.
+// ProposalChip, an amber chip "was -> now (under review)": shows an unapproved
+// category/owner change where editing is not available.
 function ProposalChip({ label, from, to }: { label: string; from: string; to: string }) {
   return (
     <Chip className="bg-amber-50 text-amber-700">
@@ -817,9 +817,9 @@ function ProposalChip({ label, from, to }: { label: string; from: string; to: st
   );
 }
 
-// ChipSelect, селект в форме чипа: компактная правка категории/владельца прямо
-// в шапке, без отдельной карточки метаданных. pending подсвечивает чип янтарём:
-// выбранное значение — предложение, оно станет активным только после согласования.
+// ChipSelect, a select shaped like a chip: compact category/owner editing right
+// in the header, without a separate metadata card. pending tints the chip amber:
+// the selected value is a proposal, it becomes active only after approval.
 function ChipSelect({
   label,
   icon,
@@ -907,9 +907,9 @@ function EditorTab({
   );
 }
 
-// Иконка-подсказка: маленькая «i», показывает короткий текст в тултипе по
-// наведению/фокусу. excludeFromTabOrder, чтобы не мешать навигации стрелками
-// (например, по табам, рядом с которыми она стоит).
+// Info hint: a small "i" that shows short text in a tooltip on hover/focus.
+// excludeFromTabOrder so it does not interfere with arrow-key navigation (e.g.
+// across the tabs it sits next to).
 function InfoHint({ text }: { text: string }) {
   return (
     <TooltipTrigger delay={150} closeDelay={0}>
@@ -930,7 +930,7 @@ function InfoHint({ text }: { text: string }) {
   );
 }
 
-// FormatHelp, справка по заполнению view.schema.json в модальном окне.
+// FormatHelp, a modal with guidance on filling in view.schema.json.
 function FormatHelp() {
   return (
     <DialogTrigger>
@@ -1063,7 +1063,7 @@ function FormatHelp() {
   );
 }
 
-// readPointer достаёт строку из values по JSON pointer (identity предпросмотра).
+// readPointer pulls a string out of values by JSON pointer (preview identity).
 function readPointer(v: unknown, ptr: string): string {
   let cur: any = v;
   for (const seg of ptr.split("/").slice(1)) {
@@ -1074,10 +1074,10 @@ function readPointer(v: unknown, ptr: string): string {
 }
 
 
-// Предпросмотр строится теми же компонентами, что и реальные страницы (форма
-// заказа из OrderFormParts, страница продукта из ProductView), поэтому он один в
-// один совпадает с тем, что увидит пользователь. Значения локальные: правки в
-// предпросмотре идут в стейт (persist), а не в API.
+// The preview is built from the same components as the real pages (the order
+// form from OrderFormParts, the product page from ProductView), so it matches
+// exactly what the user will see. Values are local: edits in the preview go to
+// state (persist), not the API.
 function PreviewPane({
   schema,
   doc,
@@ -1097,8 +1097,8 @@ function PreviewPane({
   const orderView = doc.views?.order as (View & { identity?: string }) | undefined;
   const identity = orderView?.identity;
 
-  // Состояние заказа: общее для формы и страницы продукта (заполнил форму,
-  // переключил вкладку и видишь свой заказ).
+  // Order state: shared between the form and the product page (fill the form,
+  // switch the tab and you see your order).
   const [values, setValues] = useState<Values>({});
   const [displayName, setDisplayName] = useState(label);
   const [serviceName, setServiceName] = useState("");
@@ -1107,7 +1107,7 @@ function PreviewPane({
   const [mode, setMode] = useState<"form" | "raw">("form");
   const [raw, setRaw] = useState("");
 
-  // Та же логика переключения form/raw, что и на странице заказа.
+  // The same form/raw switching logic as on the order page.
   function switchMode(next: "form" | "raw") {
     if (next === mode) return;
     if (next === "raw") {
@@ -1125,8 +1125,8 @@ function PreviewPane({
   const team = user?.teams[0] ?? "team";
   const svcName = (identity ? readPointer(values, identity) : serviceName) || "demo-service";
 
-  // Синтетический заказ: позволяет рендерить предпросмотр реальными компонентами
-  // продукта без сохранённого заказа. id фиктивный, запись идёт через persist.
+  // Synthetic order: lets the preview render with the real product components
+  // without a saved order. The id is fake, writes go through persist.
   const request: OrderRequest = {
     id: "preview",
     created_by: user?.sub ?? "",
@@ -1214,7 +1214,7 @@ function PreviewPane({
 
 // ProductPagePreview shows the order's product page exactly as RequestDetailPage
 // renders it: the same header + meta card layout and the shared ProductView
-// (tabs, tables, "Действия"). Edits write to local state via persist.
+// (tabs, tables, the actions menu). Edits write to local state via persist.
 function ProductPagePreview({
   request,
   doc,

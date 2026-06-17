@@ -6,9 +6,9 @@ import (
 
 	"context"
 
-	"idp/pkg/models"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"idp/pkg/models"
 )
 
 // --- categories ---
@@ -37,7 +37,7 @@ func (p *Postgres) UpdateCategory(ctx context.Context, c *models.Category) error
 func (p *Postgres) DeleteCategory(ctx context.Context, id string) error {
 	tag, err := p.pool.Exec(ctx, `DELETE FROM categories WHERE id=$1`, id)
 	if isFKViolation(err) {
-		return models.ErrConflict // на категорию ссылаются публикации
+		return models.ErrConflict // category is referenced by publications
 	}
 	if err != nil {
 		return err

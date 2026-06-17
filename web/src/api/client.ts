@@ -93,9 +93,9 @@ export const api = {
 
   // catalog
   listCharts: () => req<Chart[]>("GET", "/charts"),
-  // Каталог одним запросом: Harbor-чарты + категории + оверлей публикаций.
+  // Catalog in one request: Harbor charts + categories + publication overlay.
   getCatalog: () => req<CatalogResponse>("GET", "/catalog"),
-  // Проверка чарта по произвольному пути в Harbor (project/name) перед публикацией.
+  // Check a chart by arbitrary Harbor path (project/name) before publishing.
   checkChart: (path: string) => req<ChartCheckResult>("POST", "/charts/check", { path }),
   getChart: (project: string, name: string) =>
     req<Chart>("GET", `/charts/${enc(project)}/${enc(name)}`),
@@ -112,22 +112,22 @@ export const api = {
       "GET",
       `/charts/${enc(project)}/${enc(name)}/changelog/aggregated?limit=${limit}`,
     ),
-  // Активная согласованная view чарта (view-документ из публикации). null —
-  // у чарта нет approved-view (заказ через форму недоступен).
+  // Active approved chart view (view document from the publication). null -
+  // the chart has no approved view (form-based ordering is unavailable).
   getChartView: (project: string, name: string) =>
     req<ViewDocument>("GET", `/charts/${enc(project)}/${enc(name)}/view`).catch((e) => {
       if (e instanceof HttpError && e.status === 404) return null;
       throw e;
     }),
 
-  // категории каталога (CRUD — admin)
+  // catalog categories (CRUD - admin)
   listCategories: () => req<Category[]>("GET", "/categories"),
   createCategory: (c: Category) => req<Category>("POST", "/categories", c),
   updateCategory: (c: Category) =>
     req<Category>("PATCH", `/categories/${enc(c.id)}`, { label: c.label, sort: c.sort }),
   deleteCategory: (id: string) => req<void>("DELETE", `/categories/${enc(id)}`),
 
-  // публикации чартов (метаданные + view-конструктор + согласование)
+  // chart publications (metadata + view builder + approval)
   listPublications: (params?: Record<string, string>) =>
     req<ChartPublication[] | null>("GET", "/publications" + qs(params)).then((r) => r ?? []),
   createPublication: (body: { chart: string; category_id: string; owner_team: string }) =>

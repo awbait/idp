@@ -47,7 +47,7 @@ func TestPublicationLifecycle(t *testing.T) {
 		t.Fatalf("want DRAFT, got %s", p.Status)
 	}
 
-	// дубль чарта запрещён
+	// duplicate chart is forbidden
 	if _, err := svc.Create(ctx, owner, publications.CreateInput{
 		ChartProject: "platform", ChartName: "ingress-gateway",
 		CategoryID: "network", OwnerTeam: "core",
@@ -55,12 +55,12 @@ func TestPublicationLifecycle(t *testing.T) {
 		t.Fatalf("dup create: want conflict, got %v", err)
 	}
 
-	// черновик view
+	// view draft
 	if _, err := svc.Update(ctx, owner, p.ID, publications.UpdateInput{View: viewV1}); err != nil {
 		t.Fatalf("update view: %v", err)
 	}
 
-	// submit → PENDING; правки заморожены
+	// submit -> PENDING; edits frozen
 	p, err = svc.Submit(ctx, owner, p.ID)
 	if err != nil {
 		t.Fatalf("submit: %v", err)
@@ -75,7 +75,7 @@ func TestPublicationLifecycle(t *testing.T) {
 		t.Fatalf("double submit: want conflict, got %v", err)
 	}
 
-	// approve, только админ
+	// approve, admin only
 	if _, err := svc.Approve(ctx, owner, p.ID); !errors.Is(err, publications.ErrForbidden) {
 		t.Fatalf("member approve: want forbidden, got %v", err)
 	}
@@ -90,13 +90,13 @@ func TestPublicationLifecycle(t *testing.T) {
 		t.Fatalf("approved view mismatch: %s", p.ApprovedViewJSON)
 	}
 
-	// активная view доступна
+	// active view is available
 	view, err := svc.ActiveView(ctx, "platform", "ingress-gateway")
 	if err != nil || string(view) != string(viewV1) {
 		t.Fatalf("active view: %v %s", err, view)
 	}
 
-	// новый черновик поверх approved → submit → reject: approved живёт
+	// new draft on top of approved -> submit -> reject: approved survives
 	if _, err := svc.Update(ctx, owner, p.ID, publications.UpdateInput{View: viewV2}); err != nil {
 		t.Fatalf("update v2: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestPublicationLifecycle(t *testing.T) {
 		t.Fatalf("approved view must survive reject: %s", p.ApprovedViewJSON)
 	}
 
-	// правка после reject возвращает в DRAFT
+	// edit after reject returns to DRAFT
 	p, err = svc.Update(ctx, owner, p.ID, publications.UpdateInput{View: viewV2})
 	if err != nil {
 		t.Fatalf("update after reject: %v", err)
@@ -123,7 +123,7 @@ func TestPublicationLifecycle(t *testing.T) {
 		t.Fatalf("want DRAFT after edit, got %s", p.Status)
 	}
 
-	// аудит накопился
+	// audit accumulated
 	evs, err := svc.ListEvents(ctx, p.ID)
 	if err != nil || len(evs) < 6 {
 		t.Fatalf("events: %v n=%d", err, len(evs))
@@ -142,7 +142,7 @@ func TestWithdraw(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// не с согласования, конфликт
+	// not from review, conflict
 	if _, err := svc.Withdraw(ctx, owner, p.ID); !errors.Is(err, models.ErrConflict) {
 		t.Fatalf("withdraw from draft: want conflict, got %v", err)
 	}
@@ -154,12 +154,12 @@ func TestWithdraw(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// чужой, нельзя
+	// foreign, not allowed
 	if _, err := svc.Withdraw(ctx, member("dbaas"), p.ID); !errors.Is(err, publications.ErrForbidden) {
 		t.Fatalf("foreign withdraw: want forbidden, got %v", err)
 	}
 
-	// владелец отзывает → DRAFT, правки снова открыты
+	// owner withdraws -> DRAFT, edits open again
 	p, err = svc.Withdraw(ctx, owner, p.ID)
 	if err != nil {
 		t.Fatalf("withdraw: %v", err)
@@ -176,14 +176,14 @@ func TestCreateRBACAndValidation(t *testing.T) {
 	ctx := context.Background()
 	svc, _ := setup(t)
 
-	// чужая команда
+	// foreign team
 	if _, err := svc.Create(ctx, member("dbaas"), publications.CreateInput{
 		ChartProject: "platform", ChartName: "x", CategoryID: "network", OwnerTeam: "core",
 	}); !errors.Is(err, publications.ErrForbidden) {
 		t.Fatalf("foreign team: want forbidden, got %v", err)
 	}
 
-	// несуществующая категория
+	// nonexistent category
 	var ve *publications.ValidationError
 	if _, err := svc.Create(ctx, member("core"), publications.CreateInput{
 		ChartProject: "platform", ChartName: "x", CategoryID: "nope", OwnerTeam: "core",
@@ -191,7 +191,7 @@ func TestCreateRBACAndValidation(t *testing.T) {
 		t.Fatalf("unknown category: want validation error, got %v", err)
 	}
 
-	// submit без view
+	// submit without view
 	p, err := svc.Create(ctx, member("core"), publications.CreateInput{
 		ChartProject: "platform", ChartName: "x", CategoryID: "network", OwnerTeam: "core",
 	})
@@ -202,7 +202,7 @@ func TestCreateRBACAndValidation(t *testing.T) {
 		t.Fatalf("submit empty view: want validation error, got %v", err)
 	}
 
-	// невалидный JSON в черновике
+	// invalid JSON in the draft
 	if _, err := svc.Update(ctx, member("core"), p.ID, publications.UpdateInput{
 		View: json.RawMessage(`{broken`),
 	}); !errors.As(err, &ve) {
@@ -221,13 +221,13 @@ func TestOwnerTeamHandoff(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// не владелец не может даже предложить передачу
+	// a non-owner cannot even propose a transfer
 	to := "dbaas"
 	if _, err := svc.Update(ctx, member("dbaas"), p.ID, publications.UpdateInput{OwnerTeam: &to}); !errors.Is(err, publications.ErrForbidden) {
 		t.Fatalf("non-owner propose: want forbidden, got %v", err)
 	}
 
-	// предложить можно только в свою команду; админ, в любую
+	// can propose only to your own team; an admin, to any
 	payments := "payments"
 	if _, err := svc.Update(ctx, member("core"), p.ID, publications.UpdateInput{OwnerTeam: &payments}); !errors.Is(err, publications.ErrForbidden) {
 		t.Fatalf("propose to foreign team: want forbidden, got %v", err)
@@ -236,8 +236,8 @@ func TestOwnerTeamHandoff(t *testing.T) {
 		t.Fatalf("admin propose anywhere: %v", err)
 	}
 
-	// владелец предлагает передачу в свою вторую команду: это лишь черновик,
-	// live-владелец не меняется до согласования
+	// owner proposes a transfer to their second team: this is only a draft,
+	// the live owner does not change until approval
 	p, err = svc.Update(ctx, member("core", "dbaas"), p.ID, publications.UpdateInput{OwnerTeam: &to})
 	if err != nil {
 		t.Fatalf("propose handoff: %v", err)
@@ -246,7 +246,7 @@ func TestOwnerTeamHandoff(t *testing.T) {
 		t.Fatalf("handoff must be pending: owner=%s draft=%q", p.OwnerTeam, p.DraftOwnerTeam)
 	}
 
-	// применяется только после согласования
+	// applied only after approval
 	if _, err := svc.Submit(ctx, member("core"), p.ID); err != nil {
 		t.Fatalf("submit: %v", err)
 	}
@@ -259,7 +259,7 @@ func TestOwnerTeamHandoff(t *testing.T) {
 	}
 }
 
-// fakeSchemas — источник схемы/версии для проверки штампа ApprovedViewVersion.
+// fakeSchemas - schema/version source for testing the ApprovedViewVersion stamp.
 type fakeSchemas struct{ version string }
 
 func (f fakeSchemas) LatestSchema(context.Context, string, string) ([]byte, error) { return nil, nil }
@@ -318,7 +318,7 @@ func TestMetadataApproval(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// смена категории не применяется сразу: только черновик
+	// a category change is not applied immediately: only a draft
 	to := "databases"
 	p, err = svc.Update(ctx, owner, p.ID, publications.UpdateInput{CategoryID: &to})
 	if err != nil {
@@ -328,7 +328,7 @@ func TestMetadataApproval(t *testing.T) {
 		t.Fatalf("category must be pending: live=%s draft=%q", p.CategoryID, p.DraftCategoryID)
 	}
 
-	// возврат к согласованному значению снимает черновик
+	// reverting to the approved value clears the draft
 	back := "network"
 	p, err = svc.Update(ctx, owner, p.ID, publications.UpdateInput{CategoryID: &back})
 	if err != nil {
@@ -338,7 +338,7 @@ func TestMetadataApproval(t *testing.T) {
 		t.Fatalf("revert must clear draft, got %q", p.DraftCategoryID)
 	}
 
-	// снова предлагаем и согласуем (без view: согласуются одни метаданные)
+	// propose and approve again (without view: only metadata is approved)
 	if _, err := svc.Update(ctx, owner, p.ID, publications.UpdateInput{CategoryID: &to}); err != nil {
 		t.Fatalf("re-propose: %v", err)
 	}
@@ -365,7 +365,7 @@ func TestCategoriesRBAC(t *testing.T) {
 		t.Fatalf("admin create category: %v", err)
 	}
 
-	// занятая категория не удаляется
+	// a referenced category is not deleted
 	if _, err := svc.Create(ctx, member("core"), publications.CreateInput{
 		ChartProject: "platform", ChartName: "pg", CategoryID: "db", OwnerTeam: "core",
 	}); err != nil {
@@ -394,7 +394,7 @@ func TestSeedIdempotent(t *testing.T) {
 		t.Fatalf("seed must be approved+published, got %s", p.Status)
 	}
 
-	// повторный сид не перетирает правки
+	// a repeat seed does not overwrite edits
 	p.CategoryID = "databases"
 	if err := st.UpdatePublication(ctx, p); err != nil {
 		t.Fatal(err)

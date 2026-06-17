@@ -5,7 +5,7 @@ import { useAsync } from "../hooks/useAsync";
 import { Button, ErrorBox, Spinner } from "../components/ui";
 import type { ComponentStatus } from "../api/types";
 
-// Интервал автообновления статуса, сек.
+// Status auto-refresh interval, seconds.
 const REFRESH_SECONDS = 30;
 
 // Friendly labels for each component the backend reports.
@@ -22,7 +22,7 @@ const BACKEND_LABELS: Record<string, string> = { postgres: "PostgreSQL", redis: 
 export function StatusPage() {
   const { data, error, loading, reload } = useAsync(() => api.getSystemStatus(), []);
 
-  // Автообновление: статус живой, держим страницу свежей без ручного рефреша.
+  // Auto-refresh: status is live, keep the page fresh without manual reload.
   useEffect(() => {
     const t = setInterval(reload, REFRESH_SECONDS * 1000);
     return () => clearInterval(t);

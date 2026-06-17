@@ -24,7 +24,7 @@ type Config struct {
 	PublicURL string `env:"PUBLIC_URL" envDefault:"http://localhost:8080"`
 
 	// Upstream modes. Default to "real" so a misconfigured deployment fails loudly
-	// (missing URL/token) instead of silently serving fakes. "fake" is opt-in —
+	// (missing URL/token) instead of silently serving fakes. "fake" is opt-in -
 	// used by tests and explicit local dev (make run / run-oidc without -RealGitlab).
 	HarborMode Mode `env:"HARBOR_MODE" envDefault:"real"`
 	GitLabMode Mode `env:"GITLAB_MODE" envDefault:"real"`
@@ -92,11 +92,11 @@ type Config struct {
 	DriftDetection bool `env:"DRIFT_DETECTION_ENABLED" envDefault:"true"`
 	// ImportDiscovery toggles the reconciler that adopts application.yaml manifests
 	// created directly in Git (bypassing the portal) as IMPORTED orders. Off by
-	// default — it creates order rows.
+	// default - it creates order rows.
 	ImportDiscovery bool `env:"IMPORT_DISCOVERY_ENABLED" envDefault:"false"`
-	// CatalogAutodiscover включает фоновую регистрацию найденных в Harbor чартов как
-	// черновиков-публикаций (владелец — группа админов). Off by default — создаёт
-	// строки публикаций для каждого чарта в сканируемых проектах.
+	// CatalogAutodiscover toggles background registration of charts found in Harbor
+	// as draft publications (owned by the admin group). Off by default - it creates
+	// publication rows for every chart in the scanned projects.
 	CatalogAutodiscover bool `env:"CATALOG_AUTODISCOVER" envDefault:"false"`
 
 	// Postgres / Redis

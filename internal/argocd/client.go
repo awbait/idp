@@ -172,7 +172,7 @@ func (c *Client) GetApplication(ctx context.Context, name string) (*Application,
 	if err := c.do(ctx, http.MethodGet, "/applications/"+url.PathEscape(name), nil, nil, &app); err != nil {
 		// ArgoCD returns 403 "permission denied" (not 404) for an application
 		// that doesn't exist, to avoid leaking existence. With our admin token a
-		// 403 on a specific app therefore means "not found" — map it so the
+		// 403 on a specific app therefore means "not found" - map it so the
 		// delete flow (DELETE_MR_MERGED -> DELETED, gated on ErrNotFound) can
 		// observe a pruned app.
 		var ae *apiError
@@ -193,7 +193,7 @@ func (c *Client) Sync(ctx context.Context, name string) error {
 func (c *Client) Healthz(ctx context.Context) error {
 	// The version endpoint lives at /api/version (outside the /api/v1 base) and is
 	// unauthenticated, so it wouldn't validate the token. session/userinfo is under
-	// /api/v1, cheap, and reports whether our bearer token is accepted — covering
+	// /api/v1, cheap, and reports whether our bearer token is accepted - covering
 	// both connectivity and auth. It returns 200 even when unauthenticated, so we
 	// must inspect loggedIn rather than rely on the status code.
 	var info struct {

@@ -164,7 +164,7 @@ export function Select<T extends string>({
   errorText?: string;
   // Render without a visible label (label becomes the aria-label).
   hideLabel?: boolean;
-  // Shown by SelectValue when nothing is selected — defaults to a RU placeholder
+  // Shown by SelectValue when nothing is selected - defaults to a RU placeholder
   // instead of React Aria's built-in English "Select an item".
   placeholder?: string;
 }) {
@@ -224,9 +224,9 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
   );
 }
 
-// Chip, единый стиль бейджей-метаданных в шапках (категория, владелец, версия…).
-// Цвета задаёт className: фон + текст (например bg-slate-100 text-slate-600),
-// внутри удобно префиксовать подпись приглушённым <span> (text-slate-400).
+// Chip: a single style for metadata badges in headers (category, owner, version...).
+// Colors come from className: background + text (e.g. bg-slate-100 text-slate-600);
+// inside, it's handy to prefix the caption with a muted <span> (text-slate-400).
 export function Chip({ className = "", children }: { className?: string; children: ReactNode }) {
   return (
     <span

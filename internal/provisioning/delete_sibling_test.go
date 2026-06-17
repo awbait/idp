@@ -58,7 +58,7 @@ func createHealthy(ctx context.Context, t *testing.T, s *stack, u *models.User, 
 // TestSiblingResyncDoesNotDemoteHealthy reproduces the reported bug: when one
 // product is deleted (or changed), the shared Git branch advances and ArgoCD
 // briefly marks an *untouched* sibling OutOfSync while it re-syncs. That must NOT
-// demote the healthy sibling to DEPLOYING — its own manifests didn't change.
+// demote the healthy sibling to DEPLOYING - its own manifests didn't change.
 func TestSiblingResyncDoesNotDemoteHealthy(t *testing.T) {
 	ctx := context.Background()
 	s := newAutoStack(t)

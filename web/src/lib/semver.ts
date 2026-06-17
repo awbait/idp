@@ -1,7 +1,7 @@
-// Лёгкое сравнение semver-версий чартов (без диапазонов): нужно, чтобы понять,
-// «новее» ли благословлённая версия, чем версия заказа. Префикс «v» игнорируется,
-// pre-release-суффикс (1.2.3-rc1) отбрасывается — для каталога Helm-чартов
-// достаточно сравнения major.minor.patch.
+// Lightweight semver comparison of chart versions (no ranges): needed to tell
+// whether the blessed version is "newer" than the order's version. The "v"
+// prefix is ignored, the pre-release suffix (1.2.3-rc1) is dropped - for a Helm
+// chart catalog a major.minor.patch comparison is enough.
 
 function parse(v: string): number[] {
   const core = v.trim().replace(/^v/i, "").split(/[-+]/)[0];
@@ -11,7 +11,7 @@ function parse(v: string): number[] {
   });
 }
 
-// compareSemver: -1 если a<b, 0 если равны, 1 если a>b.
+// compareSemver: -1 if a<b, 0 if equal, 1 if a>b.
 export function compareSemver(a: string, b: string): number {
   const pa = parse(a);
   const pb = parse(b);
@@ -23,18 +23,18 @@ export function compareSemver(a: string, b: string): number {
   return 0;
 }
 
-// isNewer сообщает, что candidate строго новее, чем current.
+// isNewer reports whether candidate is strictly newer than current.
 export function isNewer(candidate: string, current: string): boolean {
   return !!candidate && !!current && compareSemver(candidate, current) > 0;
 }
 
-// upgradeTargets возвращает версии чарта, до которых заказу на версии current
-// разрешено обновиться: строго новее current и не выше approved (версии, под
-// которую автор согласовал форму, - дальше форма не гарантирована). Список
-// отсортирован от новой к старой; пустой, если апгрейд недоступен. Это
-// единственный источник допустимых версий апгрейда (и для UI, и для проверки
-// ?to= на странице заказа), чтобы нельзя было открыть обновление до
-// несуществующей/недопустимой версии.
+// upgradeTargets returns the chart versions an order on version current is
+// allowed to upgrade to: strictly newer than current and not above approved
+// (the version the author approved the form for - beyond it the form is not
+// guaranteed). The list is sorted newest to oldest; empty if no upgrade is
+// available. This is the single source of allowed upgrade versions (both for the
+// UI and for validating ?to= on the order page), so one cannot open an upgrade
+// to a nonexistent/invalid version.
 export function upgradeTargets(versions: string[], current: string, approved?: string): string[] {
   if (!approved || !isNewer(approved, current)) return [];
   return versions

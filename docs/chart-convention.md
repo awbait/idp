@@ -21,15 +21,15 @@ all agree on.
 
 ## How the portal reads it (`HARBOR_MODE=real`)
 
-- **Metadata** (catalog list, versions, latest, digest) — Harbor API v2.0:
+- **Metadata** (catalog list, versions, latest, digest) - Harbor API v2.0:
   `GET /api/v2.0/projects/{project}/repositories` and `.../repositories/{chart}/artifacts`.
   "Latest" is the newest artifact by push time (the "last tag" rule; no semver
   computation).
 - **File bodies** (`values.yaml`, `README.md`, `values.schema.json`, `CHANGELOG.md`)
-  — pulled from the chart's **OCI artifact** (`.tgz`) and extracted. Harbor's chart
+  - pulled from the chart's **OCI artifact** (`.tgz`) and extracted. Harbor's chart
   "additions" only expose `values.yaml`+`readme.md`, so the tarball is the single
   source that also yields the schema and changelog. The chart's `values.schema.json`
-  is the **single source of truth** for the order form — there is no second copy.
+  is the **single source of truth** for the order form - there is no second copy.
 - Auth is an optional robot account (`HARBOR_ROBOT_USER`/`HARBOR_ROBOT_TOKEN`); with
   none set the client runs anonymously, which works against a **public** project.
   `AllowedTeams` is always empty for real Harbor (no allowlist source in Harbor yet).
@@ -46,7 +46,7 @@ endpoint in prod).
 
 A **minimal Harbor** (harbor-helm, Trivy off, self-signed TLS, persistent volumes
 via KinD's local-path StorageClass) runs in KinD and is published at
-`host.docker.internal:8084` (NodePort 30084) — the same
+`host.docker.internal:8084` (NodePort 30084) - the same
 host name used by the portal (host/container) and by ArgoCD pods (via the CoreDNS
 patch in `10-coredns.ps1`), so the registry host resolves identically everywhere.
 The `platform` project is created **public** (`45-harbor-project.ps1`) so nobody
@@ -54,7 +54,7 @@ needs credentials to pull or to read the catalog; pushes (`50-charts.ps1`) use t
 admin account. Self-signed TLS → `HARBOR_INSECURE_TLS=true` for the portal and
 `insecure: true` on the ArgoCD repo secret.
 
-This repo is **chart-agnostic** — it does not vendor deployable charts. Charts
+This repo is **chart-agnostic** - it does not vendor deployable charts. Charts
 (`ingress-gateway`, `egress`, …) live in their own location/repo and are published
 to **Harbor** by their own pipeline. The portal only knows that some chart exists
 in Harbor and pulls/serves it from there; ArgoCD likewise deploys straight from
@@ -67,6 +67,6 @@ and served by `HARBOR_MODE=fake` (tests + zero-infra dev only). It is never used
 in `real` mode and is not a deployable chart.
 
 For a local stand, seed Harbor once from an external chart directory:
-`deployments/kind/50-charts.ps1 -ChartsDir <path>` (or `$env:STAND_CHARTS_DIR`) — it
+`deployments/kind/50-charts.ps1 -ChartsDir <path>` (or `$env:STAND_CHARTS_DIR`) - it
 pushes every chart subfolder there into the Harbor project. Without a source the
 step is skipped; Harbor is expected to be populated separately.

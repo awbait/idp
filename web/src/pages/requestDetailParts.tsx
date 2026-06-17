@@ -102,7 +102,7 @@ export function Field({ label, value, href }: { label: string; value: string; hr
   );
 }
 
-// DetailActions is the header's "Действия" dropdown (vertical dots). It renders
+// DetailActions is the header's actions dropdown (vertical dots). It renders
 // only the actions available for the current order/role; nothing if there are none.
 export function DetailActions({
   isDraft,
@@ -245,7 +245,7 @@ export function fmtRelative(iso: string): string {
   return fmtDateTime(iso);
 }
 
-// ---- История действий: «Хронология» (timeline) + «Запросы на слияние» (MRs) ----
+// ---- Activity history: timeline + merge requests (MRs) ----
 
 type TablerIcon = typeof IconHistory;
 
@@ -276,7 +276,7 @@ const EVENT_META: Record<string, { label: string; Icon: TablerIcon; tint: string
 };
 
 // ProductView is the view-driven body of the product (order) page: the tab strip
-// (Общая информация + one tab per product view + История действий) and the
+// (Info + one tab per product view + Activity history) and the
 // values.yaml button. It is shared by RequestDetailPage (live order, writes via
 // the API) and the chart-manage preview (synthetic order, writes to local state
 // via `persist` and uses the in-editor `schema`), so both render identically.

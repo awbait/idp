@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"idp/internal/auth"
 	"github.com/go-chi/chi/v5"
+	"idp/internal/auth"
 )
 
 func (s *Server) handleListApplications(w http.ResponseWriter, r *http.Request) {
@@ -29,7 +29,7 @@ func (s *Server) handleGetApplication(w http.ResponseWriter, r *http.Request) {
 
 // handleAllRequestEvents streams status changes for ALL requests (a global
 // topic) so list views can refresh live. The payload is only a "something
-// changed" signal — the client re-fetches the team-scoped list on each event.
+// changed" signal - the client re-fetches the team-scoped list on each event.
 func (s *Server) handleAllRequestEvents(w http.ResponseWriter, r *http.Request) {
 	s.stream(w, r, "requests")
 }

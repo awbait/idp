@@ -1,5 +1,5 @@
 // RequestDetailPage: the product (order) detail page. Fully schema + view driven:
-// the Info-tab "Действия" and the product tabs are derived from the chart's view
+// the Info-tab actions and the product tabs are derived from the chart's view
 // document (genericView/GenericProductTabs), so it is chart-agnostic - no per-chart
 // code. Presentational pieces live in ./requestDetailParts.
 import { useEffect, useRef, useState } from "react";
@@ -52,9 +52,9 @@ export function RequestDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pulling, setPulling] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
-  // «Доступно обновление» показываем один раз на заказ: в localStorage храним
-  // версию, на которой нудж закрыли крестиком; при новой целевой версии покажем
-  // снова. Ключ по id заказа (id доступен сразу, до загрузки данных).
+  // "Upgrade available" is shown once per order: localStorage holds the version
+  // at which the nudge was dismissed; a new target version shows it again. Keyed
+  // by order id (id is available immediately, before data loads).
   const [upgradeDismissed, setUpgradeDismissed] = useState<string | null>(() => {
     try {
       return localStorage.getItem(`order-upgrade-nudge:${id}`);
@@ -101,14 +101,14 @@ export function RequestDetailPage() {
   const catalogChart = findCatalogChart(charts, r.chart_project, r.chart_name);
   const pub = catalogChart?.publication;
   const liveStatus = ["MR_MERGED", "DEPLOYING", "HEALTHY", "DEGRADED", "ARGO_MISSING"].includes(r.status);
-  // Допустимые версии апгрейда: выше текущей и не выше согласованной автором.
-  // Единственный источник правды (им же валидируется ?to= на странице заказа).
+  // Allowed upgrade versions: above current and not above the author-approved one.
+  // The single source of truth (it also validates ?to= on the order page).
   const upgradeVersions = upgradeTargets(
     catalogChart?.versions ?? [],
     r.chart_version,
     pub?.approved_view_version,
   );
-  const upgradeTo = upgradeVersions[0] ?? null; // рекомендуемая (согласованная) версия
+  const upgradeTo = upgradeVersions[0] ?? null; // recommended (approved) version
   const canUpgrade = modifiable && !isDraft && liveStatus && upgradeVersions.length > 0 && !r.drifted;
   const showUpgradeNudge = canUpgrade && upgradeDismissed !== upgradeTo;
 
@@ -117,7 +117,7 @@ export function RequestDetailPage() {
     try {
       if (upgradeTo) localStorage.setItem(`order-upgrade-nudge:${id}`, upgradeTo);
     } catch {
-      /* нет localStorage - переживём, просто не запомним показ */
+      /* no localStorage - that's fine, we just won't remember the dismissal */
     }
   }
 

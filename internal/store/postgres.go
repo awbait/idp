@@ -6,10 +6,10 @@ import (
 	"errors"
 	"strconv"
 
-	"idp/pkg/models"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"idp/pkg/models"
 )
 
 // Postgres is the production Store backed by pgx.
@@ -160,7 +160,7 @@ func (p *Postgres) UpdateRequest(ctx context.Context, r *models.Request) error {
 }
 
 // SetDrift updates only the drift columns. It deliberately does NOT bump version
-// or updated_at — drift is a system-observed signal, not a user edit, so it must
+// or updated_at - drift is a system-observed signal, not a user edit, so it must
 // not collide with optimistic locking on concurrent edits.
 func (p *Postgres) SetDrift(ctx context.Context, id string, drifted bool, detail string) error {
 	tag, err := p.pool.Exec(ctx, `UPDATE requests SET drifted=$1, drift_detail=$2 WHERE id=$3`,
@@ -288,7 +288,7 @@ func (p *Postgres) ListEvents(ctx context.Context, requestID string) ([]*models.
 }
 
 func (p *Postgres) Ping(ctx context.Context) error { return p.pool.Ping(ctx) }
-func (p *Postgres) Close()                          { p.pool.Close() }
+func (p *Postgres) Close()                         { p.pool.Close() }
 
 // helpers
 func nullStr(s string) any {

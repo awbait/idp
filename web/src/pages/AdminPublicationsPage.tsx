@@ -14,8 +14,8 @@ const STATUS_BADGE: Record<PublicationStatus, { label: string; cls: string }> = 
   REJECTED: { label: "Отклонено", cls: "bg-red-50 text-red-700" },
 };
 
-// Админ-интерфейс публикаций: очередь на согласование (решение принимается на
-// странице управления чартом, где есть diff и предпросмотр) + CRUD категорий.
+// Publications admin: review queue (the decision is made on the chart manage
+// page, which has the diff and preview) + category CRUD.
 export function AdminPublicationsPage() {
   const { user } = useUser();
   if (user?.role !== "admin") {

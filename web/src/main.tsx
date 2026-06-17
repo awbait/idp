@@ -43,7 +43,7 @@ const router = createBrowserRouter([
     ],
   },
   // Docs open standalone (no portal sidebar/topbar); they have a "Портал"
-  // button to return. Kept outside the Layout route on purpose.
+  // button to return to. Kept outside the Layout route on purpose.
   { path: "/docs", element: <DocsPage /> },
   { path: "/docs/:slug", element: <DocsPage /> },
 ]);

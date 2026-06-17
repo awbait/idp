@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"idp/internal/auth"
 	"idp/internal/catalog"
 	"idp/internal/publications"
 	"idp/internal/store"
 	"idp/internal/views"
 	"idp/pkg/models"
-	"github.com/go-chi/chi/v5"
 )
 
 // --- categories ---
@@ -75,7 +75,7 @@ type createPubReq struct {
 type patchPubReq struct {
 	CategoryID *string         `json:"category_id"`
 	OwnerTeam  *string         `json:"owner_team"`
-	View       json.RawMessage `json:"view"` // черновик view-документа; null/absent = не менять
+	View       json.RawMessage `json:"view"` // view-document draft; null/absent = leave unchanged
 }
 
 type rejectPubReq struct {
@@ -154,8 +154,8 @@ type validatePubReq struct {
 	View json.RawMessage `json:"view"`
 }
 
-// handleValidatePublication, live-валидация черновика view из конструктора:
-// всегда 200 со списком проблем (пустой = документ валиден).
+// handleValidatePublication: live validation of a draft view from the builder.
+// Always returns 200 with a list of issues (empty = document is valid).
 func (s *Server) handleValidatePublication(w http.ResponseWriter, r *http.Request) {
 	var body validatePubReq
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.View) == 0 {
@@ -220,8 +220,8 @@ func (s *Server) handleRejectPublication(w http.ResponseWriter, r *http.Request)
 
 // --- catalog overlay & active view ---
 
-// publicationSummary, лёгкая проекция публикации для каталога/меню
-// (без тел view-документов).
+// publicationSummary is a lightweight projection of a publication for the
+// catalog/menu (without view-document bodies).
 type publicationSummary struct {
 	ID            string                   `json:"id"`
 	CategoryID    string                   `json:"category_id"`
@@ -229,30 +229,31 @@ type publicationSummary struct {
 	CreatedBy     string                   `json:"created_by"`
 	CreatedByName string                   `json:"created_by_name"`
 	Status        models.PublicationStatus `json:"status"`
-	Published     bool                     `json:"published"`      // есть действующая approved-view
-	HasOrderView  bool                     `json:"has_order_view"` // approved-view содержит views.order
-	// ApprovedViewVersion — «благословлённая» версия чарта: до неё view проверен,
-	// заказы с версией ниже можно обновлять.
+	Published     bool                     `json:"published"`      // has an active approved view
+	HasOrderView  bool                     `json:"has_order_view"` // approved view contains views.order
+	// ApprovedViewVersion is the "blessed" chart version: the view is checked up
+	// to it, and orders on a lower version can be upgraded.
 	ApprovedViewVersion string `json:"approved_view_version,omitempty"`
-	// ApprovedDescription — описание чарта на момент согласования (каталог
-	// показывает его, а не живое из Harbor).
+	// ApprovedDescription is the chart description at approval time (the catalog
+	// shows this, not the live one from Harbor).
 	ApprovedDescription string `json:"approved_description,omitempty"`
-	// ApprovedIconURL — иконка чарта на момент согласования (каталог/профиль
-	// показывают её, а не живую из Harbor).
+	// ApprovedIconURL is the chart icon at approval time (catalog/profile show
+	// this, not the live one from Harbor).
 	ApprovedIconURL string `json:"approved_icon_url,omitempty"`
 }
 
 type catalogChart struct {
 	models.Chart
 	Publication *publicationSummary `json:"publication,omitempty"`
-	// Missing: публикация ссылается на чарт, которого (уже) нет в Harbor.
+	// Missing: the publication references a chart that is (no longer) in Harbor.
 	Missing bool `json:"missing,omitempty"`
 }
 
-// handleCatalog, каталог одним запросом: живой Harbor-листинг настроенных
-// проектов + категории + наложенные метаданные публикаций. Чарты без публикации
-// остаются видимыми (живой каталог); публикации, чьи чарты лежат вне настроенных
-// проектов (добавлены по пути), дотягиваются из Harbor поштучно.
+// handleCatalog returns the catalog in one request: live Harbor listing of the
+// configured projects + categories + overlaid publication metadata. Charts
+// without a publication stay visible (live catalog); publications whose charts
+// lie outside the configured projects (added by path) are fetched from Harbor
+// one by one.
 func (s *Server) handleCatalog(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	u := auth.UserFrom(ctx)
@@ -293,9 +294,9 @@ func (s *Server) handleCatalog(w http.ResponseWriter, r *http.Request) {
 		listed[c.Project+"/"+c.Name] = true
 		out = append(out, catalogChart{Chart: c, Publication: byChart[c.Project+"/"+c.Name]})
 	}
-	// Публикации чартов вне Harbor-листинга: добавлены по произвольному пути:
-	// дотягиваем метаданные поштучно; пропавший из Harbor чарт показываем с
-	// пометкой missing (владельцу видно, что публикация осиротела).
+	// Publications for charts outside the Harbor listing, added by an arbitrary
+	// path: fetch metadata one by one; a chart gone from Harbor is shown with the
+	// missing flag (so the owner sees the publication is orphaned).
 	for _, p := range pubs {
 		key := p.ChartProject + "/" + p.ChartName
 		if listed[key] {
@@ -325,8 +326,8 @@ type checkChartReq struct {
 	Path string `json:"path"` // "project/name"
 }
 
-// handleCheckChart проверяет чарт по произвольному пути в Harbor перед
-// публикацией: существование + комплектность файлов последней версии.
+// handleCheckChart checks a chart at an arbitrary Harbor path before
+// publication: existence + file completeness of the latest version.
 func (s *Server) handleCheckChart(w http.ResponseWriter, r *http.Request) {
 	var body checkChartReq
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -353,8 +354,8 @@ func (s *Server) handleCheckChart(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, res)
 }
 
-// hasOrderView сообщает, содержит ли view-документ проекцию views.order
-// (по ней строится форма заказа и пункт в левом меню).
+// hasOrderView reports whether the view-document contains the views.order
+// projection (used to build the order form and the left-menu item).
 func hasOrderView(view json.RawMessage) bool {
 	if len(view) == 0 {
 		return false
@@ -369,7 +370,7 @@ func hasOrderView(view json.RawMessage) bool {
 	return ok
 }
 
-// handleGetChartView отдаёт действующую согласованную view чарта.
+// handleGetChartView returns the chart's active approved view.
 func (s *Server) handleGetChartView(w http.ResponseWriter, r *http.Request) {
 	view, err := s.Pubs.ActiveView(r.Context(), chi.URLParam(r, "project"), chi.URLParam(r, "name"))
 	if err != nil {

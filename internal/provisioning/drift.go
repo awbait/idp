@@ -7,14 +7,14 @@ import (
 	"reflect"
 	"strings"
 
-	"idp/pkg/models"
 	"gopkg.in/yaml.v3"
+	"idp/pkg/models"
 )
 
 // CheckDrift compares each deployed order's committed Git state (values.yaml +
 // chart version in application.yaml) against what the portal has on record, and
 // flags orders that were changed directly in Git (not through the portal). It is
-// read-only — it never overwrites Git — and idempotent, so the poller can call it
+// read-only - it never overwrites Git - and idempotent, so the poller can call it
 // every tick. Implemented as a separate pass (not folded into Reconcile) so it
 // can later move to its own, slower cadence.
 func (s *Service) CheckDrift(ctx context.Context) error {
@@ -46,7 +46,7 @@ func driftCheckable(st models.RequestStatus) bool {
 func (s *Service) checkDriftOne(ctx context.Context, r *models.Request) {
 	proj, err := s.gl.GetProject(ctx, s.gitops.RepoPath(r.Team, r.ChartName))
 	if err != nil {
-		return // can't resolve the repo (transient/absent) — skip this tick
+		return // can't resolve the repo (transient/absent) - skip this tick
 	}
 	branch := proj.DefaultBranch
 	if branch == "" {
@@ -64,7 +64,7 @@ func (s *Service) checkDriftOne(ctx context.Context, r *models.Request) {
 		if !yamlEqual(git, []byte(r.ValuesYAML)) {
 			reasons = append(reasons, "values.yaml изменён в Git")
 		}
-		// other errors: transient — ignore this tick
+		// other errors: transient - ignore this tick
 	}
 
 	// application.yaml: compare the chart version (targetRevision).

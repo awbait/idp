@@ -69,7 +69,7 @@ func TestClientGetApplicationDefaultsUnknown(t *testing.T) {
 			http.Error(w, "unexpected path "+r.URL.Path, http.StatusInternalServerError)
 			return
 		}
-		// No sync/health status yet — client must default to Unknown, and fall
+		// No sync/health status yet - client must default to Unknown, and fall
 		// back to destination.server when destination.name is empty.
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"metadata": map[string]any{"name": "core-pg1"},

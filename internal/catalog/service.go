@@ -167,15 +167,16 @@ func (s *Service) GetChangelog(ctx context.Context, project, name, version strin
 	return nil, models.ErrNotFound
 }
 
-// FileCheck — наличие одного файла комплекта чарта (для проверки при добавлении).
+// FileCheck reports presence of one file in a chart's bundle (checked when adding).
 type FileCheck struct {
 	Name     string `json:"name"`
 	Required bool   `json:"required"`
 	Found    bool   `json:"found"`
 }
 
-// CheckResult — отчёт проверки чарта по пути в Harbor: существует ли и есть ли
-// необходимые файлы. OK=false с Error — нормальный исход проверки (не HTTP-ошибка).
+// CheckResult is the report of checking a chart by Harbor path: whether it
+// exists and has the required files. OK=false with Error is a normal check
+// outcome (not an HTTP error).
 type CheckResult struct {
 	OK    bool          `json:"ok"`
 	Error string        `json:"error,omitempty"`
@@ -183,9 +184,9 @@ type CheckResult struct {
 	Files []FileCheck   `json:"files,omitempty"`
 }
 
-// requiredChartFiles — комплект, который проверяем у последней версии чарта.
-// values.yaml и values.schema.json обязательны (схема — единственный источник
-// формы заказа); README и CHANGELOG — желательны, но не блокируют.
+// requiredChartFiles is the bundle we check on the chart's latest version.
+// values.yaml and values.schema.json are required (the schema is the only source
+// for the order form); README and CHANGELOG are desired but not blocking.
 var requiredChartFiles = []struct {
 	name     string
 	required bool
@@ -199,9 +200,9 @@ var requiredChartFiles = []struct {
 	}},
 }
 
-// CheckChart проверяет чарт по произвольному пути (project/name): существование
-// в Harbor и комплектность файлов последней версии. Возвращает отчёт; ошибкой
-// завершается только недоступность самого Harbor.
+// CheckChart checks a chart by an arbitrary path (project/name): existence in
+// Harbor and completeness of the latest version's files. Returns a report; only
+// Harbor being unreachable returns an error.
 func (s *Service) CheckChart(ctx context.Context, project, name string) (*CheckResult, error) {
 	chart, err := s.hb.GetChart(ctx, project, name)
 	if err != nil {
@@ -224,8 +225,8 @@ func (s *Service) CheckChart(ctx context.Context, project, name string) (*CheckR
 		_, ferr := f.fetch(s, ctx, project, name, chart.LatestVersion)
 		found := ferr == nil
 		if ferr != nil && !errors.Is(ferr, models.ErrNotFound) {
-			// Битый/недоступный артефакт (не «файла нет», а «не смогли прочитать») —
-			// отчёт, не 502.
+			// Broken/unreachable artifact (not "file missing" but "could not read") -
+			// a report, not a 502.
 			if harbor.IsAccessDenied(ferr) {
 				res.Error = "нет доступа к артефакту чарта: проект приватный. Сделайте его публичным или выдайте доступ роботу портала"
 			} else {

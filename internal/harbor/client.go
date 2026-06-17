@@ -25,7 +25,7 @@ import (
 // Client is the real Harbor implementation of Port. Catalog metadata (projects,
 // repositories, artifacts/versions) comes from the Harbor API v2.0; the per-chart
 // file bodies (values.yaml, README.md, values.schema.json, CHANGELOG.md) are read
-// by pulling the chart's OCI artifact (.tgz) and extracting them — Harbor's chart
+// by pulling the chart's OCI artifact (.tgz) and extracting them - Harbor's chart
 // "additions" only cover values.yaml + readme.md, so the tarball is the single
 // source that also yields the schema and changelog.
 //
@@ -160,7 +160,7 @@ type apiArtifact struct {
 		Version     string `json:"version"`
 		AppVersion  string `json:"appVersion"`
 		Description string `json:"description"`
-		Icon        string `json:"icon"` // Chart.yaml icon (URL или data:image/...;base64,)
+		Icon        string `json:"icon"` // Chart.yaml icon (URL or data:image/...;base64,)
 	} `json:"extra_attrs"`
 }
 
@@ -178,7 +178,7 @@ func (c *Client) ListCharts(ctx context.Context) ([]models.Chart, error) {
 		err := c.apiGet(ctx, "/projects/"+url.PathEscape(project)+"/repositories",
 			url.Values{"page_size": {"100"}}, &repos)
 		if err != nil {
-			// A configured project may be absent or invisible to these creds —
+			// A configured project may be absent or invisible to these creds -
 			// Harbor answers 404, or 401/403 for an absent project read
 			// anonymously. Skip it rather than failing the whole catalog.
 			if isProjectSkippable(err) {

@@ -1,15 +1,15 @@
 // Package events is a tiny in-process pub/sub used to push status changes to
 // SSE clients. MVP runs a single replica, so an in-memory bus is enough.
 // NOTE: scaling to 2+ replicas requires swapping this for Redis Pub/Sub
-// (see spec "Стратегия обновления статуса" / techdebt).
+// (see spec "status update strategy" / techdebt).
 package events
 
 import "sync"
 
 // Event is a status update for a request or application.
 type Event struct {
-	Topic string         `json:"-"`     // e.g. "request:<id>" or "app:<name>"
-	Type  string         `json:"type"`  // status_changed, mr_updated, ...
+	Topic string         `json:"-"`    // e.g. "request:<id>" or "app:<name>"
+	Type  string         `json:"type"` // status_changed, mr_updated, ...
 	Data  map[string]any `json:"data"`
 }
 

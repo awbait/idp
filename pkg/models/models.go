@@ -79,10 +79,10 @@ type Request struct {
 	ChartProject  string        `json:"chart_project"`
 	ChartName     string        `json:"chart_name"`
 	ChartVersion  string        `json:"chart_version"`
-	ServiceName   string        `json:"service_name"`  // deploy identity: GitOps folder, ArgoCD app, unique index
-	DisplayName   string        `json:"display_name"`  // cosmetic, user-facing, mutable; no deploy impact
-	Cluster       string        `json:"cluster"`       // ArgoCD Application destination.name
-	Namespace     string        `json:"namespace"`     // ArgoCD Application destination.namespace (empty -> service_name)
+	ServiceName   string        `json:"service_name"` // deploy identity: GitOps folder, ArgoCD app, unique index
+	DisplayName   string        `json:"display_name"` // cosmetic, user-facing, mutable; no deploy impact
+	Cluster       string        `json:"cluster"`      // ArgoCD Application destination.name
+	Namespace     string        `json:"namespace"`    // ArgoCD Application destination.namespace (empty -> service_name)
 	ValuesYAML    string        `json:"values_yaml"`
 	Status        RequestStatus `json:"status"`
 	ArgoCDAppName string        `json:"argocd_app_name"`
@@ -92,7 +92,7 @@ type Request struct {
 	DeletedAt     *time.Time    `json:"deleted_at,omitempty"`
 	// Drifted is set by the drift reconciler when the order's committed Git state
 	// (values.yaml / chart version) was changed outside the portal. DriftDetail
-	// holds a human-readable summary of what diverged. Read-only signal — the
+	// holds a human-readable summary of what diverged. Read-only signal - the
 	// portal does not auto-overwrite Git.
 	Drifted     bool   `json:"drifted"`
 	DriftDetail string `json:"drift_detail,omitempty"`

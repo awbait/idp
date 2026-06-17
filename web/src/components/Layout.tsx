@@ -48,7 +48,7 @@ const navItems = [
   { to: "/catalog", label: "Чарты", Icon: IconPackages },
 ];
 
-// Дополнительные пункты для админа (согласование публикаций + категории).
+// Extra items for admins (publication approvals + categories).
 const adminNavItems = [{ to: "/admin/publications", label: "Публикации", Icon: IconChecklist }];
 
 export function Layout() {
@@ -57,7 +57,7 @@ export function Layout() {
   const { pathname } = useLocation();
 
   // On a request detail/edit route the URL doesn't say which product it is, so
-  // fetch the order and map its chart — that chart's sidebar item then lights
+  // fetch the order and map its chart - that chart's sidebar item then lights
   // up (e.g. viewing an Ingress Gateway order highlights it).
   const reqId = pathname.match(/^\/requests\/([^/]+)(?:\/edit)?$/)?.[1];
   const { data: reqForNav } = useAsync(
@@ -82,10 +82,10 @@ export function Layout() {
   );
 
   // A chart's menu item is "active" on its product page (/products/:project/:name),
-  // while ordering it (/catalog/:project/:name/order — ordering is a product
+  // while ordering it (/catalog/:project/:name/order - ordering is a product
   // action), and on a request of that chart (/requests/:id). Browsing the chart
-  // itself (/catalog/:project/:name, no /order) is NOT a product — it belongs to
-  // "Чарты", so that top-level item lights up there instead.
+  // itself (/catalog/:project/:name, no /order) is NOT a product - it belongs to
+  // the "Charts" section, so that top-level item lights up there instead.
   const chartActive = (c: CatalogChart) =>
     pathname === `/products/${c.project}/${c.name}` ||
     pathname === `/catalog/${c.project}/${c.name}/order` ||
@@ -111,9 +111,9 @@ export function Layout() {
     }
   }, [activeCategory]);
 
-  // Top-level nav active state. "Чарты"/"Список заказов" must NOT light up when
+  // Top-level nav active state. "Charts"/"Orders list" must NOT light up when
   // the route belongs to a product (ordering a gateway under /catalog/…, or
-  // viewing a gateway order under /requests/:id) — the product item owns it.
+  // viewing a gateway order under /requests/:id) - the product item owns it.
   const navActive = (to: string) => {
     if (to === "/catalog")
       return (pathname === "/catalog" || pathname.startsWith("/catalog/")) && !activeCategory;
@@ -122,9 +122,8 @@ export function Layout() {
     return pathname === to || pathname.startsWith(`${to}/`);
   };
 
-  // Конструктор публикации (manage) — широкий двухпанельный редактор: на нём
-  // снимаем ограничение ширины контента, чтобы editor + предпросмотр заняли
-  // весь экран.
+  // Publication builder (manage) - a wide two-pane editor: drop the content
+  // width limit here so the editor + preview fill the whole screen.
   const fullBleed = /^\/catalog\/[^/]+\/[^/]+\/manage$/.test(pathname);
 
   if (loading) return <Spinner />;
@@ -132,7 +131,7 @@ export function Layout() {
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-800">
-      {/* LEFT NAV — full height; width animates (px→px) for a smooth collapse */}
+      {/* LEFT NAV - full height; width animates (px->px) for a smooth collapse */}
       <aside
         className={`flex shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-surface transition-[width] duration-300 ease-in-out ${
           collapsed ? "w-16" : "w-[260px]"
@@ -150,7 +149,7 @@ export function Layout() {
           )}
         </div>
 
-        {/* flat group: Ресурсы / Чарты (active via navActive aria-current) */}
+        {/* flat group: Resources / Charts (active via navActive aria-current) */}
         <nav className="px-2 py-3">
           <ul className="flex flex-col gap-0.5">
             {[...navItems, ...(user.role === "admin" ? adminNavItems : [])].map((n) => {
@@ -290,16 +289,16 @@ export function Layout() {
         </div>
       </header>
 
-        {/* MAIN — min-h-0 lets this flex child shrink below its content so its
+        {/* MAIN - min-h-0 lets this flex child shrink below its content so its
             own overflow-y-auto scrolls instead of growing the page. relative
             makes it the containing block for react-aria's absolutely-positioned
             hidden nodes (VisuallyHidden/HiddenSelect) so they're clipped here
             instead of escaping to grow the document (whole-page scroll + phantom
             white block on the form). */}
         <main className="relative min-h-0 flex-1 overflow-y-auto p-6">
-          {/* Ограничиваем ширину контента и центрируем: на широких экранах строки
-              не растягиваются во всю ширину. h-full сохраняет цепочку высоты
-              (страницы, тянущиеся на всю высоту, напр. конструктор view). */}
+          {/* Constrain content width and center it: on wide screens rows don't
+              stretch full width. h-full keeps the height chain intact (pages
+              that stretch full height, e.g. the view builder). */}
           <div className={`mx-auto h-full w-full ${fullBleed ? "" : "max-w-screen-xl"}`}>
             <Outlet />
           </div>
@@ -394,8 +393,8 @@ function IconButton({ label, children }: { label: string; children: React.ReactN
   );
 }
 
-// Переключатель темы оформления: светлая / тёмная / РН. Выбор сохраняется в
-// localStorage и применяется на <html data-theme> (см. ThemeContext).
+// Theme switcher: light / dark / RN. The choice is saved in localStorage and
+// applied on <html data-theme> (see ThemeContext).
 function ThemeMenu() {
   const { theme, setTheme } = useTheme();
   return (

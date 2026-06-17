@@ -25,13 +25,13 @@ export function CatalogPage() {
     (c) => !team || !c.allowed_teams?.length || c.allowed_teams.includes(team),
   );
 
-  // Согласованные — опубликованные с order-view (прошли модерацию + есть view);
-  // остальные — найденные сканом / в работе / на согласовании.
+  // Approved: published with an order-view (passed moderation + has a view);
+  // the rest: found by scan / in progress / under review.
   const isApproved = (c: CatalogChart) => !!c.publication?.published && !!c.publication?.has_order_view;
   const approved = visible.filter(isApproved);
   const others = visible.filter((c) => !isApproved(c));
 
-  // Уведомление владельцам: по их чартам в Harbor вышла версия новее согласованной.
+  // Notify owners: a version newer than the approved one is out in Harbor for their charts.
   const outdated = visible.filter((c) => {
     const p = c.publication;
     return (
@@ -119,9 +119,9 @@ function ChartSection({
 function ChartCard({ chart: c, categoryLabel }: { chart: CatalogChart; categoryLabel: CatLabel }) {
   const pub = c.publication;
   const approved = !!pub?.published && !!pub?.has_order_view;
-  // Согласованные показывают снапшот (версия + описание + иконка на момент approve),
-  // а не живое из Harbor; остальные — живые данные. Иконку у согласованных берём
-  // строго из снапшота (даже если он пуст), иначе иконка новой версии «протекает».
+  // Approved charts show a snapshot (version + description + icon at approve time),
+  // not the live Harbor data; the rest show live data. For approved charts take the
+  // icon strictly from the snapshot (even if empty), else a new version's icon leaks.
   const version = (approved && pub?.approved_view_version) || c.latest_version;
   const description = (approved && pub?.approved_description) || c.description;
   const iconUrl = approved ? pub?.approved_icon_url : c.icon_url;
@@ -131,12 +131,12 @@ function ChartCard({ chart: c, categoryLabel }: { chart: CatalogChart; categoryL
       <Card className="h-full transition hover:border-brand-400 hover:shadow">
         <div className="flex items-baseline justify-between gap-2">
           <h2 className="flex min-w-0 items-center gap-1.5 font-medium text-gray-900">
-            {/* Иконка согласованной версии (data:image/...;base64,…). Нет — не показываем. */}
+            {/* Approved version icon (data:image/...;base64,...). If absent, hide it. */}
             {iconUrl && (
               <img src={iconUrl} alt="" className="h-5 w-5 shrink-0 rounded object-contain" />
             )}
             <span className="truncate">{c.name}</span>
-            {/* Опубликован и согласован — простая зелёная галочка. */}
+            {/* Published and approved: a plain green check. */}
             {approved && (
               <IconCircleCheckFilled
                 size={16}

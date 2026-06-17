@@ -1,7 +1,7 @@
-// Package views валидирует view-документы публикаций чартов: структуру формата
-// (views.* с include/exclude/overrides/identity) и, при наличии values.schema.json
-// чарта, ссылки на реальные поля схемы. Схема чарта остаётся единственным
-// источником истины; view только проецирует её поля.
+// Package views validates chart publication view documents: the format
+// structure (views.* with include/exclude/overrides/identity) and, when the
+// chart's values.schema.json is present, references to real schema fields. The
+// chart schema stays the single source of truth; a view only projects its fields.
 package views
 
 import (
@@ -11,33 +11,34 @@ import (
 	"strings"
 )
 
-// Issue, одна проблема валидации; Path указывает внутрь view-документа
-// (JSON pointer), для ошибок ссылок на схему, на ссылающееся поле.
+// Issue is a single validation problem; Path points into the view document
+// (JSON pointer), and for schema reference errors, to the referencing field.
 type Issue struct {
 	Path    string `json:"path"`
 	Message string `json:"message"`
 }
 
-// Известные виджеты ui:widget (см. web/src/form/SchemaForm.tsx).
+// Known ui:widget widgets (see web/src/form/SchemaForm.tsx).
 var knownWidgets = map[string]bool{"single": true, "edit": true, "hidden": true}
 
-// ValidateStructure проверяет только формат документа (без схемы чарта).
+// ValidateStructure checks only the document format (without the chart schema).
 func ValidateStructure(viewJSON []byte) []Issue {
 	return Validate(viewJSON, nil)
 }
 
-// Validate проверяет view-документ. Когда schemaJSON непуст, дополнительно
-// сверяет include/exclude/overrides/identity с полями values.schema.json
-// (неизвестная структура схемы пропускается молча, проверяем лишь то, что
-// можем доказать).
+// Validate checks the view document. When schemaJSON is non-empty, it also
+// cross-checks include/exclude/overrides/identity against values.schema.json
+// fields (an unknown schema structure is skipped silently, we check only what
+// we can prove).
 func Validate(viewJSON, schemaJSON []byte) []Issue {
 	var issues []Issue
 	var doc map[string]any
 	if err := json.Unmarshal(viewJSON, &doc); err != nil {
 		return []Issue{{Path: "", Message: "Невалидный JSON: " + err.Error()}}
 	}
-	// json.Unmarshal молча схлопывает дублирующиеся ключи (вторая "order"
-	// перетёрла бы первую), ловим их токен-сканом до содержательных проверок.
+	// json.Unmarshal silently collapses duplicate keys (a second "order"
+	// would overwrite the first), so we catch them with a token scan before
+	// the substantive checks.
 	issues = append(issues, duplicateKeys(viewJSON)...)
 	for k := range doc {
 		switch k {
@@ -58,8 +59,8 @@ func Validate(viewJSON, schemaJSON []byte) []Issue {
 	if len(viewsMap) == 0 {
 		issues = append(issues, Issue{"/views", `Блок "views" пуст. Опишите хотя бы view "order" (форму заказа)`})
 	}
-	// view "order" обязательна и ровно одна: по ней строится форма заказа и
-	// пункт в меню (дубль ключа поймал бы duplicateKeys выше).
+	// The "order" view is required and exactly one: it builds the order form and
+	// the menu item (a duplicate key would be caught by duplicateKeys above).
 	if _, ok := viewsMap["order"]; !ok && len(viewsMap) > 0 {
 		issues = append(issues, Issue{"",
 			`Не хватает view "order": это форма заказа, она обязательна и должна быть ровно одна`})
@@ -67,12 +68,12 @@ func Validate(viewJSON, schemaJSON []byte) []Issue {
 
 	var schema map[string]any
 	if len(schemaJSON) > 0 {
-		// Сломанную схему чарта не вменяем view-документу, просто без кросс-проверок.
+		// A broken chart schema is not blamed on the view document, just no cross-checks.
 		_ = json.Unmarshal(schemaJSON, &schema)
 	}
 
-	// Формы, используемые вкладкой как form, проецируют ЭЛЕМЕНТ массива items, а
-	// не корень схемы, поэтому их include/exclude сверяются с полями элемента.
+	// Forms used by a tab as its form project the ELEMENT of the items array, not
+	// the schema root, so their include/exclude are checked against element fields.
 	formNode := map[string]map[string]any{}
 	if tabsArr, ok := doc["tabs"].([]any); ok && schema != nil {
 		for _, it := range tabsArr {
@@ -98,13 +99,13 @@ func Validate(viewJSON, schemaJSON []byte) []Issue {
 		}
 		node := schema
 		if n, ok := formNode[name]; ok {
-			node = n // форма элемента вкладки: сверяем с полями элемента массива
+			node = n // tab element form: check against array element fields
 		}
 		issues = append(issues, validateView(path, vm, node, schema, true)...)
 	}
 
-	// tabs: вкладки продукта (таблицы-списки). Возвращает множество id вкладок,
-	// на которые могут ссылаться actions через "tab:<id>".
+	// tabs: product tabs (list tables). Returns the set of tab ids that
+	// actions can reference via "tab:<id>".
 	tabIDs := map[string]bool{}
 	if tabsRaw, ok := doc["tabs"]; ok {
 		var tabIssues []Issue
@@ -112,17 +113,17 @@ func Validate(viewJSON, schemaJSON []byte) []Issue {
 		issues = append(issues, tabIssues...)
 	}
 
-	// actions: размещение формы-view в меню «Действия» (info или вкладка tab:<id>).
+	// actions: placement of a view form in the "Actions" menu (info or tab:<id>).
 	if actionsRaw, ok := doc["actions"]; ok {
 		issues = append(issues, validateActions(actionsRaw, viewsMap, tabIDs)...)
 	}
 	return issues
 }
 
-// validateTabs проверяет вкладки продукта. Каждая вкладка это таблица-список:
-// items (JSON pointer на массив в values), form (id формы из views для
-// добавления/редактирования элемента) и опциональный ui:table (колонки).
-// Возвращает issues и множество id вкладок (для ссылок из actions).
+// validateTabs checks product tabs. Each tab is a list table:
+// items (JSON pointer to an array in values), form (id of a form from views to
+// add/edit an element) and an optional ui:table (columns).
+// Returns issues and the set of tab ids (for references from actions).
 func validateTabs(raw any, viewsMap, schema map[string]any) ([]Issue, map[string]bool) {
 	ids := map[string]bool{}
 	arr, ok := raw.([]any)
@@ -186,10 +187,10 @@ func validateTabs(raw any, viewsMap, schema map[string]any) ([]Issue, map[string
 	return issues, ids
 }
 
-// validateEnums проверяет динамические enum'ы вкладки: массив правил
-// {at, from, value}. at - JSON pointer на поле внутри элемента; from - JSON
-// pointer на массив-источник в values; value - имя поля строки источника,
-// дающее значение опции.
+// validateEnums checks a tab's dynamic enums: an array of rules
+// {at, from, value}. at - JSON pointer to a field inside the element; from - JSON
+// pointer to the source array in values; value - name of the source row field
+// that yields the option value.
 func validateEnums(path string, raw any, schema map[string]any) []Issue {
 	arr, ok := raw.([]any)
 	if !ok {
@@ -231,9 +232,9 @@ func validateEnums(path string, raw any, schema map[string]any) []Issue {
 	return issues
 }
 
-// validateColumnLookup проверяет вычисляемую колонку: объект {keys, in, match,
-// get}. keys - указатель внутри элемента (может содержать "*"); in - указатель
-// на массив в values; match/get - имена полей строки массива.
+// validateColumnLookup checks a computed column: an object {keys, in, match,
+// get}. keys - pointer inside the element (may contain "*"); in - pointer
+// to an array in values; match/get - names of the array row fields.
 func validateColumnLookup(path string, raw any) []Issue {
 	m, ok := raw.(map[string]any)
 	if !ok {
@@ -267,9 +268,9 @@ func validateColumnLookup(path string, raw any) []Issue {
 	return issues
 }
 
-// validateActions проверяет секцию actions. Каждый элемент кладёт форму-view
-// (кроме order, она в views) в меню «Действия»: в "info" (вкладка «Общая
-// информация») или в "tab:<id>", где <id> это вкладка из блока "tabs".
+// validateActions checks the actions section. Each entry places a view form
+// (except order, which lives in views) in the "Actions" menu: in "info" (the
+// "General info" tab) or in "tab:<id>", where <id> is a tab from the "tabs" block.
 func validateActions(raw any, viewsMap map[string]any, tabIDs map[string]bool) []Issue {
 	arr, ok := raw.([]any)
 	if !ok {
@@ -304,7 +305,7 @@ func validateActions(raw any, viewsMap map[string]any, tabIDs map[string]bool) [
 		case in == "":
 			issues = append(issues, Issue{p + "/in", `Укажите "in": "info" или "tab:<id>"`})
 		case in == "info":
-			// вкладка «Общая информация» есть всегда
+			// the "General info" tab always exists
 		case strings.HasPrefix(in, "tab:"):
 			tab := strings.TrimPrefix(in, "tab:")
 			if tab == "" {
@@ -319,8 +320,8 @@ func validateActions(raw any, viewsMap map[string]any, tabIDs map[string]bool) [
 	return issues
 }
 
-// validateView проверяет одну view (или вложенный ui:view) против узла схемы.
-// node, узел схемы, на чьи поля ссылается view (nil = проверка невозможна).
+// validateView checks one view (or a nested ui:view) against a schema node.
+// node is the schema node whose fields the view references (nil = cannot check).
 func validateView(path string, vm map[string]any, node, root map[string]any, top bool) []Issue {
 	var issues []Issue
 	props := collectProperties(node, root)
@@ -405,10 +406,10 @@ func validateView(path string, vm map[string]any, node, root map[string]any, top
 	return issues
 }
 
-// validateUITable проверяет колонки списочной вкладки: массив объектов. Колонка
-// задаёт либо "path" (имя поля элемента), либо "lookup" (вычисляемое значение
-// через join по ссылке). label опционален для path-колонки (по умолчанию равен
-// path) и обязателен для lookup-колонки.
+// validateUITable checks the columns of a list tab: an array of objects. A column
+// sets either "path" (an element field name) or "lookup" (a value computed
+// through a join by reference). label is optional for a path column (defaults to
+// path) and required for a lookup column.
 func validateUITable(path string, raw any) []Issue {
 	arr, ok := raw.([]any)
 	if !ok {
@@ -439,8 +440,8 @@ func validateUITable(path string, raw any) []Issue {
 	return issues
 }
 
-// validateOverride проверяет известные ключи override; прочие ключи, это
-// schema-хинты (title/description/enum/...), их пропускаем.
+// validateOverride checks the known override keys; other keys are
+// schema hints (title/description/enum/...), which we skip.
 func validateOverride(path string, ovm, fieldNode, root map[string]any) []Issue {
 	var issues []Issue
 	for k, v := range ovm {
@@ -458,8 +459,8 @@ func validateOverride(path string, ovm, fieldNode, root map[string]any) []Issue 
 					`Поле "ui:view" должно быть объектом вложенной view (include/exclude/overrides)`})
 				continue
 			}
-			// Вложенный ui:view применяется к полям объекта; для массива
-			// к элементу (массив рендерится списком карточек или как single).
+			// A nested ui:view applies to object fields; for an array,
+			// to the element (an array renders as a list of cards or as single).
 			child := itemNode(fieldNode, root)
 			issues = append(issues, validateView(path+"/ui:view", vm, child, root, false)...)
 		case "title":
@@ -471,8 +472,8 @@ func validateOverride(path string, ovm, fieldNode, root map[string]any) []Issue 
 	return issues
 }
 
-// duplicateKeys токен-сканом находит повторяющиеся ключи в объектах документа
-// (json.Unmarshal их молча схлопывает, теряя данные).
+// duplicateKeys uses a token scan to find repeated keys in document objects
+// (json.Unmarshal silently collapses them, losing data).
 func duplicateKeys(data []byte) []Issue {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	var scanValue func(path string) []Issue
@@ -483,7 +484,7 @@ func duplicateKeys(data []byte) []Issue {
 		}
 		d, ok := t.(json.Delim)
 		if !ok {
-			return nil // скаляр
+			return nil // scalar
 		}
 		var issues []Issue
 		switch d {
@@ -515,11 +516,11 @@ func duplicateKeys(data []byte) []Issue {
 	return scanValue("")
 }
 
-// --- навигация по схеме ---
+// --- schema navigation ---
 
-// deref разворачивает $ref внутри документа схемы (#/definitions/...).
+// deref resolves a $ref within the schema document (#/definitions/...).
 func deref(node, root map[string]any) map[string]any {
-	for range 10 { // защита от циклов
+	for range 10 { // cycle guard
 		ref, _ := node["$ref"].(string)
 		if ref == "" || !strings.HasPrefix(ref, "#/") || root == nil {
 			return node
@@ -541,9 +542,10 @@ func deref(node, root map[string]any) map[string]any {
 	return node
 }
 
-// collectProperties собирает объединённые properties узла: собственные + ветки
-// allOf/oneOf/anyOf/then/else (поля могут жить в условных ветках). nil, узел
-// неизвестен или не описывает объект с properties (проверки пропускаются).
+// collectProperties gathers a node's merged properties: own + the
+// allOf/oneOf/anyOf/then/else branches (fields may live in conditional branches).
+// nil if the node is unknown or does not describe an object with properties
+// (checks are skipped).
 func collectProperties(node, root map[string]any) map[string]any {
 	if node == nil {
 		return nil
@@ -582,8 +584,8 @@ func collectProperties(node, root map[string]any) map[string]any {
 	return out
 }
 
-// itemNode возвращает узел, к чьим полям применяется вложенный ui:view: для
-// массива, items (view описывает один элемент), иначе сам узел.
+// itemNode returns the node whose fields a nested ui:view applies to: for an
+// array, items (the view describes one element), otherwise the node itself.
 func itemNode(node, root map[string]any) map[string]any {
 	if node == nil {
 		return nil
@@ -599,15 +601,15 @@ func itemNode(node, root map[string]any) map[string]any {
 	return node
 }
 
-// pointerResolves проверяет, что JSON pointer по values (например
-// /gateways/0/name) находит поле в схеме: числовой сегмент шагает в items,
-// прочие, в properties. Неизвестные участки схемы считаются совпадением
-// (доказать ошибку нельзя).
+// pointerResolves checks that a JSON pointer over values (for example
+// /gateways/0/name) finds a field in the schema: a numeric segment steps into
+// items, others into properties. Unknown parts of the schema count as a match
+// (the error cannot be proven).
 func pointerResolves(ptr string, node, root map[string]any) bool {
 	cur := deref(node, root)
 	for seg := range strings.SplitSeq(strings.TrimPrefix(ptr, "/"), "/") {
 		if cur == nil {
-			return true // дальше схема не описана, не вменяем
+			return true // schema not described further, do not blame
 		}
 		if isIndex(seg) {
 			if t, _ := cur["type"].(string); t != "" && t != "array" {
@@ -622,7 +624,7 @@ func pointerResolves(ptr string, node, root map[string]any) bool {
 		}
 		props := collectProperties(cur, root)
 		if props == nil {
-			return true // free-form объект
+			return true // free-form object
 		}
 		next, ok := props[seg].(map[string]any)
 		if !ok {
@@ -633,9 +635,9 @@ func pointerResolves(ptr string, node, root map[string]any) bool {
 	return true
 }
 
-// resolvePointerNode возвращает узел схемы, на который указывает JSON pointer по
-// values (например /gateways/0/listeners, узел массива listeners), или nil, если
-// путь не находится или схема дальше не описана.
+// resolvePointerNode returns the schema node a JSON pointer over values points
+// to (for example /gateways/0/listeners, the listeners array node), or nil if
+// the path is not found or the schema is not described further.
 func resolvePointerNode(ptr string, node, root map[string]any) map[string]any {
 	cur := deref(node, root)
 	for seg := range strings.SplitSeq(strings.TrimPrefix(ptr, "/"), "/") {

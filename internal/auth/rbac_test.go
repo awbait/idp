@@ -39,7 +39,7 @@ func TestBuildUser(t *testing.T) {
 
 	t.Run("prefixed segment anywhere in path (external IdP)", func(t *testing.T) {
 		// The team segment may sit in the MIDDLE of a nested path, and the admin
-		// group at any depth — both must still resolve.
+		// group at any depth - both must still resolve.
 		u := r.BuildUser("s4", "", "dave", "Dave",
 			[]string{"/group/group/team-core/group", "/org/platform-admins/sub"})
 		if !u.InTeam("core") {

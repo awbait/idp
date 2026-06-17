@@ -9,8 +9,8 @@ import (
 	"idp/pkg/models"
 )
 
-// TestHTTPCheckChart, проверка чарта по пути: фикстурный чарт комплектен,
-// несуществующий, ok=false, кривой путь, 422.
+// TestHTTPCheckChart: check a chart by path: fixture chart is complete,
+// nonexistent gives ok=false, malformed path gives 422.
 func TestHTTPCheckChart(t *testing.T) {
 	srv, _, _ := newServer(t)
 	h := srv.Router()
@@ -58,8 +58,8 @@ func TestHTTPCheckChart(t *testing.T) {
 	}
 }
 
-// TestHTTPCatalogIncludesOrphanPublication, публикация чарта вне Harbor-листинга
-// видна в каталоге с пометкой missing.
+// TestHTTPCatalogIncludesOrphanPublication: a publication for a chart outside
+// the Harbor listing is visible in the catalog with the missing flag.
 func TestHTTPCatalogIncludesOrphanPublication(t *testing.T) {
 	srv, _, _ := newServer(t)
 	h := srv.Router()
@@ -110,9 +110,9 @@ func adminReq(method, path string, body any) *http.Request {
 	return r
 }
 
-// TestHTTPPublicationsFlow прогоняет полный цикл публикации через HTTP:
-// категория (admin) → регистрация чарта → черновик view → submit → approve →
-// активная view и оверлей в /catalog.
+// TestHTTPPublicationsFlow runs the full publication cycle over HTTP:
+// category (admin) -> chart registration -> view draft -> submit -> approve ->
+// active view and overlay in /catalog.
 func TestHTTPPublicationsFlow(t *testing.T) {
 	srv, _, _ := newServer(t)
 	h := srv.Router()
@@ -123,7 +123,7 @@ func TestHTTPPublicationsFlow(t *testing.T) {
 		return rec
 	}
 
-	// категории: member нельзя, admin можно
+	// categories: member cannot, admin can
 	if rec := do(devReq("POST", "/api/v1/categories", "core",
 		map[string]any{"id": "network", "label": "Сеть"})); rec.Code != http.StatusForbidden {
 		t.Fatalf("member create category: %d %s", rec.Code, rec.Body.String())
@@ -133,7 +133,7 @@ func TestHTTPPublicationsFlow(t *testing.T) {
 		t.Fatalf("admin create category: %d %s", rec.Code, rec.Body.String())
 	}
 
-	// регистрация чарта владельцем
+	// chart registration by the owner
 	rec := do(devReq("POST", "/api/v1/publications", "core", map[string]any{
 		"chart": "platform/ingress-gateway", "category_id": "network", "owner_team": "core",
 	}))
@@ -143,12 +143,12 @@ func TestHTTPPublicationsFlow(t *testing.T) {
 	var pub models.ChartPublication
 	_ = json.Unmarshal(rec.Body.Bytes(), &pub)
 
-	// view ещё не согласована
+	// view not approved yet
 	if rec := do(devReq("GET", "/api/v1/charts/platform/ingress-gateway/view", "core", nil)); rec.Code != http.StatusNotFound {
 		t.Fatalf("view before approve: %d", rec.Code)
 	}
 
-	// черновик + submit
+	// draft + submit
 	view := map[string]any{"views": map[string]any{"order": map[string]any{"include": []string{"gateways"}}}}
 	if rec := do(devReq("PATCH", "/api/v1/publications/"+pub.ID, "core",
 		map[string]any{"view": view})); rec.Code != http.StatusOK {
@@ -166,7 +166,7 @@ func TestHTTPPublicationsFlow(t *testing.T) {
 		t.Fatalf("admin approve: %d %s", rec.Code, rec.Body.String())
 	}
 
-	// активная view отдаётся
+	// active view is returned
 	rec = do(devReq("GET", "/api/v1/charts/platform/ingress-gateway/view", "core", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("view after approve: %d %s", rec.Code, rec.Body.String())
@@ -178,7 +178,7 @@ func TestHTTPPublicationsFlow(t *testing.T) {
 		t.Fatalf("view body: %v %s", err, rec.Body.String())
 	}
 
-	// каталог: чарт несёт оверлей публикации
+	// catalog: the chart carries the publication overlay
 	rec = do(devReq("GET", "/api/v1/catalog", "core", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("catalog: %d %s", rec.Code, rec.Body.String())

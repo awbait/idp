@@ -1,22 +1,22 @@
 ---
 name: git-workflow
-description: "Enforces the project's Git workflow: feature branches, conventional commits, PR creation, and release process. Use this skill whenever working with git — creating branches, committing, switching tasks, creating PRs, or making releases. Triggers on any git operation, branch management, PR creation, or when the user says 'сделай релиз', 'создай PR', 'закоммить', 'commit', 'release'."
+description: "Enforces the project's Git workflow: feature branches, conventional commits, PR creation, and release process. Use this skill whenever working with git - creating branches, committing, switching tasks, creating PRs, or making releases. Triggers on any git operation, branch management, PR creation, or when the user says 'сделай релиз', 'создай PR', 'закоммить', 'commit', 'release'."
 ---
 
 # Git Workflow
 
-This skill enforces the project's branching and release strategy. Every code change flows through feature branches and pull requests — main is always protected.
+This skill enforces the project's branching and release strategy. Every code change flows through feature branches and pull requests - main is always protected.
 
 ## Branch Rules
 
 ### Never commit to main
 
 All work happens on feature branches created from main:
-- `feat/short-description` — new features
-- `fix/short-description` — bug fixes
-- `chore/short-description` — maintenance, refactoring, deps
-- `docs/short-description` — documentation only
-- `release/vX.Y.Z` — release preparation
+- `feat/short-description` - new features
+- `fix/short-description` - bug fixes
+- `chore/short-description` - maintenance, refactoring, deps
+- `docs/short-description` - documentation only
+- `release/vX.Y.Z` - release preparation
 
 Before creating a branch, pull the latest main:
 ```bash
@@ -51,7 +51,7 @@ Format: `type(scope): description`
 
 Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `perf`
 
-Keep commits small and focused — one logical change per commit.
+Keep commits small and focused - one logical change per commit.
 
 Before committing, pull the latest changes for the current branch to avoid conflicts:
 ```bash
@@ -60,9 +60,9 @@ git pull origin <current-branch> --rebase
 
 ## Pre-PR Checks
 
-Build, lint, and test checks are enforced by **lefthook** (pre-push hook). When you `git push`, lefthook runs automatically — no need to run checks manually.
+Build, lint, and test checks are enforced by **lefthook** (pre-push hook). When you `git push`, lefthook runs automatically - no need to run checks manually.
 
-If the push fails due to lefthook — read the error output, fix the issue, commit the fix, and push again.
+If the push fails due to lefthook - read the error output, fix the issue, commit the fix, and push again.
 
 ## Pull Requests
 
@@ -73,7 +73,7 @@ After finishing work on a branch:
    git push -u origin feat/my-feature
    ```
 2. Create a PR to main using `gh pr create`
-3. The **user reviews and merges** — Claude never merges PRsа визу 
+3. The **user reviews and merges** - Claude never merges PRsа визу 
 
 PR title should be concise (<70 chars). Body should summarize what changed and why.
 
@@ -110,7 +110,7 @@ Releases happen **only when the user explicitly asks** ("сделай релиз
 
 ## Prohibited Actions
 
-Never delete branches, tags, or releases — only the user can do that. Specifically:
+Never delete branches, tags, or releases - only the user can do that. Specifically:
 - No `git branch -d/-D` on remote branches
 - No `git push --delete`
 - No `git tag -d` + push

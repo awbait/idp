@@ -121,7 +121,7 @@ export function GenericListTab({
     );
   }
   // Even without ui:table columns we still render the editor: the form is
-  // assigned, so the Действия menu (Добавить + назначенные views) stays usable;
+  // assigned, so the actions menu (Add + assigned views) stays usable;
   // the list itself just shows a neutral placeholder instead of a table.
   return (
     <ListEditor
@@ -454,7 +454,7 @@ function ItemModal({
   );
 }
 
-// GenericInfoActions is the "Действия" dropdown on the Общая информация tab. It
+// GenericInfoActions is the actions dropdown on the general-info tab. It
 // lists every form-view placed at in:"info" and opens it as a schema+view driven
 // form over the order's values.
 export function GenericInfoActions({

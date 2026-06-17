@@ -2,11 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Токены тем в формате «R G B» (см. tailwind.config.js: палитры Tailwind
-   ссылаются на эти переменные). Светлая — :root; тёмная и РН переопределяют.
-   Тёмная и РН делят нейтрали и статусы, различаются только акцентом
-   (синий/жёлтый) и текстом-на-акценте (светлый/тёмный). data-theme живёт на
-   <html> (выставляется до отрисовки скриптом в index.html). */
+/* Theme tokens in "R G B" format (see tailwind.config.js: Tailwind palettes
+   reference these vars). Light - :root; dark and RN override below.
+   Dark and RN share neutrals and statuses, differing only in accent
+   (blue/yellow) and on-accent text (light/dark). data-theme lives on
+   <html> (set before paint by a script in index.html). */
 :root {
   color-scheme: light;
 
@@ -78,15 +78,15 @@
   --c-orange-800: 154 52 18;
 }
 
-/* Тёмная и РН: общие нейтрали, поверхности и статусы. */
+/* Dark and RN: shared neutrals, surfaces and statuses. */
 [data-theme="dark"],
 [data-theme="rn"] {
   color-scheme: dark;
 
-  --c-surface: 29 32 37; /* #1d2025 — карточки/нав, чуть светлее фона */
-  --c-app: 20 22 26; /* #14161a — фон страницы, самый тёмный */
+  --c-surface: 29 32 37; /* #1d2025 - cards/nav, slightly lighter than the background */
+  --c-app: 20 22 26; /* #14161a - page background, the darkest */
 
-  --c-neutral-50: 20 22 26; /* = фон страницы: заливки/hover темнее поверхности, карточки выделяются */
+  --c-neutral-50: 20 22 26; /* = page background: fills/hover darker than surface so cards stand out */
   --c-neutral-100: 38 42 48;
   --c-neutral-200: 46 51 59;
   --c-neutral-300: 58 64 74;
@@ -94,7 +94,7 @@
   --c-neutral-500: 139 145 155;
   --c-neutral-600: 161 167 176;
   --c-neutral-700: 195 200 206;
-  --c-neutral-800: 230 232 235; /* основной текст */
+  --c-neutral-800: 230 232 235; /* main text */
   --c-neutral-900: 244 245 247;
   --c-neutral-950: 251 251 252;
 
@@ -141,30 +141,30 @@
   --c-orange-800: 254 215 170;
 }
 
-/* Тёмная: синий акцент, светлый текст-на-акценте. */
+/* Dark: blue accent, light on-accent text. */
 [data-theme="dark"] {
   --c-on-accent: 255 255 255;
-  --c-brand-50: 27 37 54; /* тёмно-синяя подложка для активных пунктов */
+  --c-brand-50: 27 37 54; /* dark-blue backing for active items */
   --c-brand-100: 34 48 74;
   --c-brand-200: 42 60 96;
   --c-brand-300: 59 111 208;
   --c-brand-400: 75 139 245;
-  --c-brand-500: 75 139 245; /* фокус-кольцо, ярче для тёмного фона */
+  --c-brand-500: 75 139 245; /* focus ring, brighter for the dark background */
   --c-brand-600: 59 130 246;
   --c-brand-700: 47 111 224;
 }
 
-/* РН: жёлтый акцент Роснефти, тёмный текст-на-акценте (на жёлтых кнопках). */
+/* RN: Rosneft yellow accent, dark on-accent text (on yellow buttons). */
 [data-theme="rn"] {
-  --c-on-accent: 20 22 26; /* #14161a — тёмный текст на жёлтом */
-  --c-brand-50: 42 36 16; /* тёмно-жёлтая подложка для активных пунктов */
+  --c-on-accent: 20 22 26; /* #14161a - dark text on yellow */
+  --c-brand-50: 42 36 16; /* dark-yellow backing for active items */
   --c-brand-100: 58 49 21;
   --c-brand-200: 92 76 26;
   --c-brand-300: 138 111 31;
   --c-brand-400: 214 176 40;
-  --c-brand-500: 255 210 63; /* #ffd23f — фокус-кольцо */
-  --c-brand-600: 255 198 0; /* #ffc600 — заливка кнопок/иконок */
-  --c-brand-700: 224 173 0; /* #e0ad00 — hover/текст */
+  --c-brand-500: 255 210 63; /* #ffd23f - focus ring */
+  --c-brand-600: 255 198 0; /* #ffc600 - button/icon fill */
+  --c-brand-700: 224 173 0; /* #e0ad00 - hover/text */
 }
 
 body {

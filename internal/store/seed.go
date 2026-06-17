@@ -5,30 +5,30 @@ import (
 	_ "embed"
 	"errors"
 
-	"idp/pkg/models"
 	"github.com/google/uuid"
+	"idp/pkg/models"
 )
 
-// Канонический view-документ ingress-gateway (бывший
-// web/public/schemas/ingress-gateway.ui.json), сидируется как approved-публикация.
+// Canonical ingress-gateway view document (formerly
+// web/public/schemas/ingress-gateway.ui.json), seeded as an approved publication.
 //
 //go:embed seed/ingress-gateway.view.json
 var seedIngressView []byte
 
-// seedCategories, стартовый список категорий каталога; дальше управляется
-// админом через API.
+// seedCategories is the initial catalog category list; afterwards managed
+// by the admin via API.
 var seedCategories = []models.Category{
 	{ID: "databases", Label: "Базы данных", Sort: 10},
 	{ID: "network", Label: "Сеть", Sort: 20},
-	// Дефолтная категория для авто-обнаруженных чартов (CATALOG_AUTODISCOVER);
-	// админ переносит их в нужную при модерации.
+	// Default category for auto-discovered charts (CATALOG_AUTODISCOVER);
+	// the admin moves them to the right one during moderation.
 	{ID: "uncategorized", Label: "Без категории", Sort: 99},
 }
 
-// SeedPublications заполняет базовые категории и approved-публикацию
-// ingress-gateway, если их ещё нет. Идемпотентен: вызывается на каждом старте
-// для обоих бэкендов (Postgres и memory); существующие записи не трогает,
-// поэтому правки админа переживают рестарт.
+// SeedPublications populates the base categories and the approved
+// ingress-gateway publication if they do not exist yet. Idempotent: called on
+// every start for both backends (Postgres and memory); existing records are
+// left untouched, so admin edits survive a restart.
 func SeedPublications(ctx context.Context, s Store) error {
 	for _, c := range seedCategories {
 		cat := c
@@ -39,25 +39,25 @@ func SeedPublications(ctx context.Context, s Store) error {
 
 	_, err := s.GetPublicationByChart(ctx, "platform", "ingress-gateway")
 	if err == nil {
-		return nil // уже есть, не перезаписываем
+		return nil // already exists, do not overwrite
 	}
 	if !errors.Is(err, models.ErrNotFound) {
 		return err
 	}
 	pub := &models.ChartPublication{
-		ID:            uuid.Must(uuid.NewV7()).String(),
-		ChartProject:  "platform",
-		ChartName:     "ingress-gateway",
-		CategoryID:    "network",
-		OwnerTeam:     "core",
-		CreatedBy:     "seed",
-		CreatedByName: "Seed",
-		Status:        models.PubApproved,
-		ViewJSON:      seedIngressView,
+		ID:               uuid.Must(uuid.NewV7()).String(),
+		ChartProject:     "platform",
+		ChartName:        "ingress-gateway",
+		CategoryID:       "network",
+		OwnerTeam:        "core",
+		CreatedBy:        "seed",
+		CreatedByName:    "Seed",
+		Status:           models.PubApproved,
+		ViewJSON:         seedIngressView,
 		ApprovedViewJSON: seedIngressView,
-		// Снапшот согласованной версии: каталог/профиль показывают эти данные, а не
-		// живые из Harbor. Согласовано на 3.2.0 (без иконки) — новая версия с иконкой
-		// в Harbor видна только в «Управлении» как доступное обновление.
+		// Snapshot of the approved version: catalog/profile show this data, not
+		// the live one from Harbor. Approved at 3.2.0 (no icon) - a newer version
+		// with an icon in Harbor is visible only in "Manage" as an available update.
 		ApprovedViewVersion: "3.2.0",
 		ApprovedDescription: "Helm chart for Istio-based ingress gateway (Gateway API, routes, NetworkPolicy, AuthorizationPolicy, OIDC)",
 		ApprovedIconURL:     "",

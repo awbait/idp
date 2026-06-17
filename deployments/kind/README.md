@@ -22,32 +22,32 @@ KinD node `v1.33.7`, Argo CD `v3.4.3`, istiod + istio/base `1.30.1`, Harbor char
 
 ## Архитектура
 
-- **Единое имя для GitLab — `host.docker.internal:8929`** — резолвится из хоста,
+- **Единое имя для GitLab - `host.docker.internal:8929`** - резолвится из хоста,
   из контейнера portal и (после патча CoreDNS) из подов KinD. Поэтому `repoURL` в
   Application одинаков везде.
-- **Argo CD** — `argocd-server` в insecure-режиме (HTTP), опубликован на
+- **Argo CD** - `argocd-server` в insecure-режиме (HTTP), опубликован на
   `host.docker.internal:8083` через NodePort 30083 (`kind-config.yaml`
   `extraPortMappings`).
 - **Harbor** (`harbor-helm`, минимальный: Trivy off, **самоподписанный TLS**,
-  persistent volumes через local-path StorageClass KinD — registry обязан хранить
-  блобы между перекатами пода, иначе emptyDir теряет их и push даёт 500) —
+  persistent volumes через local-path StorageClass KinD - registry обязан хранить
+  блобы между перекатами пода, иначе emptyDir теряет их и push даёт 500) -
   настоящий реестр, отдаёт И API v2.0 (каталог портала
   читает его), И OCI-реестр (Argo тянет чарты). Опубликован на
-  `host.docker.internal:8084` (NodePort 30084) — **тем же именем**, что и GitLab,
+  `host.docker.internal:8084` (NodePort 30084) - **тем же именем**, что и GitLab,
   поэтому host/container/поды KinD (через CoreDNS) резолвят его одинаково. Argo CD
   всегда апгрейдит OCI до HTTPS → Harbor обязан говорить по TLS; Argo и `helm`
   пропускают проверку (`insecure: true` / `--insecure-skip-tls-verify`). Проект
   `platform` создаётся **public** (`45-harbor-project.ps1`) → анонимный pull и
-  анонимное чтение каталога (creds не нужны); push (`50-charts.ps1`) — под admin
-  (`admin` / `Harbor12345`). Раскладка чартов — `docs/chart-convention.md`.
+  анонимное чтение каталога (creds не нужны); push (`50-charts.ps1`) - под admin
+  (`admin` / `Harbor12345`). Раскладка чартов - `docs/chart-convention.md`.
 - **IDP коммитит полноценный `application.yaml`** (`kind: Application`,
-  multi-source) рядом с `values.yaml` в папке заказа `<service>/`: source 0 — чарт
-  из OCI (`{CHART_REGISTRY}/{chart_project}`), source 1 — этот же git-репо
+  multi-source) рядом с `values.yaml` в папке заказа `<service>/`: source 0 - чарт
+  из OCI (`{CHART_REGISTRY}/{chart_project}`), source 1 - этот же git-репо
   (`ref: values`), а `helm.valueFiles: $values/<service>/values.yaml` подмешивает
   соседний values. Манифест самодостаточен.
-- **`CHART_REGISTRY`** (env у бэка) — база OCI для chart-source. На стенде
-  `host.docker.internal:8084` (тот же хост, что HARBOR_URL); в проде — Harbor.
-- **app-of-apps ApplicationSet** (`applicationset.yaml`, `kind: ApplicationSet`) —
+- **`CHART_REGISTRY`** (env у бэка) - база OCI для chart-source. На стенде
+  `host.docker.internal:8084` (тот же хост, что HARBOR_URL); в проде - Harbor.
+- **app-of-apps ApplicationSet** (`applicationset.yaml`, `kind: ApplicationSet`) -
   единый generic-механизм без перечисления репо: SCM-provider (GitLab) авто-находит
   ВСЕ репозитории группы `managed-services` (incl. подгруппы) и на каждый создаёт
   directory-`Application`, который рекурсивно применяет `<service>/application.yaml`
@@ -103,12 +103,12 @@ http://host.docker.internal:8083, Harbor - https://host.docker.internal:8084
 
 ## e2e-проверка
 
-1. `kubectl get pods -n argocd` — все Running.
+1. `kubectl get pods -n argocd` - все Running.
 2. CoreDNS-резолв: `kubectl run dnstest --rm -it --image=busybox --restart=Never -- nslookup host.docker.internal`.
 3. Чарт в реестре: `helm pull oci://host.docker.internal:8084/platform/ingress-gateway --version 3.1.0 --insecure-skip-tls-verify`
    (или Harbor API: `curl -sk https://host.docker.internal:8084/api/v2.0/projects/platform/repositories`).
 4. Argo API: `curl -H "Authorization: Bearer $env:ARGOCD_TOKEN" http://host.docker.internal:8083/api/v1/version`.
-5. Заказ (dev-auth, команда `core`; тело `values` — см. `charts/ingress-gateway/minimal-values.yaml`):
+5. Заказ (dev-auth, команда `core`; тело `values` - см. `charts/ingress-gateway/minimal-values.yaml`):
    ```bash
    curl -X POST http://localhost:8080/api/v1/requests -H 'Content-Type: application/json' \
      -H 'X-Dev-Sub: alice' -H 'X-Dev-Teams: core' -H 'X-Dev-Role: member' \
@@ -128,22 +128,22 @@ http://host.docker.internal:8083, Harbor - https://host.docker.internal:8084
 `up.ps1` оркеструет: `00-cluster` → `20-argocd` → `10-coredns` → `30-crds` →
 `35-istio` → `40-harbor` → `45-harbor-project` → `50-charts` → `60-argo-repos` →
 `70-appset` → `token`. Каждый можно запускать отдельно (идемпотентны где возможно).
-`40-harbor.ps1` ставит Harbor через `harbor-helm` (values — `harbor-values.yaml`) и
+`40-harbor.ps1` ставит Harbor через `harbor-helm` (values - `harbor-values.yaml`) и
 ждёт `/api/v2.0/health`. `35-istio.ps1` ставит istiod + MetalLB, чтобы Gateway
 (`gatewayClassName: istio`) был `Programmed` и приложение могло стать `Healthy`.
 
 ## Известные риски / тонкие места
 
-1. **`host.docker.internal` в подах KinD** — чинится патчем CoreDNS
+1. **`host.docker.internal` в подах KinD** - чинится патчем CoreDNS
    (`10-coredns.ps1`, gateway сети `kind`). Без него Argo не склонирует git-source.
-   Фолбэк: подключить kind-ноду к compose-сети и DNS-имя `gitlab` (хуже — меняет
+   Фолбэк: подключить kind-ноду к compose-сети и DNS-имя `gitlab` (хуже - меняет
    `repoURL`).
-2. **OCI поверх HTTP не работает в Argo** — Argo CD (helm-клиент) всегда апгрейдит
+2. **OCI поверх HTTP не работает в Argo** - Argo CD (helm-клиент) всегда апгрейдит
    OCI до HTTPS (`server gave HTTP response to HTTPS client`). Поэтому реестр здесь
    на самоподписанном TLS, а Argo пропускает проверку через `insecure: true`
    (= `helm --insecure-skip-tls-verify`). Plain-http через поле репозитория в
    v3.4 недоступно для `type: helm`.
-3. **Healthy и Gateway** — `35-istio.ps1` ставит istiod (регистрирует
+3. **Healthy и Gateway** - `35-istio.ps1` ставит istiod (регистрирует
    `GatewayClass istio` и программирует Gateway) + MetalLB (даёт LoadBalancer-IP в
    KinD, иначе Gateway `Programmed=False/AddressNotAssigned`). После этого Gateway
    `Accepted+Programmed=True`. Приложение становится `Healthy`, **только если
@@ -154,19 +154,19 @@ http://host.docker.internal:8083, Harbor - https://host.docker.internal:8084
    ставится из **experimental**-канала (нужны TCP/TLS/UDP routes чарта).
 4. **Образ ноды KinD** закреплён на `v1.33.7`: дефолтный `v1.35.0` не поднимает
    kubelet на Docker Desktop/WSL2 (`required cgroups disabled`).
-5. **Установка Argo — server-side apply** (`--server-side --force-conflicts`): CRD
+5. **Установка Argo - server-side apply** (`--server-side --force-conflicts`): CRD
    `applicationsets` слишком велик для client-side apply (аннотация > 256 КБ).
 
 ## Про `kind: Application` vs `kind: ApplicationSet`
 
-`Application` **не устарел** — это базовый CRD, единица деплоя (один инстанс).
-`ApplicationSet` — это «фабрика», которая по генератору (git/scm/list) **создаёт
+`Application` **не устарел** - это базовый CRD, единица деплоя (один инстанс).
+`ApplicationSet` - это «фабрика», которая по генератору (git/scm/list) **создаёт
 множество** `Application`. Это разные сущности, а не замена одной другой.
 
 Поэтому в стенде два слоя с разными kind:
-- то, что IDP коммитит на КАЖДЫЙ заказ — `kind: Application` (`<service>/application.yaml`):
+- то, что IDP коммитит на КАЖДЫЙ заказ - `kind: Application` (`<service>/application.yaml`):
   один сервис = один Application;
-- bootstrap (`deployments/kind/applicationset.yaml`) — `kind: ApplicationSet`: он
+- bootstrap (`deployments/kind/applicationset.yaml`) - `kind: ApplicationSet`: он
   обнаруживает репо и создаёт directory-`Application`, которые применяют те самые
   закоммиченные `Application`.
 

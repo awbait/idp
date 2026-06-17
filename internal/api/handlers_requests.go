@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"idp/internal/auth"
 	"idp/internal/provisioning"
 	"idp/internal/store"
 	"idp/pkg/models"
-	"github.com/go-chi/chi/v5"
 )
 
 type createReq struct {
@@ -170,7 +170,7 @@ func (s *Server) handleSyncRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 // handlePullRequest adopts the order's current Git state (values + version) into
-// the portal, clearing drift. GitOps pull — does not write to Git.
+// the portal, clearing drift. GitOps pull - does not write to Git.
 func (s *Server) handlePullRequest(w http.ResponseWriter, r *http.Request) {
 	u := auth.UserFrom(r.Context())
 	req, err := s.Prov.PullFromGit(r.Context(), u, chi.URLParam(r, "id"))

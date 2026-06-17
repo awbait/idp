@@ -8,12 +8,12 @@ import (
 	"path"
 	"time"
 
-	"idp/pkg/models"
 	"gopkg.in/yaml.v3"
+	"idp/pkg/models"
 )
 
 // Real Helm charts vendored for the fakes-only dev/demo run. The chart is the
-// single source of truth for its values.schema.json — the portal serves and
+// single source of truth for its values.schema.json - the portal serves and
 // validates against these exact bytes, so there is no second copy to drift.
 // Layout: charts/{project}/{name}/ with the usual Helm files.
 //
@@ -80,7 +80,7 @@ func (f *Fake) seedEmbeddedCharts() {
 
 			// Content-derived digest: editing any vendored file changes it, which
 			// invalidates the catalog's per-digest cache (a stable digest would
-			// keep serving a stale schema/values after edits — a dev footgun).
+			// keep serving a stale schema/values after edits - a dev footgun).
 			h := sha256.New()
 			for _, s := range []string{string(metaB), values, schema, readme, changelog} {
 				h.Write([]byte(s))

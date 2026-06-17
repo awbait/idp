@@ -6,4 +6,4 @@ the full chart.
 
 The real, deployable chart lives in [`charts/ingress-gateway`](../../../../../charts/ingress-gateway)
 and is pushed to Harbor by `scripts/stand/50-charts.ps1`. At runtime the catalog
-source is Harbor — this fixture is never used in `real` mode.
+source is Harbor - this fixture is never used in `real` mode.

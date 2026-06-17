@@ -6,11 +6,11 @@ import (
 	"path"
 	"strings"
 
+	"github.com/google/uuid"
+	"gopkg.in/yaml.v3"
 	"idp/internal/gitlab"
 	"idp/internal/store"
 	"idp/pkg/models"
-	"github.com/google/uuid"
-	"gopkg.in/yaml.v3"
 )
 
 // ImportFromGit discovers application.yaml manifests committed under the GitOps
@@ -44,7 +44,7 @@ func (s *Service) ImportFromGit(ctx context.Context) error {
 	for _, d := range discovered {
 		r := s.parseDiscovered(d)
 		if r == nil {
-			continue // couldn't determine the essential identity — skip
+			continue // couldn't determine the essential identity - skip
 		}
 		if _, ok := known[r.ArgoCDAppName]; ok {
 			continue
@@ -52,18 +52,18 @@ func (s *Service) ImportFromGit(ctx context.Context) error {
 		// Only adopt VALID, conforming instances:
 		//  1) the adjacent values.yaml must exist (a complete instance folder), and
 		//  2) the application.yaml must be exactly what the portal would generate for
-		//     this order (re-render and compare) — i.e. it follows our GitOps
+		//     this order (re-render and compare) - i.e. it follows our GitOps
 		//     convention, not some foreign Application we shouldn't manage.
 		valuesPath := path.Dir(d.FilePath) + "/values.yaml"
 		vb, verr := s.gl.GetFile(ctx, d.ProjectID, valuesPath, d.Branch)
 		if verr != nil {
-			continue // no values.yaml (or unreadable) — incomplete instance
+			continue // no values.yaml (or unreadable) - incomplete instance
 		}
 		expected, rerr := s.gitops.RenderApplication(r, d.ProjectWebURL)
 		if rerr != nil || !yamlEqual([]byte(expected), d.Content) {
-			continue // application.yaml is not identical to ours — skip
+			continue // application.yaml is not identical to ours - skip
 		}
-		// values.yaml must satisfy the chart schema — otherwise the adopted order
+		// values.yaml must satisfy the chart schema - otherwise the adopted order
 		// would be un-editable (every edit re-validates the whole values). Skip
 		// instances whose values don't validate.
 		var vmap map[string]any

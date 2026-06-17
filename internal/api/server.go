@@ -73,31 +73,31 @@ func (s *Server) Router() http.Handler {
 
 			// catalog
 			r.Get("/charts", s.handleListCharts)
-			r.Post("/charts/check", s.handleCheckChart) // проверка чарта по произвольному пути
+			r.Post("/charts/check", s.handleCheckChart) // check a chart at an arbitrary path
 			r.Get("/charts/{project}/{name}", s.handleGetChart)
 			r.Get("/charts/{project}/{name}/changelog/aggregated", s.handleAggregatedChangelog)
-			r.Get("/charts/{project}/{name}/view", s.handleGetChartView) // активная approved-view (static wins over {version})
+			r.Get("/charts/{project}/{name}/view", s.handleGetChartView) // active approved view (static wins over {version})
 			r.Get("/charts/{project}/{name}/{version}", s.handleGetVersion)
 			r.Get("/charts/{project}/{name}/{version}/values", s.handleGetValues)
 			r.Get("/charts/{project}/{name}/{version}/readme", s.handleGetReadme)
 			r.Get("/charts/{project}/{name}/{version}/changelog", s.handleGetChangelog)
 			r.Get("/charts/{project}/{name}/{version}/schema", s.handleGetSchema)
 
-			// catalog metadata: категории + публикации поверх Harbor-листинга
+			// catalog metadata: categories + publications over the Harbor listing
 			r.Get("/catalog", s.handleCatalog)
 			r.Get("/categories", s.handleListCategories)
 			r.Post("/categories", s.handleCreateCategory)        // admin
 			r.Patch("/categories/{id}", s.handleUpdateCategory)  // admin
 			r.Delete("/categories/{id}", s.handleDeleteCategory) // admin
 
-			// chart publications: метаданные + view-конструктор + согласование
+			// chart publications: metadata + view builder + approval
 			r.Get("/publications", s.handleListPublications)
 			r.Post("/publications", s.handleCreatePublication)
 			r.Get("/publications/{id}", s.handleGetPublication)
 			r.Patch("/publications/{id}", s.handlePatchPublication)
-			r.Post("/publications/{id}/validate", s.handleValidatePublication) // live-проверка из конструктора
+			r.Post("/publications/{id}/validate", s.handleValidatePublication) // live check from the builder
 			r.Post("/publications/{id}/submit", s.handleSubmitPublication)
-			r.Post("/publications/{id}/withdraw", s.handleWithdrawPublication) // отозвать с согласования
+			r.Post("/publications/{id}/withdraw", s.handleWithdrawPublication) // withdraw from approval
 			r.Post("/publications/{id}/approve", s.handleApprovePublication)   // admin
 			r.Post("/publications/{id}/reject", s.handleRejectPublication)     // admin
 

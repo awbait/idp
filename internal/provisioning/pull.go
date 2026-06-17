@@ -10,7 +10,7 @@ import (
 
 // PullFromGit adopts the order's current Git state into the portal: it reads the
 // committed values.yaml + chart version and writes them onto the order record, so
-// the portal reflects a change made directly in Git. GitOps-correct — Git is the
+// the portal reflects a change made directly in Git. GitOps-correct - Git is the
 // source of truth, this only syncs the portal's copy to it; it does NOT open an
 // MR or touch Git. Clears the drift flag and records a "git_pulled" event.
 func (s *Service) PullFromGit(ctx context.Context, u *models.User, id string) (*models.Request, error) {
@@ -64,7 +64,7 @@ func (s *Service) PullFromGit(ctx context.Context, u *models.User, id string) (*
 		}
 		s.event(ctx, r, u.Subject, "git_pulled", "", "")
 	}
-	// We are now in sync with Git either way — clear any drift flag.
+	// We are now in sync with Git either way - clear any drift flag.
 	_ = s.store.SetDrift(ctx, r.ID, false, "")
 	r.Drifted, r.DriftDetail = false, ""
 	s.publishStatus(r.ID, string(r.Status))

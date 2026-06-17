@@ -9,23 +9,23 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/santhosh-tekuri/jsonschema/v5"
+	"gopkg.in/yaml.v3"
 	"idp/internal/argocd"
 	"idp/internal/catalog"
 	"idp/internal/events"
 	"idp/internal/gitlab"
 	"idp/internal/store"
 	"idp/pkg/models"
-	"github.com/google/uuid"
-	"github.com/santhosh-tekuri/jsonschema/v5"
-	"gopkg.in/yaml.v3"
 )
 
 var nameRe = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
 
 var allDigitsRe = regexp.MustCompile(`^[0-9]+$`)
 
-// validNamespace: DNS-1123 label и не чисто числовой (число в namespace
-// почти наверняка опечатка, и часть инструментов такое имя не переваривает).
+// validNamespace: DNS-1123 label and not purely numeric (a numeric namespace
+// is almost certainly a typo, and some tools choke on such a name).
 func validNamespace(ns string) bool {
 	return nameRe.MatchString(ns) && len(ns) <= 63 && !allDigitsRe.MatchString(ns)
 }
@@ -357,7 +357,7 @@ func (s *Service) updateDraft(ctx context.Context, u *models.User, r *models.Req
 }
 
 // Rename changes only the cosmetic display name. It never opens an MR and works
-// in any non-deleted status — the display name doesn't affect the deployment.
+// in any non-deleted status - the display name doesn't affect the deployment.
 func (s *Service) Rename(ctx context.Context, u *models.User, id, displayName string) (*models.Request, error) {
 	r, err := s.store.GetRequest(ctx, id)
 	if err != nil {
@@ -369,7 +369,7 @@ func (s *Service) Rename(ctx context.Context, u *models.User, id, displayName st
 	if r.DeletedAt != nil {
 		return nil, models.ErrNotFound
 	}
-	// Имя не изменилось — ничего не пишем и не плодим событие «renamed».
+	// Name unchanged - write nothing and don't emit a "renamed" event.
 	if displayName == r.DisplayName {
 		return r, nil
 	}
@@ -427,7 +427,7 @@ func (s *Service) Delete(ctx context.Context, u *models.User, id string) (*model
 		return nil, fmt.Errorf("%w: gitlab list tree: %v", ErrUpstream, terr)
 	}
 	if len(files) == 0 {
-		// Nothing committed in Git for this instance — the manifests were removed
+		// Nothing committed in Git for this instance - the manifests were removed
 		// outside the portal (e.g. an imported order whose files are gone, or a
 		// reset repo). There's no delete MR to open; close the order out directly
 		// rather than committing a delete of files that don't exist (GitLab 400).
@@ -563,7 +563,7 @@ func (s *Service) ensureRepo(ctx context.Context, team, chart string) (*gitlab.P
 		return nil, fmt.Errorf("%w: gitlab: %v", ErrUpstream, err)
 	}
 	// A freshly created repo is empty (no default branch). The MR-based flow needs
-	// a branch to open MRs against, so seed a single .gitkeep to establish it —
+	// a branch to open MRs against, so seed a single .gitkeep to establish it -
 	// no README, keeping the repo otherwise empty. Idempotent: skip once a default
 	// branch exists (also self-heals a repo left half-initialised by a past run).
 	if proj.DefaultBranch == "" {
@@ -593,7 +593,7 @@ func commitTitle(action models.MRAction, chart, service string) string {
 
 // mrTitle builds the merge-request title by a reviewer-friendly convention:
 //
-//	portal(<action>): <chart> "<service>" — <team>/<cluster>
+//	portal(<action>): <chart> "<service>" - <team>/<cluster>
 //
 // More descriptive than the bare commit subject so the MR list reads well in
 // GitLab (what changed, which instance, which team/cluster).
@@ -606,7 +606,7 @@ func mrTitle(action models.MRAction, r *models.Request) string {
 	if verb == "" {
 		verb = "change"
 	}
-	return fmt.Sprintf("portal(%s): %s %q — %s/%s", verb, r.ChartName, r.ServiceName, r.Team, r.Cluster)
+	return fmt.Sprintf("portal(%s): %s %q - %s/%s", verb, r.ChartName, r.ServiceName, r.Team, r.Cluster)
 }
 
 func (s *Service) openChange(ctx context.Context, r *models.Request, proj *gitlab.Project,

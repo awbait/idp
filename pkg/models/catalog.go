@@ -11,9 +11,9 @@ type Chart struct {
 	LatestVersion string   `json:"latest_version"`
 	Versions      []string `json:"versions"`
 	AllowedTeams  []string `json:"allowed_teams,omitempty"` // empty = all teams
-	// Author, первый maintainer из Chart.yaml (если есть). Используется как автор
-	// авто-обнаруженной публикации. Реальный Harbor-клиент пока не парсит Chart.yaml,
-	// так что для него пусто.
+	// Author is the first maintainer from Chart.yaml (if any). Used as the author
+	// of an auto-discovered publication. The real Harbor client does not parse
+	// Chart.yaml yet, so for it this is empty.
 	Author string `json:"author,omitempty"`
 }
 

@@ -53,7 +53,7 @@ type DiscoveredApp struct {
 // and the in-memory fake implement it.
 type Port interface {
 	// GetGroup resolves a (sub)group by full path; ErrNotFound if absent.
-	// The portal never creates team subgroups — they are provisioned manually.
+	// The portal never creates team subgroups - they are provisioned manually.
 	GetGroup(ctx context.Context, fullPath string) (*Group, error)
 	// GetProject resolves a repo by full path; ErrNotFound if absent.
 	GetProject(ctx context.Context, fullPath string) (*Project, error)

@@ -153,7 +153,7 @@ func TestCreateNamespaceValidation(t *testing.T) {
 	s := newStack(t)
 	u := member("core")
 
-	// чисто числовой namespace отклоняется
+	// purely numeric namespace is rejected
 	var ve *provisioning.ValidationError
 	if _, err := s.prov.Create(ctx, u, provisioning.CreateInput{
 		ChartProject: "platform", ChartName: "postgres", Version: "15.4.2",
@@ -162,7 +162,7 @@ func TestCreateNamespaceValidation(t *testing.T) {
 		t.Fatalf("numeric namespace: want validation error, got %v", err)
 	}
 
-	// невалидное k8s-имя тоже
+	// an invalid k8s name too
 	if _, err := s.prov.Create(ctx, u, provisioning.CreateInput{
 		ChartProject: "platform", ChartName: "postgres", Version: "15.4.2",
 		Team: "core", ServiceName: "pg1", Namespace: "Bad_NS", Values: validValues(),
@@ -170,7 +170,7 @@ func TestCreateNamespaceValidation(t *testing.T) {
 		t.Fatalf("bad namespace: want validation error, got %v", err)
 	}
 
-	// нормальный namespace проходит
+	// a normal namespace passes
 	req, err := s.prov.Create(ctx, u, provisioning.CreateInput{
 		ChartProject: "platform", ChartName: "postgres", Version: "15.4.2",
 		Team: "core", ServiceName: "pg1", Namespace: "payments-prod", Values: validValues(),

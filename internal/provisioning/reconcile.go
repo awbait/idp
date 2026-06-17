@@ -81,7 +81,7 @@ func (s *Service) reconcileOne(ctx context.Context, r *models.Request) {
 		// sync status here. Instances of the same chart share one Git branch, so a
 		// sibling's create/update/delete MR advances the branch and briefly marks
 		// this (unchanged) app OutOfSync; that must not demote a Healthy product
-		// back to DEPLOYING — its own manifests/values did not change.
+		// back to DEPLOYING - its own manifests/values did not change.
 		if app, err := s.argo.GetApplication(ctx, r.ArgoCDAppName); err == nil {
 			if target := mapHealth(app.Health); target != "" {
 				s.tryTransition(ctx, r, target)
@@ -99,7 +99,7 @@ func (s *Service) reconcileOne(ctx context.Context, r *models.Request) {
 // pre-sync read right after a merge. We rely on Sync status, not on matching a
 // specific Git commit: instances of one chart share a single Git branch, so an
 // app's revision tracks the whole branch (advanced by any sibling's MR) rather
-// than this instance's own change — comparing exact commits would wedge unrelated
+// than this instance's own change - comparing exact commits would wedge unrelated
 // instances in DEPLOYING. Only used while DEPLOYING (see reconcileOne).
 func deploySettled(app *argocd.Application) bool {
 	return app.Sync == argocd.SyncSynced

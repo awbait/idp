@@ -46,7 +46,7 @@ const checkTimeout = 5 * time.Second
 
 // handleSystemStatus probes every integration (Harbor/GitLab/ArgoCD via Healthz)
 // and storage backend (store/cache via Ping) in parallel and reports their
-// health. Always returns 200 — the body's `healthy` flag carries the verdict so
+// health. Always returns 200 - the body's `healthy` flag carries the verdict so
 // the page can render partial failures rather than erroring out.
 func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
 	type check struct {

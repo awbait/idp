@@ -27,7 +27,7 @@ type Values = Record<string, unknown>;
 
 // readPointer resolves a JSON Pointer (e.g. "/gateways/0/name") to a string.
 // Used to source the deploy identity (service_name) from a values field that a
-// view declares via "identity" — so the backend stays chart-agnostic.
+// view declares via "identity" - so the backend stays chart-agnostic.
 function readPointer(obj: unknown, pointer: string): string {
   let cur: unknown = obj;
   for (const part of pointer.split("/").filter(Boolean)) {
@@ -39,14 +39,14 @@ function readPointer(obj: unknown, pointer: string): string {
 
 // OrderPage drives ordering a new service (/catalog/:project/:name/order),
 // editing an existing DRAFT (/requests/:id/edit), and upgrading a live order to
-// a newer chart version (/requests/:id/upgrade?to=X — the upgrade flag). Upgrade
+// a newer chart version (/requests/:id/upgrade?to=X - the upgrade flag). Upgrade
 // reuses the form at the target version (prefilled from the order) and opens an
 // update MR; identity/cluster/namespace are immutable once deployed.
 export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
   const { project: pParam = "", name: nParam = "", id } = useParams();
   const [searchParams] = useSearchParams();
-  // Целевая версия апгрейда из ?to= (благословлённая версия); запасной вариант —
-  // последняя версия чарта.
+  // Upgrade target version from ?to= (the approved version); fallback is the
+  // chart's latest version.
   const upgradeToParam = searchParams.get("to") ?? "";
   const editing = !!id;
   const navigate = useNavigate();
@@ -91,13 +91,13 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
   // that, a field's error shows only once it's been touched.
   const [showErrors, setShowErrors] = useState(false);
 
-  // Upgrade: целевая версия строго из ?to= (без подмены на latest, иначе можно
-  // было бы «обновиться» на произвольную версию). Draft: закреплённая версия.
-  // Новый заказ: последняя версия чарта.
+  // Upgrade: target version strictly from ?to= (no fallback to latest, else one
+  // could "upgrade" to an arbitrary version). Draft: the pinned version.
+  // New order: the chart's latest version.
   const targetVersion = upgrade ? upgradeToParam : "";
-  // Допустимые версии апгрейда для этого заказа (выше текущей, не выше
-  // согласованной). По ним валидируем ?to=, чтобы нельзя было открыть форму на
-  // несуществующей/недопустимой версии.
+  // Allowed upgrade versions for this order (above current, not above the
+  // approved one). We validate ?to= against them so the form can't open on a
+  // missing/disallowed version.
   const approvedVersion = findCatalogChart(charts, project, name)?.publication?.approved_view_version;
   const allowedUpgrades = upgrade
     ? upgradeTargets(chart?.versions ?? [], draft?.chart_version ?? "", approvedVersion)
@@ -108,8 +108,8 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
       ? draft?.chart_version ?? null
       : chart?.latest_version ?? null;
 
-  // Апгрейд: CHANGELOG чарта между текущей версией заказа и целевой, чтобы было
-  // видно, что изменилось.
+  // Upgrade: the chart's CHANGELOG between the order's current version and the
+  // target, so the changes are visible.
   const { data: changelog } = useAsync(
     async () => {
       if (!upgrade || !project || !name) return [] as ChangelogEntry[];
@@ -138,7 +138,7 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
   const viewDoc = form?.doc ?? null;
   // A view may declare which values field supplies the deploy identity
   // (service_name). When set, we source the name from the form instead of a
-  // separate "Service name" input — e.g. the gateway's own name field.
+  // separate "Service name" input - e.g. the gateway's own name field.
   const identity: string | undefined = orderView?.identity;
   const identityName = identity ? readPointer(values, identity) : "";
 
@@ -170,7 +170,7 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
   if (editing && existingErr) return <ErrorBox error={existingErr} />;
   if (editing && !upgrade && draft && draft.status !== "DRAFT") {
     // Only drafts are editable here; live orders bounce to the read-only detail
-    // page (the upgrade flow is the one exception — it edits a live order).
+    // page (the upgrade flow is the one exception - it edits a live order).
     navigate(`/requests/${draft.id}`, { replace: true });
     return null;
   }
@@ -178,8 +178,8 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
   if (chartErr) return <ErrorBox error={chartErr} />;
   if (!chart) return null;
 
-  // Upgrade guard: ждём каталог (источник допустимых версий), затем сверяем ?to=.
-  // Недопустимая/несуществующая целевая версия не открывает форму обновления.
+  // Upgrade guard: wait for the catalog (source of allowed versions), then check
+  // ?to=. A disallowed/missing target version won't open the upgrade form.
   if (upgrade) {
     if (catalogLoading) return <Spinner />;
     if (!targetVersion || !allowedUpgrades.includes(targetVersion)) {
@@ -330,9 +330,10 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
     }
   }
 
-  // doUpgrade обновляет живой заказ до целевой версии: валидирует значения по
-  // новой схеме и открывает update-MR (api.updateRequest с новой version). Имя
-  // сервиса/кластер/namespace неизменны — отправляем только версию и values.
+  // doUpgrade upgrades a live order to the target version: validates the values
+  // against the new schema and opens an update MR (api.updateRequest with the new
+  // version). Service name/cluster/namespace are immutable - we send only the
+  // version and values.
   async function doUpgrade() {
     setSubmitErr(null);
     if (clientErrors.size > 0) {
@@ -393,7 +394,7 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
           <p className="text-sm text-gray-600">
             Версия <span className="font-medium text-gray-800">{draft?.chart_version}</span> →{" "}
             <span className="font-medium text-brand-700">{targetVersion}</span>. Идентификатор,
-            кластер и namespace при обновлении не меняются — правятся только значения под новую схему.
+            кластер и namespace при обновлении не меняются - правятся только значения под новую схему.
           </p>
           {changelog && changelog.length > 0 && (
             <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs">
@@ -451,8 +452,8 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
         lockedPaths={upgrade && identity ? [identity] : undefined}
       />
 
-      {/* На обновлении даём редактировать и остальные секции (вкладки + действия),
-          как на странице продукта, но в одни и те же values и одним MR. */}
+      {/* On upgrade, let the other sections be edited too (tabs + actions), like
+          on the product page, but into the same values and as a single MR. */}
       {upgrade && schema && viewDoc && draft && (
         <UpgradeExtras
           request={{ ...draft, chart_version: targetVersion, values_yaml: yaml.dump(pruneEmpty(values)) }}

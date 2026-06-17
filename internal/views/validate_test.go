@@ -7,7 +7,7 @@ import (
 	"idp/internal/views"
 )
 
-// Схема в духе реального ingress-gateway: definitions + $ref + вложенность.
+// A schema in the spirit of the real ingress-gateway: definitions + $ref + nesting.
 const schema = `{
   "type": "object",
   "properties": {
@@ -98,7 +98,7 @@ func TestStructuralIssues(t *testing.T) {
 		{"bad widget", `{"views":{"order":{"overrides":{"x":{"ui:widget":"fancy"}}}}}`, "ui:widget", "single"},
 		{"identity not pointer", `{"views":{"order":{"identity":"gateways"}}}`, "/identity", "pointer"},
 		{"identity nested", `{"views":{"order":{"overrides":{"x":{"ui:view":{"identity":"/a"}}}}}}`, "ui:view/identity", "верхнем уровне"},
-		// view "order", ровно одна.
+		// view "order", exactly one.
 		{"order missing", `{"views":{"routes":{}}}`, "", `Не хватает view "order"`},
 		{"order duplicated", `{"views":{"order":{},"order":{}}}`, "/views/order", "указан дважды"},
 	}
@@ -132,8 +132,8 @@ func TestSchemaCrossChecks(t *testing.T) {
 			"ui:view/exclude/0", "Definition",
 		},
 		{
-			// Правило: include внутри overrides.gateways.ui:view сверяется с
-			// properties элемента массива gateways (gateways[].nosuch не существует).
+			// Rule: include inside overrides.gateways.ui:view is checked against
+			// the properties of the gateways array element (gateways[].nosuch does not exist).
 			"nested include unknown (gateways[].items)",
 			`{"views":{"order":{"include":["gateways"],"overrides":{"gateways":{"ui:view":{"include":["nosuch"]}}}}}}`,
 			"overrides/gateways/ui:view/include/0", `Definition "nosuch" не найден`,
@@ -154,7 +154,7 @@ func TestSchemaCrossChecks(t *testing.T) {
 	}
 }
 
-// Правильно прописанный вложенный include (gateways[].listeners) проходит без ошибок.
+// A correctly written nested include (gateways[].listeners) passes without errors.
 func TestNestedIncludeValid(t *testing.T) {
 	doc := `{"views":{"order":{
 		"include":["gateways"],
@@ -165,7 +165,7 @@ func TestNestedIncludeValid(t *testing.T) {
 	}
 }
 
-// Секция tabs: вкладки-таблицы (items + form + ui:table).
+// tabs section: list tabs (items + form + ui:table).
 func TestTabsValid(t *testing.T) {
 	doc := `{"views":{"order":{},"listener":{}},"tabs":[
 		{"id":"listeners","title":"Слушатели","items":"/gateways/0/listeners","form":"listener",
@@ -177,7 +177,7 @@ func TestTabsValid(t *testing.T) {
 }
 
 func TestTabsIssues(t *testing.T) {
-	// База: одна форма listener в views, вкладку дополняем в каждом кейсе.
+	// Base: one listener form in views, the tab is filled in per case.
 	cases := []struct{ name, doc, path, msg string }{
 		{"not array", `{"views":{"order":{}},"tabs":{}}`, "/tabs", "массивом"},
 		{"id missing", `{"views":{"order":{},"listener":{}},"tabs":[{"items":"/x","form":"listener"}]}`, "/tabs/0/id", `Укажите "id"`},
@@ -200,7 +200,7 @@ func TestTabsIssues(t *testing.T) {
 	}
 }
 
-// enums (динамические enum'ы) + lookup-колонки: валидный документ против схемы.
+// enums (dynamic enums) + lookup columns: a valid document against the schema.
 func TestTabsEnumsLookupValid(t *testing.T) {
 	doc := `{"views":{"order":{},"route":{}},"tabs":[
 		{"id":"routes","items":"/xroutes","form":"route",
@@ -235,7 +235,7 @@ func TestTabsEnumsLookupIssues(t *testing.T) {
 	}
 }
 
-// Секция actions: размещение формы-view в «Действия» (info и вкладка из tabs).
+// actions section: placement of a view form in "Actions" (info and a tab from tabs).
 func TestActionsValid(t *testing.T) {
 	doc := `{"views":{"order":{},"resources":{},"listener":{}},
 		"tabs":[{"id":"listeners","items":"/x","form":"listener"}],
@@ -269,7 +269,7 @@ func TestActionsIssues(t *testing.T) {
 	}
 }
 
-// Без схемы (чарт без values.schema.json) кросс-проверки молчат.
+// Without a schema (a chart without values.schema.json) cross-checks stay silent.
 func TestNoSchemaSkipsCrossChecks(t *testing.T) {
 	doc := `{"views":{"order":{"identity":"/whatever/0/x","include":["anything"]}}}`
 	if issues := views.Validate([]byte(doc), nil); len(issues) > 0 {
@@ -277,7 +277,7 @@ func TestNoSchemaSkipsCrossChecks(t *testing.T) {
 	}
 }
 
-// Free-form участки схемы (объект без properties) не дают ложных ошибок.
+// Free-form parts of the schema (an object without properties) produce no false errors.
 func TestFreeFormObjectTolerated(t *testing.T) {
 	loose := `{"type":"object","properties":{"cfg":{"type":"object"}}}`
 	doc := `{"views":{"order":{"overrides":{"cfg":{"ui:view":{"include":["whatever"]}}}}}}`

@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import { IconAlertCircle, IconCheck, IconX } from "@tabler/icons-react";
 
-// Глобальные тосты: уведомления success/error в правом нижнем углу с
-// автозакрытием. Любая страница вызывает useToast().success(...) / .error(...).
-// Реализация лёгкая, без внешних зависимостей (RAC Toast здесь избыточен).
+// Global toasts: success/error notifications in the bottom-right corner with
+// auto-dismiss. Any page calls useToast().success(...) / .error(...).
+// Lightweight implementation, no external deps (RAC Toast would be overkill here).
 
 export type ToastTone = "success" | "error";
 
@@ -16,7 +16,7 @@ interface Toast {
 
 interface ToastOptions {
   title?: string;
-  duration?: number; // мс; 0 = не закрывать автоматически
+  duration?: number; // ms; 0 = do not auto-dismiss
 }
 
 interface ToastApi {
@@ -28,7 +28,7 @@ interface ToastApi {
 
 const ToastContext = createContext<ToastApi | null>(null);
 
-// Дефолтное время показа: ошибки держим дольше, чтобы успеть прочитать.
+// Default display time: errors stay longer so there's time to read them.
 const DEFAULT_DURATION: Record<ToastTone, number> = { success: 3500, error: 8000 };
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {

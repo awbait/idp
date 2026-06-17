@@ -79,7 +79,7 @@ func run(ctx context.Context, cfg *config.Config, log *slog.Logger) error {
 	}
 	defer st.Close()
 
-	// Базовые категории + approved-публикация ingress-gateway (идемпотентно).
+	// Base categories + approved ingress-gateway publication (idempotent).
 	if err := store.SeedPublications(ctx, st); err != nil {
 		return fmt.Errorf("seed publications: %w", err)
 	}
@@ -232,9 +232,9 @@ type importReconciler struct{ s *provisioning.Service }
 
 func (i importReconciler) Reconcile(ctx context.Context) error { return i.s.ImportFromGit(ctx) }
 
-// discoveryReconciler регистрирует найденные в Harbor чарты как черновики-
-// публикации (владелец — группа админов). Список чартов берёт от каталога
-// (admin-видимость — все), автор из Chart.yaml.
+// discoveryReconciler registers charts found in Harbor as draft publications
+// (owner - the admin group). It pulls the chart list from the catalog
+// (admin visibility - all), with the author taken from Chart.yaml.
 type discoveryReconciler struct {
 	pubs       *publications.Service
 	cat        *catalog.Service

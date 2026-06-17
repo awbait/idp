@@ -1,9 +1,9 @@
-// Package publications реализует «публикации чартов»: портальные метаданные
-// каталога (категория, владелец) и согласование view-документов.
+// Package publications implements "chart publications": portal catalog
+// metadata (category, owner) and the approval of view documents.
 //
-// FSM черновика view: DRAFT → PENDING → APPROVED | REJECTED → DRAFT (правка).
-// Approved-версия (ApprovedViewJSON) продолжает обслуживать формы заказа, пока
-// новый черновик находится на согласовании.
+// View draft FSM: DRAFT -> PENDING -> APPROVED | REJECTED -> DRAFT (edit).
+// The approved version (ApprovedViewJSON) keeps serving order forms while a
+// new draft is under review.
 package publications
 
 import (
@@ -13,20 +13,20 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"idp/internal/store"
 	"idp/internal/views"
 	"idp/pkg/models"
-	"github.com/google/uuid"
 )
 
 var (
 	ErrForbidden = errors.New("forbidden")
-	// ErrPendingLocked: черновик на согласовании, правки заморожены до решения админа.
+	// ErrPendingLocked: draft is under review, edits are frozen until the admin decides.
 	ErrPendingLocked = errors.New("publication is pending review")
 )
 
-// ValidationError, ошибка валидации входных данных (422 в API). Issues
-// заполнен для ошибок view-документа (путь внутри документа + сообщение).
+// ValidationError is an input validation error (422 in the API). Issues
+// is filled for view document errors (path inside the document + message).
 type ValidationError struct {
 	Message string
 	Issues  []views.Issue
@@ -38,9 +38,9 @@ func invalid(format string, a ...any) error {
 	return &ValidationError{Message: fmt.Sprintf(format, a...)}
 }
 
-// conflictError, конфликт с человекочитаемой причиной: errors.Is(err,
-// models.ErrConflict) остаётся истинным (API маппит в 409), но в message
-// уходит понятный текст вместо голого "conflict".
+// conflictError is a conflict with a human-readable reason: errors.Is(err,
+// models.ErrConflict) stays true (the API maps it to 409), but the message
+// carries clear text instead of a bare "conflict".
 type conflictError struct{ msg string }
 
 func (e *conflictError) Error() string        { return e.msg }
@@ -50,10 +50,10 @@ func conflict(format string, a ...any) error {
 	return &conflictError{msg: fmt.Sprintf(format, a...)}
 }
 
-// SchemaSource отдаёт values.schema.json и номер последней версии чарта
-// (реализуется catalog.Service). Схема нужна для кросс-валидации view-документов;
-// версия — чтобы штамповать согласованный view (ApprovedViewVersion). nil или
-// ошибка источника, соответствующий шаг пропускается.
+// SchemaSource provides values.schema.json and the chart's latest version
+// number (implemented by catalog.Service). The schema is needed for view
+// document cross-validation; the version - to stamp the approved view
+// (ApprovedViewVersion). On nil or a source error, the corresponding step is skipped.
 type SchemaSource interface {
 	LatestSchema(ctx context.Context, project, name string) ([]byte, error)
 	LatestVersion(ctx context.Context, project, name string) (string, error)
@@ -73,7 +73,7 @@ func New(st store.Store, schemas SchemaSource) *Service {
 
 func newID() string { return uuid.Must(uuid.NewV7()).String() }
 
-// canManage: управление публикацией, участник группы-владельца или админ.
+// canManage: manage a publication, a member of the owner group or an admin.
 func canManage(u *models.User, ownerTeam string) bool {
 	return u.IsAdmin() || u.InTeam(ownerTeam)
 }
@@ -127,7 +127,7 @@ func (s *Service) DeleteCategory(ctx context.Context, u *models.User, id string)
 
 // --- publications ---
 
-// CreateInput регистрирует чарт в каталоге: категория + группа-владелец.
+// CreateInput registers a chart in the catalog: category + owner group.
 type CreateInput struct {
 	ChartProject string
 	ChartName    string
@@ -173,11 +173,11 @@ func (s *Service) Create(ctx context.Context, u *models.User, in CreateInput) (*
 	return p, nil
 }
 
-// UpdateInput, правка метаданных и/или черновика view. Nil-поля не трогаются.
+// UpdateInput edits metadata and/or the view draft. Nil fields are left untouched.
 type UpdateInput struct {
 	CategoryID *string
 	OwnerTeam  *string
-	View       json.RawMessage // черновик view-документа; nil = не менять
+	View       json.RawMessage // view document draft; nil = do not change
 }
 
 func (s *Service) Update(ctx context.Context, u *models.User, id string, in UpdateInput) (*models.ChartPublication, error) {
@@ -192,9 +192,9 @@ func (s *Service) Update(ctx context.Context, u *models.User, id string, in Upda
 		return nil, ErrPendingLocked
 	}
 	payload := map[string]any{}
-	// Смена категории/владельца не применяется сразу: она копится в draft-полях и
-	// уходит в live (CategoryID/OwnerTeam) только на approve. Возврат значения к
-	// согласованному снимает черновик.
+	// A category/owner change is not applied immediately: it accumulates in the
+	// draft fields and moves to live (CategoryID/OwnerTeam) only on approve.
+	// Reverting a value to the approved one clears the draft.
 	if in.CategoryID != nil {
 		if *in.CategoryID == p.CategoryID {
 			if p.DraftCategoryID != "" {
@@ -219,7 +219,7 @@ func (s *Service) Update(ctx context.Context, u *models.User, id string, in Upda
 				payload["draft_owner_team"] = ""
 			}
 		} else if *in.OwnerTeam != p.DraftOwnerTeam {
-			// Предложить передачу владения можно только в свою команду; админ, в любую.
+			// Ownership transfer can be proposed only to your own team; an admin, to any.
 			if !u.IsAdmin() && !u.InTeam(*in.OwnerTeam) {
 				return nil, ErrForbidden
 			}
@@ -228,8 +228,8 @@ func (s *Service) Update(ctx context.Context, u *models.User, id string, in Upda
 		}
 	}
 	if in.View != nil {
-		// Черновик можно сохранить со схемными недочётами (схема чарта может
-		// меняться), но структура формата обязана быть валидной.
+		// A draft may be saved with schema flaws (the chart schema can
+		// change), but the format structure must be valid.
 		if issues := views.ValidateStructure(in.View); len(issues) > 0 {
 			return nil, &ValidationError{Message: "view.schema.json не проходит валидацию формата", Issues: issues}
 		}
@@ -239,8 +239,8 @@ func (s *Service) Update(ctx context.Context, u *models.User, id string, in Upda
 	if len(payload) == 0 {
 		return p, nil // no-op
 	}
-	// Любая правка черновика (view или метаданные) возвращает отклонённую
-	// публикацию в работу.
+	// Any draft edit (view or metadata) returns a rejected publication
+	// back to work.
 	if p.Status == models.PubRejected {
 		p.Status = models.PubDraft
 	}
@@ -251,7 +251,7 @@ func (s *Service) Update(ctx context.Context, u *models.User, id string, in Upda
 	return p, nil
 }
 
-// Submit отправляет черновик view на согласование админом.
+// Submit sends the view draft for review by an admin.
 func (s *Service) Submit(ctx context.Context, u *models.User, id string) (*models.ChartPublication, error) {
 	p, err := s.store.GetPublication(ctx, id)
 	if err != nil {
@@ -266,9 +266,9 @@ func (s *Service) Submit(ctx context.Context, u *models.User, id string) (*model
 	if len(p.ViewJSON) == 0 && !p.PendingMeta() {
 		return nil, invalid("нечего отправлять: нет ни черновика view, ни изменений метаданных")
 	}
-	// На согласование уходит только полностью валидный документ: формат +
-	// (по возможности) сверка с values.schema.json чарта. Если меняются только
-	// метаданные (view не трогали), проверять нечего.
+	// Only a fully valid document goes to review: format +
+	// (when possible) a check against the chart's values.schema.json. If only
+	// metadata changes (the view was not touched), there is nothing to check.
 	if len(p.ViewJSON) > 0 {
 		if issues := s.validateView(ctx, p, p.ViewJSON); len(issues) > 0 {
 			return nil, &ValidationError{Message: "view.schema.json не проходит валидацию", Issues: issues}
@@ -283,8 +283,8 @@ func (s *Service) Submit(ctx context.Context, u *models.User, id string) (*model
 	return p, nil
 }
 
-// Withdraw отзывает черновик с согласования для доработки: PENDING → DRAFT.
-// Доступно владельцам (и админу); approved-версия, как обычно, не трогается.
+// Withdraw pulls a draft back from review for rework: PENDING -> DRAFT.
+// Available to owners (and the admin); the approved version, as usual, is untouched.
 func (s *Service) Withdraw(ctx context.Context, u *models.User, id string) (*models.ChartPublication, error) {
 	p, err := s.store.GetPublication(ctx, id)
 	if err != nil {
@@ -305,12 +305,12 @@ func (s *Service) Withdraw(ctx context.Context, u *models.User, id string) (*mod
 	return p, nil
 }
 
-// Approve (admin): черновик становится активной view.
+// Approve (admin): the draft becomes the active view.
 func (s *Service) Approve(ctx context.Context, u *models.User, id string) (*models.ChartPublication, error) {
 	return s.review(ctx, u, id, models.PubApproved, "")
 }
 
-// Reject (admin): черновик отклонён с комментарием; approved-версия не трогается.
+// Reject (admin): the draft is rejected with a comment; the approved version is untouched.
 func (s *Service) Reject(ctx context.Context, u *models.User, id, comment string) (*models.ChartPublication, error) {
 	return s.review(ctx, u, id, models.PubRejected, comment)
 }
@@ -330,14 +330,14 @@ func (s *Service) review(ctx context.Context, u *models.User, id string, to mode
 	var applied map[string]any
 	if to == models.PubApproved {
 		p.ApprovedViewJSON = p.ViewJSON
-		// Штампуем версию, под которую согласован view: это «благословлённая»
-		// версия чарта (latest на момент approve). Best-effort: Harbor недоступен —
-		// оставляем прежнюю отметку.
+		// Stamp the version the view is approved for: this is the "blessed"
+		// chart version (latest at approve time). Best-effort: if Harbor is
+		// unavailable, keep the previous mark.
 		if v := s.latestVersion(ctx, p); v != "" {
 			p.ApprovedViewVersion = v
 		}
-		// Описание и иконку тоже снапшотим — каталог/профиль покажут согласованные,
-		// а не живые из Harbor (иначе новая версия «протекает» в каталог).
+		// Snapshot the description and icon too - catalog/profile show the
+		// approved ones, not the live Harbor data (otherwise a new version "leaks" into the catalog).
 		if s.schemas != nil {
 			if d, err := s.schemas.LatestDescription(ctx, p.ChartProject, p.ChartName); err == nil {
 				p.ApprovedDescription = d
@@ -346,8 +346,8 @@ func (s *Service) review(ctx context.Context, u *models.User, id string, to mode
 				p.ApprovedIconURL = ic
 			}
 		}
-		// Согласованная смена метаданных применяется к live-значениям и черновик
-		// гасится. Категорию перепроверяем: за время ревью её могли удалить.
+		// The approved metadata change is applied to the live values and the draft
+		// is cleared. Recheck the category: it could have been deleted during review.
 		applied = map[string]any{}
 		if p.DraftCategoryID != "" {
 			if err := s.checkCategory(ctx, p.DraftCategoryID); err != nil {
@@ -363,8 +363,8 @@ func (s *Service) review(ctx context.Context, u *models.User, id string, to mode
 			applied["owner_team"] = p.OwnerTeam
 		}
 	}
-	// Статус и реквизиты ревью проставляем после возможных проверок, чтобы
-	// неуспешный approve не оставил публикацию в полупринятом виде.
+	// Set the status and review details after the possible checks, so that
+	// a failed approve does not leave the publication in a half-accepted state.
 	p.Status = to
 	p.ReviewedBy = u.Subject
 	p.ReviewComment = comment
@@ -383,24 +383,24 @@ func (s *Service) review(ctx context.Context, u *models.User, id string, to mode
 	return p, nil
 }
 
-// DefaultDiscoveryCategory — категория для авто-обнаруженных черновиков (seed).
+// DefaultDiscoveryCategory is the category for auto-discovered drafts (seed).
 const DefaultDiscoveryCategory = "uncategorized"
 
-// DiscoveredChart — найденный в Harbor чарт для авто-регистрации.
+// DiscoveredChart is a chart found in Harbor for auto-registration.
 type DiscoveredChart struct {
 	Project string
 	Name    string
-	Author  string // из Chart.yaml maintainers, может быть пусто
+	Author  string // from Chart.yaml maintainers, may be empty
 }
 
-// EnsureDiscovered заводит черновики-публикации для найденных в Harbor чартов,
-// у которых публикации ещё нет: владелец — группа админов (ownerTeam), категория —
-// дефолтная (categoryID), автор — из Chart.yaml. Уже существующие не трогает.
-// Системная операция (без пользователя/RBAC), вызывается фоновым реконсилером.
+// EnsureDiscovered creates draft publications for charts found in Harbor that
+// do not have a publication yet: the owner is the admin group (ownerTeam), the
+// category is the default (categoryID), the author comes from Chart.yaml. Existing ones are left untouched.
+// A system operation (no user/RBAC), called by the background reconciler.
 func (s *Service) EnsureDiscovered(ctx context.Context, charts []DiscoveredChart, ownerTeam, categoryID string) error {
 	for _, c := range charts {
 		if _, err := s.store.GetPublicationByChart(ctx, c.Project, c.Name); err == nil {
-			continue // уже зарегистрирован
+			continue // already registered
 		} else if !errors.Is(err, models.ErrNotFound) {
 			return err
 		}
@@ -411,12 +411,12 @@ func (s *Service) EnsureDiscovered(ctx context.Context, charts []DiscoveredChart
 			CategoryID:    categoryID,
 			OwnerTeam:     ownerTeam,
 			CreatedBy:     "auto-discovery",
-			CreatedByName: c.Author, // пусто, если у чарта нет maintainers
+			CreatedByName: c.Author, // empty if the chart has no maintainers
 			Status:        models.PubDraft,
 		}
 		if err := s.store.CreatePublication(ctx, p); err != nil {
 			if errors.Is(err, models.ErrConflict) {
-				continue // гонка с другим путём регистрации — ок
+				continue // race with another registration path - ok
 			}
 			return err
 		}
@@ -442,7 +442,7 @@ func (s *Service) ListEvents(ctx context.Context, id string) ([]*models.Publicat
 	return s.store.ListPublicationEvents(ctx, id)
 }
 
-// ActiveView возвращает действующую согласованную view чарта (для форм заказа).
+// ActiveView returns the chart's active approved view (for order forms).
 func (s *Service) ActiveView(ctx context.Context, project, name string) (json.RawMessage, error) {
 	p, err := s.store.GetPublicationByChart(ctx, project, name)
 	if err != nil {
@@ -454,9 +454,9 @@ func (s *Service) ActiveView(ctx context.Context, project, name string) (json.Ra
 	return p.ApprovedViewJSON, nil
 }
 
-// ValidateView прогоняет полную валидацию черновика view для конструктора
-// (live-проверка): структура формата + сверка со схемой чарта. Возвращает
-// список проблем (пустой = всё хорошо), а не ошибку, 422 здесь не нужен.
+// ValidateView runs a full validation of the view draft for the builder
+// (live check): format structure + a check against the chart schema. Returns
+// a list of problems (empty = all good), not an error, 422 is not needed here.
 func (s *Service) ValidateView(ctx context.Context, id string, view json.RawMessage) ([]views.Issue, error) {
 	p, err := s.store.GetPublication(ctx, id)
 	if err != nil {
@@ -465,8 +465,8 @@ func (s *Service) ValidateView(ctx context.Context, id string, view json.RawMess
 	return s.validateView(ctx, p, view), nil
 }
 
-// latestVersion, best-effort номер последней версии чарта (для штампа
-// ApprovedViewVersion). Пусто, если источник недоступен.
+// latestVersion is a best-effort latest chart version number (for the
+// ApprovedViewVersion stamp). Empty if the source is unavailable.
 func (s *Service) latestVersion(ctx context.Context, p *models.ChartPublication) string {
 	if s.schemas == nil {
 		return ""
@@ -478,9 +478,9 @@ func (s *Service) latestVersion(ctx context.Context, p *models.ChartPublication)
 	return v
 }
 
-// validateView, формат + best-effort кросс-валидация со схемой чарта: схема
-// недоступна (нет SchemaSource, чарт без схемы, Harbor недоступен), проверяем
-// только структуру.
+// validateView does format + best-effort cross-validation against the chart
+// schema: if the schema is unavailable (no SchemaSource, a chart without a
+// schema, Harbor unavailable), we check only the structure.
 func (s *Service) validateView(ctx context.Context, p *models.ChartPublication, view json.RawMessage) []views.Issue {
 	var schema []byte
 	if s.schemas != nil {
@@ -504,8 +504,8 @@ func (s *Service) checkCategory(ctx context.Context, id string) error {
 	return invalid("unknown category %q", id)
 }
 
-// addEvent пишет аудит-запись; её ошибка не должна ломать основную операцию
-// (паттерн provisioning.event).
+// addEvent writes an audit record; its error must not break the main operation
+// (the provisioning.event pattern).
 func (s *Service) addEvent(ctx context.Context, pubID string, u *models.User, eventType string, from, to models.PublicationStatus, payload map[string]any) {
 	_ = s.store.AddPublicationEvent(ctx, &models.PublicationEvent{
 		PublicationID: pubID,

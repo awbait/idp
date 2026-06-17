@@ -218,7 +218,7 @@ func (c *Client) GetMR(ctx context.Context, projectID, iid int) (*MR, error) {
 
 func (c *Client) MergeMR(ctx context.Context, projectID, iid int) error {
 	// GitLab merges immediately when the MR is mergeable. Just after creation the
-	// merge_status may still be "checking" (405) — the poller retries next tick.
+	// merge_status may still be "checking" (405) - the poller retries next tick.
 	return c.do(ctx, http.MethodPut,
 		fmt.Sprintf("/projects/%d/merge_requests/%d/merge", projectID, iid), nil, nil, nil)
 }

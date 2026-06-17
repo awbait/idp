@@ -83,7 +83,7 @@ function walkErrors(
       if (isHidden(child)) continue;
       const cv = (value as Values)?.[k];
       const cpath = `${base}/${k}`;
-      // A required field with a schema default/const isn't "missing input" — the
+      // A required field with a schema default/const isn't "missing input" - the
       // form shows the default selected and it's applied on submit, so don't flag.
       const hasDefault = "default" in child || "const" in child;
       if (required.has(k) && emptyVal(cv) && !hasDefault) {
@@ -138,7 +138,7 @@ function viewKeys(schema: Schema, view?: View): string[] {
 // objects, arrays (add/remove), oneOf (variant picker), additionalProperties
 // maps, enum/const, defaults and defaultSnippets. if/then is used to surface
 // conditional required fields (see conditionalRequired) but not otherwise
-// enforced — the OrderPage offers a raw-YAML fallback for the rest.
+// enforced - the OrderPage offers a raw-YAML fallback for the rest.
 
 function resolvePointer(ref: string, root: Schema): Schema {
   if (!ref.startsWith("#/")) return {};
@@ -681,7 +681,7 @@ function ArrayField({
 
 // SingleField renders an array constrained to a single element as one object
 // (no add/remove). The value stays a real array ([item]) so it still validates
-// against the array schema (minItems:1 etc.) — the form just hides the list
+// against the array schema (minItems:1 etc.) - the form just hides the list
 // machinery. Used by views that cap a list to one, e.g. ordering one Gateway.
 function SingleField({
   name,
@@ -716,7 +716,7 @@ function SingleField({
     seeded.current = true;
     const def = seedDefaults(itemSchema, root) as Values | undefined;
     if (!def || typeof def !== "object") return;
-    // Don't seed values for fields hidden by the view (e.g. hpa) — only visible defaults.
+    // Don't seed values for fields hidden by the view (e.g. hpa) - only visible defaults.
     for (const k of (schema["ui:view"] as View | undefined)?.exclude ?? []) delete def[k];
     if (Object.keys(def).length > 0) onChange([def]);
     // eslint-disable-next-line react-hooks/exhaustive-deps

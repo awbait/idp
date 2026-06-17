@@ -15,10 +15,9 @@ import { useCatalog } from "../app/CatalogContext";
 import { Button, Select, TextField } from "./ui";
 import type { ChartCheckResult } from "../api/types";
 
-// «Добавить чарт»: чарт может лежать по произвольному пути в Harbor (вне
-// настроенных проектов). Указываем путь project/name → проверяем существование
-// и комплектность файлов → выбираем категорию/владельца → публикуем (черновик,
-// дальше, конструктор view).
+// "Add chart": a chart may live at an arbitrary path in Harbor (outside the
+// configured projects). Enter project/name -> check it exists and the files are
+// complete -> pick a category/owner -> publish (draft, then the view builder).
 export function AddChartDialog() {
   const { user } = useUser();
   const { categories, reload: reloadCatalog } = useCatalog();
@@ -31,12 +30,12 @@ export function AddChartDialog() {
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [ownerTeam, setOwnerTeam] = useState<string | null>(user?.teams[0] ?? null);
   const [busy, setBusy] = useState(false);
-  // Чарт уже опубликован (409), вместо формы предлагаем перейти к управлению.
+  // Chart already published (409); instead of the form, offer to go to manage.
   const [conflict, setConflict] = useState(false);
 
   const teams = user?.teams ?? [];
   const isAdmin = user?.role === "admin";
-  if (!isAdmin && teams.length === 0) return null; // viewer, публикация недоступна
+  if (!isAdmin && teams.length === 0) return null; // viewer, publishing unavailable
 
   function reset() {
     setPath("");
