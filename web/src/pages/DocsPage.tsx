@@ -301,7 +301,7 @@ function DocToc({ toc, scrollRef }: { toc: Heading[]; scrollRef: React.RefObject
 
   if (toc.length === 0) return <div />;
   return (
-    <nav className="sticky top-0 hidden w-56 shrink-0 overflow-y-auto py-8 pl-4 xl:block">
+    <nav className="sticky top-0 hidden max-h-[calc(100vh-3.5rem)] w-56 shrink-0 self-start overflow-y-auto py-8 pl-4 xl:block">
       <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">На этой странице</div>
       <ul className="border-l border-slate-200">
         {toc.map((h) => (
