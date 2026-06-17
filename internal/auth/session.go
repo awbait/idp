@@ -47,6 +47,17 @@ func (s *SessionStore) Create(ctx context.Context, sess *Session) (string, error
 	return id, nil
 }
 
+// Save overwrites an existing session in place and refreshes its TTL. Used to
+// persist silently-refreshed tokens (and extend the session lifetime) without
+// minting a new id.
+func (s *SessionStore) Save(ctx context.Context, id string, sess *Session) error {
+	b, err := json.Marshal(sess)
+	if err != nil {
+		return err
+	}
+	return s.cache.Set(ctx, sessionKey(id), b, s.ttl)
+}
+
 // Get loads a session by id.
 func (s *SessionStore) Get(ctx context.Context, id string) (*Session, error) {
 	b, ok, err := s.cache.Get(ctx, sessionKey(id))

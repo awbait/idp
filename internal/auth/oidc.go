@@ -189,9 +189,13 @@ func (o *OIDC) Authenticate(r *http.Request) (*models.User, error) {
 		sess.AccessToken = newTok.AccessToken
 		sess.Expiry = newTok.Expiry
 		if newTok.RefreshToken != "" {
+			// Persist the rotated refresh token; the IdP invalidates the old one
+			// after first use, so dropping it here would break the next refresh.
 			sess.RefreshToken = newTok.RefreshToken
 		}
-		// best-effort persist (overwrites same key would need re-create; skipped for skeleton)
+		// Persist the rotated tokens and extend the session TTL. Best-effort: a
+		// store error must not fail an otherwise-authenticated request.
+		_ = o.sessions.Save(r.Context(), c.Value, sess)
 	}
 	return sess.User, nil
 }
