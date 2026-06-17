@@ -53,24 +53,53 @@ KinD node `v1.33.7`, Argo CD `v3.4.3`, istiod + istio/base `1.30.1`, Harbor char
   directory-`Application`, который рекурсивно применяет `<service>/application.yaml`
   как CR. Новые репо/сервисы подхватываются автоматически.
 
-## Запуск
+## Запуск с нуля (полный e2e)
 
+Порядок и ожидания важны: каждый шаг зависит от предыдущего. Всё на
+Windows/PowerShell.
+
+**Шаг 0 - предусловие: чарты.** Репозиторий chart-agnostic, деплоить нечего, пока
+в Harbor нет чартов. Укажи каталог с чартами (по одной папке на чарт с
+`Chart.yaml`) ДО `make stand-up`, иначе шаг пуша пропустится и каталог портала
+будет пуст:
 ```powershell
-make stand-up            # KinD + Argo + Harbor + istio + charts + appset; пишет ARGOCD_TOKEN в deployments/.env
-make up-upstreams        # реальный GitLab + portal в real-режиме (тяжело: ~4 ГБ)
-# подождать пока GitLab healthy (~3-5 мин)
-make gitlab-seed         # группы GitOps + фиксированный токен
-make stand-down          # снести KinD-кластер
+$env:STAND_CHARTS_DIR = "D:\path\to\charts"
 ```
 
-**Чарты.** Репозиторий chart-agnostic - деплоить нечего, пока в Harbor нет чартов.
-`50-charts.ps1` заливает их из внешнего каталога, заданного `STAND_CHARTS_DIR` (или
-`-ChartsDir`); без него шаг пропускается и каталог портала будет пуст. Для полного
-e2e укажи каталог с чартами (по одной папке на чарт с `Chart.yaml`):
-`make stand-charts` со `STAND_CHARTS_DIR=<path>`.
+**Шаг 1 - стенд** (KinD + Argo CD + Harbor + istio + пуш чартов + app-of-apps).
+~10-15 мин; в конце сам пишет `ARGOCD_TOKEN` в `deployments/.env`:
+```powershell
+make stand-up
+```
 
-`ARGOCD_TOKEN` пишется в `deployments/.env` автоматически (шаг `token.ps1`);
-ручного копирования больше не нужно. Перевыпустить: `make stand-token`.
+**Шаг 2 - GitLab + портал** в real-режиме (читает `ARGOCD_TOKEN` из `.env`). GitLab
+тяжёлый (~4 ГБ, грузится 3-5 мин), запускается detached:
+```powershell
+make up-upstreams
+```
+
+**Шаг 3 - дождаться, пока GitLab healthy** (без этого `gitlab-seed` упадёт):
+```powershell
+docker compose -f deployments/docker-compose.yml -f deployments/docker-compose.upstreams.yml ps
+# или: curl.exe -s http://host.docker.internal:8929/-/health
+```
+
+**Шаг 4 - засеять GitLab** (группа `managed-services` + команды + фиксированный
+токен). Только ПОСЛЕ healthy:
+```powershell
+make gitlab-seed
+```
+
+Готово. Доступ: портал (SPA, dev-auth) - http://localhost:8088, Argo CD -
+http://host.docker.internal:8083, Harbor - https://host.docker.internal:8084
+(`admin`/`Harbor12345`), GitLab - http://host.docker.internal:8929. Проверить
+полную петлю - раздел «e2e-проверка» ниже.
+
+**Снести:** `make stand-down` (KinD-кластер) + `make down-upstreams` (GitLab/портал).
+
+`ARGOCD_TOKEN` пишется в `.env` автоматически (шаг `token.ps1`); перевыпустить
+после пересоздания стенда - `make stand-token`. Перезалить только чарты, не трогая
+кластер - `make stand-charts` со `STAND_CHARTS_DIR`.
 
 ## e2e-проверка
 
