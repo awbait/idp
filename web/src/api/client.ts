@@ -45,6 +45,15 @@ export class HttpError extends Error {
   }
 }
 
+// Central 401 handler, registered by the auth layer. Lets a mid-session
+// expiry trigger a re-login flow (return-to current page) instead of surfacing
+// a raw "unauthorized" error in every caller. Kept out of React so the plain
+// fetch wrapper stays dependency-free.
+let unauthorizedHandler: (() => void) | null = null;
+export function setUnauthorizedHandler(h: (() => void) | null) {
+  unauthorizedHandler = h;
+}
+
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(BASE + path, {
     method,
@@ -62,6 +71,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
     } catch {
       /* non-JSON error */
     }
+    if (res.status === 401) unauthorizedHandler?.();
     throw new HttpError(res.status, parsed);
   }
   if (res.status === 204) return undefined as T;
@@ -73,7 +83,10 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 export const api = {
   // auth
   me: () => req<User>("GET", "/auth/me"),
-  loginUrl: () => BASE + "/auth/login",
+  loginUrl: (returnTo?: string) =>
+    returnTo
+      ? `${BASE}/auth/login?return_to=${encodeURIComponent(returnTo)}`
+      : `${BASE}/auth/login`,
   logout: () => req<void>("POST", "/auth/logout"),
 
   // catalog

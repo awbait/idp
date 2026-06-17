@@ -46,7 +46,13 @@ func (d *Dev) Authenticate(r *http.Request) (*models.User, error) {
 	return &u, nil
 }
 
-func (d *Dev) Login(w http.ResponseWriter, r *http.Request)  { http.Redirect(w, r, "/", http.StatusFound) }
+func (d *Dev) Login(w http.ResponseWriter, r *http.Request) {
+	dest := "/"
+	if rt := safeReturnTo(r.URL.Query().Get("return_to")); rt != "" {
+		dest = rt
+	}
+	http.Redirect(w, r, dest, http.StatusFound)
+}
 func (d *Dev) Callback(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/", http.StatusFound) }
 func (d *Dev) Logout(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) }
 

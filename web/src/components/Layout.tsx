@@ -474,7 +474,7 @@ function LoginScreen() {
         <p className="text-xs text-slate-400">Managed Services</p>
         <p className="mt-2 text-sm text-slate-500">Вы не аутентифицированы.</p>
         <a
-          href={api.loginUrl()}
+          href={api.loginUrl(window.location.pathname + window.location.search)}
           className="mt-4 inline-block rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-on-accent hover:bg-brand-700"
         >
           Войти через Keycloak

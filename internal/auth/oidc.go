@@ -78,12 +78,33 @@ func randState() string {
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
+// safeReturnTo returns p if it is a safe same-origin relative path, else "".
+// Guards against open-redirect: the path must start with a single "/" and must
+// not begin with "//" or "/\" (which browsers treat as protocol-relative URLs).
+func safeReturnTo(p string) string {
+	if p == "" || p[0] != '/' {
+		return ""
+	}
+	if len(p) > 1 && (p[1] == '/' || p[1] == '\\') {
+		return ""
+	}
+	return p
+}
+
 func (o *OIDC) Login(w http.ResponseWriter, r *http.Request) {
 	state := randState()
 	http.SetCookie(w, &http.Cookie{
 		Name: "oauth_state", Value: state, Path: "/", HttpOnly: true,
 		Secure: o.secure, SameSite: http.SameSiteLaxMode, MaxAge: 300,
 	})
+	// Remember where to return after callback. Base64-encoded so arbitrary path
+	// characters survive cookie sanitization; validated again on the way back.
+	if rt := safeReturnTo(r.URL.Query().Get("return_to")); rt != "" {
+		http.SetCookie(w, &http.Cookie{
+			Name: "oauth_return", Value: base64.RawURLEncoding.EncodeToString([]byte(rt)),
+			Path: "/", HttpOnly: true, Secure: o.secure, SameSite: http.SameSiteLaxMode, MaxAge: 300,
+		})
+	}
 	http.Redirect(w, r, o.oauth.AuthCodeURL(state), http.StatusFound)
 }
 
@@ -131,7 +152,20 @@ func (o *OIDC) Callback(w http.ResponseWriter, r *http.Request) {
 		Name: o.cookieName, Value: id, Path: "/", HttpOnly: true,
 		Secure: o.secure, SameSite: http.SameSiteLaxMode,
 	})
-	http.Redirect(w, r, o.postLogin, http.StatusFound)
+	dest := o.postLogin
+	if c, err := r.Cookie("oauth_return"); err == nil && c.Value != "" {
+		if raw, derr := base64.RawURLEncoding.DecodeString(c.Value); derr == nil {
+			if rt := safeReturnTo(string(raw)); rt != "" {
+				dest = rt
+			}
+		}
+		// Consume the one-shot cookie regardless of validity.
+		http.SetCookie(w, &http.Cookie{
+			Name: "oauth_return", Value: "", Path: "/", HttpOnly: true,
+			Secure: o.secure, SameSite: http.SameSiteLaxMode, MaxAge: -1,
+		})
+	}
+	http.Redirect(w, r, dest, http.StatusFound)
 }
 
 func (o *OIDC) Authenticate(r *http.Request) (*models.User, error) {
