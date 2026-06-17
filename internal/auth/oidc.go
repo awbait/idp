@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
-	"idp/pkg/models"
 	"golang.org/x/oauth2"
+	"idp/pkg/models"
 )
 
 // OIDC authenticates via Keycloak Authorization Code flow (PKCE-ready) and keeps
@@ -25,6 +25,8 @@ type OIDC struct {
 	cookieName string
 	secure     bool
 	postLogin  string
+	postLogout string
+	endSession string // Keycloak end_session_endpoint (RP-initiated logout)
 }
 
 var _ Authenticator = (*OIDC)(nil)
@@ -40,6 +42,9 @@ type OIDCConfig struct {
 	Secure       bool
 	// Where to send the browser after a successful login (default "/").
 	PostLogin string
+	// Where to send the browser after logout. Must be registered as a valid
+	// post-logout redirect URI on the Keycloak client. Defaults to PostLogin.
+	PostLogout string
 }
 
 // NewOIDC discovers the issuer and builds the authenticator.
@@ -48,6 +53,12 @@ func NewOIDC(ctx context.Context, c OIDCConfig, sessions *SessionStore, rbac RBA
 	if err != nil {
 		return nil, err
 	}
+	// end_session_endpoint is not part of go-oidc's typed Endpoint(); pull it
+	// from the raw discovery document for RP-initiated logout.
+	var disc struct {
+		EndSession string `json:"end_session_endpoint"`
+	}
+	_ = provider.Claims(&disc)
 	return &OIDC{
 		provider: provider,
 		verifier: provider.Verifier(&oidc.Config{ClientID: c.ClientID}),
@@ -63,6 +74,8 @@ func NewOIDC(ctx context.Context, c OIDCConfig, sessions *SessionStore, rbac RBA
 		cookieName: c.CookieName,
 		secure:     c.Secure,
 		postLogin:  cmp.Or(c.PostLogin, "/"),
+		postLogout: cmp.Or(c.PostLogout, c.PostLogin, "/"),
+		endSession: disc.EndSession,
 	}, nil
 }
 
@@ -219,13 +232,38 @@ func (o *OIDC) Authenticate(r *http.Request) (*models.User, error) {
 	return sess.User, nil
 }
 
+// Logout is a browser-navigated GET: it drops the local session and cookie,
+// then bounces through Keycloak's end_session_endpoint so the SSO session dies
+// too (otherwise a fresh login would silently re-authenticate). Falls back to a
+// plain redirect when the IdP advertises no end_session_endpoint.
 func (o *OIDC) Logout(w http.ResponseWriter, r *http.Request) {
+	var idToken string
 	if c, err := r.Cookie(o.cookieName); err == nil && c.Value != "" {
+		if sess, gerr := o.sessions.Get(r.Context(), c.Value); gerr == nil {
+			idToken = sess.IDToken
+		}
 		_ = o.sessions.Delete(r.Context(), c.Value)
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name: o.cookieName, Value: "", Path: "/", HttpOnly: true,
 		Secure: o.secure, SameSite: http.SameSiteLaxMode, MaxAge: -1,
 	})
-	w.WriteHeader(http.StatusNoContent)
+	if o.endSession == "" {
+		http.Redirect(w, r, o.postLogout, http.StatusFound)
+		return
+	}
+	u, err := url.Parse(o.endSession)
+	if err != nil {
+		http.Redirect(w, r, o.postLogout, http.StatusFound)
+		return
+	}
+	q := u.Query()
+	if idToken != "" {
+		q.Set("id_token_hint", idToken)
+	}
+	if o.postLogout != "" {
+		q.Set("post_logout_redirect_uri", o.postLogout)
+	}
+	u.RawQuery = q.Encode()
+	http.Redirect(w, r, u.String(), http.StatusFound)
 }

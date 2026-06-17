@@ -53,8 +53,12 @@ func (d *Dev) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	http.Redirect(w, r, dest, http.StatusFound)
 }
-func (d *Dev) Callback(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/", http.StatusFound) }
-func (d *Dev) Logout(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) }
+func (d *Dev) Callback(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "/", http.StatusFound)
+}
+func (d *Dev) Logout(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "/", http.StatusFound)
+}
 
 func splitCSV(s string) []string {
 	var out []string

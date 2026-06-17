@@ -87,7 +87,9 @@ export const api = {
     returnTo
       ? `${BASE}/auth/login?return_to=${encodeURIComponent(returnTo)}`
       : `${BASE}/auth/login`,
-  logout: () => req<void>("POST", "/auth/logout"),
+  // Browser-navigated GET: clears the session and bounces through the IdP's
+  // end-session endpoint, so it must be a full navigation, not a fetch.
+  logoutUrl: () => `${BASE}/auth/logout`,
 
   // catalog
   listCharts: () => req<Chart[]>("GET", "/charts"),

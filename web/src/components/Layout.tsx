@@ -444,9 +444,7 @@ function UserMenu() {
           className="outline-none"
           onAction={(key) => {
             if (key === "logout") {
-              api.logout().finally(() => {
-                window.location.href = "/";
-              });
+              window.location.href = api.logoutUrl();
             }
           }}
         >

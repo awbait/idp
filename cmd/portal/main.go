@@ -285,5 +285,6 @@ func buildAuth(ctx context.Context, cfg *config.Config, c cache.Cache) (auth.Aut
 		CookieName:   cfg.SessionCookie,
 		Secure:       cfg.PublicURL[:5] == "https",
 		PostLogin:    cfg.OIDCPostLogin,
+		PostLogout:   cfg.OIDCPostLogout,
 	}, sessions, rbac)
 }

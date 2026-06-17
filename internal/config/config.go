@@ -35,16 +35,17 @@ type Config struct {
 	Cache string `env:"CACHE" envDefault:"memory"`
 
 	// Auth: "oidc"|"dev". dev mode injects a static user (no Keycloak).
-	AuthMode      string        `env:"AUTH_MODE" envDefault:"dev"`
-	OIDCIssuer    string        `env:"OIDC_ISSUER"`
-	OIDCClientID  string        `env:"OIDC_CLIENT_ID"`
-	OIDCSecret    string        `env:"OIDC_CLIENT_SECRET"`
-	OIDCRedirect  string        `env:"OIDC_REDIRECT_URL"`
-	OIDCPostLogin string        `env:"OIDC_POST_LOGIN_REDIRECT" envDefault:"/"`
-	OIDCScopes    []string      `env:"OIDC_SCOPES" envSeparator:"," envDefault:"openid,profile,email,groups"`
-	SessionSecret string        `env:"SESSION_SECRET" envDefault:"dev-insecure-session-secret-change-me"`
-	SessionCookie string        `env:"SESSION_COOKIE_NAME" envDefault:"idp_session"`
-	SessionTTL    time.Duration `env:"SESSION_TTL" envDefault:"24h"`
+	AuthMode       string        `env:"AUTH_MODE" envDefault:"dev"`
+	OIDCIssuer     string        `env:"OIDC_ISSUER"`
+	OIDCClientID   string        `env:"OIDC_CLIENT_ID"`
+	OIDCSecret     string        `env:"OIDC_CLIENT_SECRET"`
+	OIDCRedirect   string        `env:"OIDC_REDIRECT_URL"`
+	OIDCPostLogin  string        `env:"OIDC_POST_LOGIN_REDIRECT" envDefault:"/"`
+	OIDCPostLogout string        `env:"OIDC_POST_LOGOUT_REDIRECT"`
+	OIDCScopes     []string      `env:"OIDC_SCOPES" envSeparator:"," envDefault:"openid,profile,email,groups"`
+	SessionSecret  string        `env:"SESSION_SECRET" envDefault:"dev-insecure-session-secret-change-me"`
+	SessionCookie  string        `env:"SESSION_COOKIE_NAME" envDefault:"idp_session"`
+	SessionTTL     time.Duration `env:"SESSION_TTL" envDefault:"24h"`
 
 	// RBAC
 	AdminGroups     []string `env:"RBAC_ADMIN_GROUPS" envSeparator:","`

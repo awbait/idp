@@ -1,6 +1,12 @@
 package auth
 
-import "testing"
+import (
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"testing"
+)
 
 func TestSafeReturnTo(t *testing.T) {
 	cases := []struct {
@@ -24,6 +30,49 @@ func TestSafeReturnTo(t *testing.T) {
 			t.Errorf("safeReturnTo(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
+}
+
+func TestOIDCLogoutRedirect(t *testing.T) {
+	const endSession = "http://kc:8081/realms/internal/protocol/openid-connect/logout"
+	const postLogout = "http://host:5173/"
+
+	t.Run("RP-initiated via end_session", func(t *testing.T) {
+		o := &OIDC{cookieName: "idp_session", endSession: endSession, postLogout: postLogout}
+		rec := httptest.NewRecorder()
+		o.Logout(rec, httptest.NewRequest(http.MethodGet, "/api/v1/auth/logout", nil))
+
+		if rec.Code != http.StatusFound {
+			t.Fatalf("status = %d, want 302", rec.Code)
+		}
+		loc := rec.Header().Get("Location")
+		if !strings.HasPrefix(loc, endSession) {
+			t.Fatalf("Location %q does not target end_session_endpoint", loc)
+		}
+		u, err := url.Parse(loc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := u.Query().Get("post_logout_redirect_uri"); got != postLogout {
+			t.Errorf("post_logout_redirect_uri = %q, want %q", got, postLogout)
+		}
+		// The session cookie must be cleared on the way out.
+		if sc := rec.Result().Cookies(); len(sc) == 0 || sc[0].MaxAge >= 0 {
+			t.Errorf("session cookie not cleared: %+v", sc)
+		}
+	})
+
+	t.Run("fallback when IdP has no end_session", func(t *testing.T) {
+		o := &OIDC{cookieName: "idp_session", postLogout: postLogout}
+		rec := httptest.NewRecorder()
+		o.Logout(rec, httptest.NewRequest(http.MethodGet, "/api/v1/auth/logout", nil))
+
+		if rec.Code != http.StatusFound {
+			t.Fatalf("status = %d, want 302", rec.Code)
+		}
+		if loc := rec.Header().Get("Location"); loc != postLogout {
+			t.Errorf("Location = %q, want %q", loc, postLogout)
+		}
+	})
 }
 
 func TestResolveReturn(t *testing.T) {

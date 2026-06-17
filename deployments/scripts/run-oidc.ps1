@@ -36,6 +36,7 @@ $env:OIDC_CLIENT_ID = "portal"
 $env:OIDC_CLIENT_SECRET = "portal-secret"
 $env:OIDC_REDIRECT_URL = "http://${BindHost}:8080/api/v1/auth/callback"
 $env:OIDC_POST_LOGIN_REDIRECT = "http://${BindHost}:5173/"
+$env:OIDC_POST_LOGOUT_REDIRECT = "http://${BindHost}:5173/"
 $env:OIDC_SCOPES = "openid,profile,email"
 $env:RBAC_ADMIN_GROUPS = "platform-admins"
 
