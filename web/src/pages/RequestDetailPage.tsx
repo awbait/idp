@@ -25,6 +25,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { ProductIcon } from "../components/icons";
 import { chartLabel, findCatalogChart, useCatalog } from "../app/CatalogContext";
+import { useTeam } from "../app/TeamContext";
 import { upgradeTargets } from "../lib/semver";
 import { DetailActions, fmtDateTime, Meta, ProductView } from "./requestDetailParts";
 import type { ViewDocument } from "../api/types";
@@ -34,6 +35,7 @@ export function RequestDetailPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useUser();
+  const { team } = useTeam();
   const { charts } = useCatalog();
   const { data, error, loading, reload } = useAsync(() => api.getRequest(id), [id]);
   // The chart's approved view document drives the product tabs/actions. Loaded
@@ -77,6 +79,30 @@ export function RequestDetailPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // The active team (topbar) scopes what the user is working on, like the orders
+  // list. If they switch it to a team that does not own this order, the order is no
+  // longer in context, so leave for the (now team-scoped) orders list. Only a
+  // user-initiated switch after load bounces: a direct link opened while another
+  // team is active is left alone (we record the team on first load, not bounce on
+  // it). Access itself stays membership-based on the backend - this is UX scoping.
+  const prevTeam = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    prevTeam.current = undefined;
+  }, [id]);
+  useEffect(() => {
+    if (!data || team == null) return;
+    const orderTeam = data.request.team;
+    if (prevTeam.current === undefined) {
+      prevTeam.current = team;
+      return;
+    }
+    if (team === prevTeam.current) return;
+    prevTeam.current = team;
+    if (user?.teams?.includes(orderTeam) && team !== orderTeam) {
+      navigate("/requests", { replace: true });
+    }
+  }, [team, data, user, navigate]);
 
   if (loading) return <Spinner />;
   if (error instanceof HttpError && error.status === 404)
