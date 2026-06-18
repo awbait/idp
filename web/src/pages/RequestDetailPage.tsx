@@ -3,7 +3,7 @@
 // document (genericView/GenericProductTabs), so it is chart-agnostic - no per-chart
 // code. Presentational pieces live in ./requestDetailParts.
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   IconArrowUpCircle,
   IconCheck,
@@ -18,7 +18,7 @@ import { Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
 import { api, HttpError } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { canModify, useUser } from "../auth/UserContext";
-import { Button, Card, ErrorBox, Select, Spinner } from "../components/ui";
+import { Button, Card, Select, Spinner } from "../components/ui";
 import { NotFound } from "../components/NotFound";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { StatusBadge } from "../components/StatusBadge";
@@ -88,7 +88,16 @@ export function RequestDetailPage() {
         backLabel="К моим заказам"
       />
     );
-  if (error) return <ErrorBox error={error} />;
+  if (error instanceof HttpError && error.status === 403)
+    return (
+      <NotFound
+        title="Нет доступа к заказу"
+        message="Заказ принадлежит другой команде. Переключите команду в шапке или вернитесь к своим заказам."
+        backTo="/requests"
+        backLabel="К моим заказам"
+      />
+    );
+  if (error) return <LoadError error={error} onRetry={reload} />;
   if (!data) return null;
 
   const r = data.request;
@@ -359,6 +368,43 @@ export function RequestDetailPage() {
           )
         }
       />
+    </div>
+  );
+}
+
+// LoadError is the friendly fallback for an unexpected load failure that is not a
+// 404/403 (those have their own NotFound states) - e.g. the backend is
+// unreachable, returns 5xx, or the order lives in a store the running portal is
+// not connected to (in-memory portal vs an order persisted in Postgres). It keeps
+// the technical detail visible for debugging instead of dumping a bare error code
+// on the user, and offers a retry plus a way back.
+function LoadError({ error, onRetry }: { error: Error; onRetry: () => void }) {
+  const detail =
+    error instanceof HttpError ? `${error.code} (HTTP ${error.status})` : error.message;
+  return (
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
+      <span className="flex h-16 w-16 items-center justify-center rounded-full bg-red-50 text-red-400">
+        <IconAlertTriangle size={38} stroke={1.5} />
+      </span>
+      <div>
+        <h1 className="text-lg font-semibold text-slate-800">Не удалось загрузить заказ</h1>
+        <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
+          Бэкенд недоступен или вернул ошибку. Проверьте, что портал запущен и подключён к тому же
+          хранилищу, где создан заказ.
+        </p>
+        <p className="mx-auto mt-2 max-w-md font-mono text-xs text-slate-400">{detail}</p>
+      </div>
+      <div className="flex gap-2">
+        <Button variant="primary" onPress={onRetry}>
+          Повторить
+        </Button>
+        <Link
+          to="/requests"
+          className="inline-flex items-center rounded-md border border-gray-300 bg-surface px-4 py-2 text-sm font-medium text-gray-700 outline-none hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-brand-500"
+        >
+          К моим заказам
+        </Link>
+      </div>
     </div>
   );
 }

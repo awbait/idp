@@ -12,9 +12,10 @@ import {
 } from "react-aria-components";
 import { IconDotsVertical, IconInfoCircle, IconPencil, IconTrash, IconX } from "@tabler/icons-react";
 import { api, HttpError } from "../../api/client";
+import { chartLabel } from "../../app/CatalogContext";
 import { useAsync } from "../../hooks/useAsync";
 import { SchemaForm, pruneEmpty, collectErrors, seedDefaults, type View } from "../../form/SchemaForm";
-import { Button, ErrorBox, Hint, Spinner } from "../ui";
+import { Button, Hint, Spinner } from "../ui";
 import { ConfirmDialog } from "../ConfirmDialog";
 import type { OrderRequest, ViewDocument, ViewTab } from "../../api/types";
 import {
@@ -70,6 +71,37 @@ function Stub({ children }: { children: React.ReactNode }) {
   );
 }
 
+// SchemaLoadError explains a failed chart-schema fetch in a tab or an action form.
+// A 404 means the order's chart version is absent from the registry the portal is
+// currently talking to (e.g. an order created against real Harbor opened while the
+// portal runs HARBOR_MODE=fake), so the user gets a plain-language hint instead of
+// a bare "not_found" code; other failures fall back to a short technical detail.
+function SchemaLoadError({ request, error }: { request: OrderRequest; error: Error }) {
+  const missing = error instanceof HttpError && error.status === 404;
+  const product = chartLabel(request.chart_name);
+  const detail =
+    error instanceof HttpError ? `${error.code} (HTTP ${error.status})` : error.message;
+  return (
+    <p className="flex items-start gap-1.5 text-sm text-amber-600">
+      <IconInfoCircle size={16} stroke={1.8} className="mt-0.5 shrink-0" />
+      <span>
+        {missing ? (
+          <>
+            Не удалось загрузить настройки версии{" "}
+            <span className="font-medium">{request.chart_version}</span> продукта «{product}». За
+            подробностями обратитесь к администрации портала.
+          </>
+        ) : (
+          <>
+            Не удалось загрузить раздел, попробуйте позже. За подробностями обратитесь к администрации
+            портала. ({detail})
+          </>
+        )}
+      </span>
+    </p>
+  );
+}
+
 // GenericListTab renders one product tab: a list table with add/edit/delete. The
 // edited array (items pointer), the element form (a view) and the columns come
 // from the tab declaration resolved against the schema. Without ui:table (or a
@@ -110,7 +142,7 @@ export function GenericListTab({
   const label = tab.title ?? tab.id;
 
   if (loading) return <Spinner label="Загрузка схемы…" />;
-  if (error) return <ErrorBox error={error} />;
+  if (error) return <SchemaLoadError request={request} error={error} />;
   if (!schema) return <p className="text-sm text-gray-500">Нет схемы.</p>;
   if (!resolved) {
     return (
@@ -597,7 +629,7 @@ function ViewFormModal({
                 {loading ? (
                   <Spinner label="Загрузка схемы…" />
                 ) : error ? (
-                  <ErrorBox error={error} />
+                  <SchemaLoadError request={request} error={error} />
                 ) : schema ? (
                   <SchemaForm schema={schema} value={value} onChange={setValue} view={view} lockReadOnly />
                 ) : (
