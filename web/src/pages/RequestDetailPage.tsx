@@ -17,7 +17,7 @@ import {
 import { Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
 import { api, HttpError } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
-import { canModify, useUser } from "../auth/UserContext";
+import { canModify, canEditOrder, useUser } from "../auth/UserContext";
 import { Button, Card, Select, Spinner } from "../components/ui";
 import { NotFound } from "../components/NotFound";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -129,7 +129,10 @@ export function RequestDetailPage() {
   const r = data.request;
   const mrs = data.merge_requests ?? [];
   const events = data.events ?? [];
+  // modifiable: provision-class affordances (create/delete) - owner or admin.
+  // editable: value/rename/upgrade affordances - also support, across teams.
   const modifiable = canModify(user, r.team) && r.status !== "DELETED";
+  const editable = canEditOrder(user, r.team) && r.status !== "DELETED";
   const isDraft = r.status === "DRAFT";
   const driftMissing = r.drifted && /отсутству/i.test(r.drift_detail ?? "");
 
@@ -144,7 +147,7 @@ export function RequestDetailPage() {
     pub?.approved_view_version,
   );
   const upgradeTo = upgradeVersions[0] ?? null; // recommended (approved) version
-  const canUpgrade = modifiable && !isDraft && liveStatus && upgradeVersions.length > 0 && !r.drifted;
+  const canUpgrade = editable && !isDraft && liveStatus && upgradeVersions.length > 0 && !r.drifted;
   const showUpgradeNudge = canUpgrade && upgradeDismissed !== upgradeTo;
 
   function dismissUpgradeNudge() {
@@ -238,8 +241,8 @@ export function RequestDetailPage() {
               </p>
             </div>
           </div>
-          {modifiable &&
-            (driftMissing ? (
+          {driftMissing
+            ? modifiable && (
               <button
                 onClick={() => setConfirmDelete(true)}
                 title="Удалить заказ из портала (в Git его уже нет)"
@@ -248,7 +251,8 @@ export function RequestDetailPage() {
                 <IconTrash size={14} stroke={1.8} />
                 Удалить из портала
               </button>
-            ) : (
+            )
+            : editable && (
               <button
                 onClick={onPull}
                 disabled={pulling}
@@ -258,7 +262,7 @@ export function RequestDetailPage() {
                 <IconRefresh size={14} stroke={1.8} />
                 {pulling ? "Подтягиваем…" : "Подтянуть из Git"}
               </button>
-            ))}
+            )}
         </div>
       )}
       {showUpgradeNudge && (
@@ -315,7 +319,7 @@ export function RequestDetailPage() {
           ) : (
             <div className="flex min-w-0 items-center gap-2">
               <h1 className="truncate text-xl font-semibold">{r.display_name || r.service_name}</h1>
-              {modifiable && (
+              {editable && (
                 <button
                   onClick={startRename}
                   aria-label="Изменить отображаемое имя"
@@ -381,7 +385,7 @@ export function RequestDetailPage() {
         events={events}
         mrs={mrs}
         argocdUrl={data.argocd_url}
-        modifiable={modifiable}
+        modifiable={editable}
         reload={reload}
         activeTab={searchParams.get("tab") ?? ""}
         onTab={(key) =>

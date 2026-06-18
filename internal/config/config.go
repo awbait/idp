@@ -48,7 +48,11 @@ type Config struct {
 	SessionTTL     time.Duration `env:"SESSION_TTL" envDefault:"24h"`
 
 	// RBAC
-	AdminGroups     []string `env:"RBAC_ADMIN_GROUPS" envSeparator:","`
+	AdminGroups []string `env:"RBAC_ADMIN_GROUPS" envSeparator:","`
+	// SupportGroups grant the support role (cross-team order view/edit);
+	// SecurityGroups grant the security role (InfoSec). Empty => nobody has them.
+	SupportGroups   []string `env:"RBAC_SUPPORT_GROUPS" envSeparator:","`
+	SecurityGroups  []string `env:"RBAC_SECURITY_GROUPS" envSeparator:","`
 	TeamGroupPrefix string   `env:"RBAC_TEAM_GROUP_PREFIX" envDefault:"team-"`
 	// TeamGroupRegex, when set, overrides the prefix: a regex whose first capture
 	// group is the team name, matched against each raw group claim. Lets an

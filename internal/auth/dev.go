@@ -10,7 +10,8 @@ import (
 // Dev is a no-Keycloak authenticator for local runs and tests. The user can be
 // overridden per-request with headers:
 //
-//	X-Dev-Sub, X-Dev-Name, X-Dev-Teams (csv), X-Dev-Role (viewer|member|admin)
+//	X-Dev-Sub, X-Dev-Name, X-Dev-Teams (csv),
+//	X-Dev-Role (auditor|member|support|security|admin)
 //
 // Defaults to a member of team "core".
 type Dev struct {
@@ -41,7 +42,10 @@ func (d *Dev) Authenticate(r *http.Request) (*models.User, error) {
 	if v := r.Header.Get("X-Dev-Role"); v != "" {
 		u.Role = models.Role(v)
 	} else if len(u.Teams) == 0 {
-		u.Role = models.RoleViewer
+		u.Role = models.RoleAuditor
+	}
+	if u.Teams == nil {
+		u.Teams = []string{} // never marshal teams as JSON null (SPA expects an array)
 	}
 	return &u, nil
 }

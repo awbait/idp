@@ -26,7 +26,7 @@ func (s *Service) ListApplications(ctx context.Context, u *models.User) ([]argoc
 	if err != nil {
 		return nil, err
 	}
-	if u.IsAdmin() {
+	if u.IsAdmin() || u.IsSupport() {
 		return apps, nil
 	}
 	out := make([]argocd.Application, 0, len(apps))
@@ -44,7 +44,7 @@ func (s *Service) GetApplication(ctx context.Context, u *models.User, name strin
 	if err != nil {
 		return nil, err
 	}
-	if !u.IsAdmin() && !u.InTeam(a.Labels[labelTeam]) {
+	if !u.IsAdmin() && !u.IsSupport() && !u.InTeam(a.Labels[labelTeam]) {
 		return nil, models.ErrNotFound // hide existence from other teams
 	}
 	return a, nil

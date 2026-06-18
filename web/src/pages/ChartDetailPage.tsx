@@ -20,7 +20,7 @@ export function ChartDetailPage() {
   // member (they pick the owner team at registration).
   const manageable = pub
     ? canModify(user, pub.owner_team)
-    : user?.role === "admin" || (user?.teams.length ?? 0) > 0;
+    : user?.role === "admin" || (user?.teams?.length ?? 0) > 0;
 
   if (loading) return <Spinner />;
   if (error) return <ErrorBox error={error} />;

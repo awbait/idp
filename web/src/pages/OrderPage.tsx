@@ -194,7 +194,7 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
     }
   }
 
-  if (!user || user.teams.length === 0) {
+  if (!user || (user.teams?.length ?? 0) === 0) {
     return (
       <Card>
         <p className="text-sm text-gray-600">

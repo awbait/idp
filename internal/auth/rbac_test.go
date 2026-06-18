@@ -8,7 +8,12 @@ import (
 )
 
 func TestBuildUser(t *testing.T) {
-	r := RBAC{AdminGroups: []string{"platform-admins"}, TeamPrefix: "team-"}
+	r := RBAC{
+		AdminGroups:    []string{"platform-admins"},
+		SupportGroups:  []string{"platform-support"},
+		SecurityGroups: []string{"infosec"},
+		TeamPrefix:     "team-",
+	}
 
 	t.Run("member of teams", func(t *testing.T) {
 		u := r.BuildUser("s1", "a@b.c", "alice", "Alice", []string{"/team-core", "team-payments", "other"})
@@ -30,10 +35,49 @@ func TestBuildUser(t *testing.T) {
 		}
 	})
 
-	t.Run("viewer with no teams", func(t *testing.T) {
+	t.Run("auditor with no teams", func(t *testing.T) {
 		u := r.BuildUser("s3", "", "carol", "Carol", []string{"some-other-group"})
-		if u.Role != models.RoleViewer {
-			t.Fatalf("want viewer, got %s", u.Role)
+		if u.Role != models.RoleAuditor {
+			t.Fatalf("want auditor, got %s", u.Role)
+		}
+		// Teams must be a non-nil empty slice: a nil slice marshals to JSON null,
+		// which breaks the SPA (it treats teams as an array).
+		if u.Teams == nil {
+			t.Fatalf("teams must be non-nil empty slice, got nil")
+		}
+	})
+
+	t.Run("support drops teams", func(t *testing.T) {
+		u := r.BuildUser("s6", "", "sam", "Sam", []string{"team-core", "platform-support"})
+		if u.Role != models.RoleSupport || !u.IsSupport() {
+			t.Fatalf("want support, got %s", u.Role)
+		}
+		if len(u.Teams) != 0 {
+			t.Fatalf("support must not carry teams, got %+v", u.Teams)
+		}
+	})
+
+	t.Run("security drops teams", func(t *testing.T) {
+		u := r.BuildUser("s7", "", "ivy", "Ivy", []string{"team-core", "infosec"})
+		if u.Role != models.RoleSecurity || !u.IsSecurity() {
+			t.Fatalf("want security, got %s", u.Role)
+		}
+		if len(u.Teams) != 0 {
+			t.Fatalf("security must not carry teams, got %+v", u.Teams)
+		}
+	})
+
+	t.Run("admin outranks support and security", func(t *testing.T) {
+		u := r.BuildUser("s8", "", "max", "Max", []string{"platform-admins", "platform-support", "infosec"})
+		if u.Role != models.RoleAdmin {
+			t.Fatalf("admin must win, got %s", u.Role)
+		}
+	})
+
+	t.Run("support outranks security", func(t *testing.T) {
+		u := r.BuildUser("s9", "", "sue", "Sue", []string{"platform-support", "infosec"})
+		if u.Role != models.RoleSupport {
+			t.Fatalf("support must outrank security, got %s", u.Role)
 		}
 	})
 

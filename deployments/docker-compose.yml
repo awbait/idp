@@ -29,7 +29,8 @@ services:
       retries: 10
 
   # Minimal Keycloak for testing the OIDC flow. dev-mode, imports the "internal"
-  # realm (client "portal", groups team-*/platform-admins, users alice/padmin).
+  # realm (client "portal", groups team-*/platform-admins/support/security,
+  # users alice/padmin/support/security).
   # Exposed on :8081 so browser and a host-run portal share the same issuer
   # (http://localhost:8081/realms/internal). See README "OIDC" for how to run.
   keycloak:

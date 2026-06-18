@@ -1,6 +1,6 @@
 // Mirrors the Go backend domain models (pkg/models).
 
-export type Role = "viewer" | "member" | "admin";
+export type Role = "auditor" | "member" | "support" | "security" | "admin";
 
 export interface User {
   sub: string;

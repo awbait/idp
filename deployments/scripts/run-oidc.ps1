@@ -39,6 +39,8 @@ $env:OIDC_POST_LOGIN_REDIRECT = "http://${BindHost}:5173/"
 $env:OIDC_POST_LOGOUT_REDIRECT = "http://${BindHost}:5173/"
 $env:OIDC_SCOPES = "openid,profile,email"
 $env:RBAC_ADMIN_GROUPS = "platform-admins"
+$env:RBAC_SUPPORT_GROUPS = "support"
+$env:RBAC_SECURITY_GROUPS = "security"
 
 if ($RealGitlab) {
   # Real GitLab CE + compose Postgres/Redis (ports exposed on the host).

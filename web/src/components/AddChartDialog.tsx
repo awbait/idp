@@ -28,14 +28,14 @@ export function AddChartDialog() {
   const [result, setResult] = useState<ChartCheckResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [ownerTeam, setOwnerTeam] = useState<string | null>(user?.teams[0] ?? null);
+  const [ownerTeam, setOwnerTeam] = useState<string | null>(user?.teams?.[0] ?? null);
   const [busy, setBusy] = useState(false);
   // Chart already published (409); instead of the form, offer to go to manage.
   const [conflict, setConflict] = useState(false);
 
   const teams = user?.teams ?? [];
   const isAdmin = user?.role === "admin";
-  if (!isAdmin && teams.length === 0) return null; // viewer, publishing unavailable
+  if (!isAdmin && teams.length === 0) return null; // auditor/support/security: publishing unavailable
 
   function reset() {
     setPath("");

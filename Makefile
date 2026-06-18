@@ -44,6 +44,8 @@ run-oidc:
 	OIDC_POST_LOGOUT_REDIRECT=http://localhost:5173/ \
 	OIDC_SCOPES=openid,profile,email \
 	RBAC_ADMIN_GROUPS=platform-admins \
+	RBAC_SUPPORT_GROUPS=support \
+	RBAC_SECURITY_GROUPS=security \
 	go run ./cmd/portal
 
 # Frontend dev server (Vite) on :5173 with live reload; proxies /api -> :8080.

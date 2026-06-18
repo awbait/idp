@@ -274,7 +274,12 @@ func buildAuth(ctx context.Context, cfg *config.Config, c cache.Cache) (auth.Aut
 		return auth.NewDev(), nil
 	}
 	sessions := auth.NewSessionStore(c, cfg.SessionTTL)
-	rbac := auth.RBAC{AdminGroups: cfg.AdminGroups, TeamPrefix: cfg.TeamGroupPrefix}
+	rbac := auth.RBAC{
+		AdminGroups:    cfg.AdminGroups,
+		SupportGroups:  cfg.SupportGroups,
+		SecurityGroups: cfg.SecurityGroups,
+		TeamPrefix:     cfg.TeamGroupPrefix,
+	}
 	if cfg.TeamGroupRegex != "" {
 		re, err := regexp.Compile(cfg.TeamGroupRegex)
 		if err != nil {

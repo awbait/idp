@@ -46,7 +46,17 @@ export function useUser() {
   return useContext(Ctx);
 }
 
+// canModify holds for the "owner/provisioner" of a resource: admins, or members
+// of the team. Gates publication ownership and order create/delete affordances.
+// Support is intentionally NOT included here (it edits but never provisions).
 export function canModify(user: User | null, team: string): boolean {
   if (!user) return false;
-  return user.role === "admin" || user.teams.includes(team);
+  return user.role === "admin" || (user.teams ?? []).includes(team);
+}
+
+// canEditOrder gates editing an existing order (values, rename, upgrade). Support
+// edits orders of every team; admins and the team's own members also qualify.
+export function canEditOrder(user: User | null, team: string): boolean {
+  if (!user) return false;
+  return user.role === "admin" || user.role === "support" || (user.teams ?? []).includes(team);
 }

@@ -91,10 +91,20 @@ type UpdateInput struct {
 	Values      map[string]any
 }
 
-func canModify(u *models.User, team string) bool {
-	return u.IsAdmin() || u.InTeam(team)
-}
+// canView / canEdit hold for admins and support across every team, and for
+// members within their own team. canEdit gates value changes on an existing
+// order (update, rename, upgrade).
 func canView(u *models.User, team string) bool {
+	return u.IsAdmin() || u.IsSupport() || u.InTeam(team)
+}
+func canEdit(u *models.User, team string) bool {
+	return u.IsAdmin() || u.IsSupport() || u.InTeam(team)
+}
+
+// canProvision gates lifecycle actions that create or destroy an instance
+// (create, submit, delete). Support is intentionally excluded: it operates on
+// existing orders but does not stand up or tear down services.
+func canProvision(u *models.User, team string) bool {
 	return u.IsAdmin() || u.InTeam(team)
 }
 
@@ -120,8 +130,16 @@ func (s *Service) Get(ctx context.Context, u *models.User, id string) (*models.R
 
 // List returns orders visible to the user (scoped to their teams unless admin).
 func (s *Service) List(ctx context.Context, u *models.User, f store.RequestFilter) ([]*models.Request, error) {
+	seesAll := u.IsAdmin() || u.IsSupport()
+	// No scope -> no orders. The store filter treats an empty Teams set as
+	// "unfiltered", so without this guard a role with no team (security/auditor)
+	// would list every order - inconsistent with Get, which denies them.
+	if !seesAll && len(u.Teams) == 0 {
+		return []*models.Request{}, nil
+	}
 	f.Teams = u.Teams
-	f.Admin = u.IsAdmin()
+	// Support sees every team's orders, same as admin (read/edit, not provision).
+	f.Admin = seesAll
 	return s.store.ListRequests(ctx, f)
 }
 
@@ -138,7 +156,7 @@ func (s *Service) ListEvents(ctx context.Context, id string) ([]*models.RequestE
 // Create validates input and persists a DRAFT. Unless in.Draft is set it then
 // opens the create MR and advances the order to MR_CREATED.
 func (s *Service) Create(ctx context.Context, u *models.User, in CreateInput) (*models.Request, error) {
-	if !canModify(u, in.Team) {
+	if !canProvision(u, in.Team) {
 		return nil, ErrForbidden
 	}
 	if !nameRe.MatchString(in.ServiceName) || len(in.ServiceName) > 63 {
@@ -224,7 +242,7 @@ func (s *Service) Submit(ctx context.Context, u *models.User, id string) (*model
 	if err != nil {
 		return nil, err
 	}
-	if !canModify(u, r.Team) {
+	if !canProvision(u, r.Team) {
 		return nil, ErrForbidden
 	}
 	if r.DeletedAt != nil {
@@ -274,7 +292,7 @@ func (s *Service) Update(ctx context.Context, u *models.User, id string, in Upda
 	if err != nil {
 		return nil, err
 	}
-	if !canModify(u, r.Team) {
+	if !canEdit(u, r.Team) {
 		return nil, ErrForbidden
 	}
 	if r.DeletedAt != nil {
@@ -374,7 +392,7 @@ func (s *Service) Rename(ctx context.Context, u *models.User, id, displayName st
 	if err != nil {
 		return nil, err
 	}
-	if !canModify(u, r.Team) {
+	if !canEdit(u, r.Team) {
 		return nil, ErrForbidden
 	}
 	if r.DeletedAt != nil {
@@ -400,7 +418,7 @@ func (s *Service) Delete(ctx context.Context, u *models.User, id string) (*model
 	if err != nil {
 		return nil, err
 	}
-	if !canModify(u, r.Team) {
+	if !canProvision(u, r.Team) {
 		return nil, ErrForbidden
 	}
 	if r.DeletedAt != nil {

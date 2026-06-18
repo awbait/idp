@@ -100,7 +100,7 @@ http://localhost:5173**. Проверка полной петли - раздел
 | Что | URL | Логин |
 |---|---|---|
 | Портал SPA - вариант A (в Docker, dev-auth) | http://localhost:8088 | заголовки `X-Dev-*` (nginx) |
-| Портал SPA - вариант B (локально, Vite) | http://localhost:5173 | Keycloak OIDC: `alice`/`alice`, `padmin`/`padmin` |
+| Портал SPA - вариант B (локально, Vite) | http://localhost:5173 | Keycloak OIDC: `alice`/`alice`, `padmin`/`padmin`, `support`/`support`, `security`/`security` |
 | Backend portal | http://localhost:8080 | `/health`, `/ready`, `/metrics` |
 | Argo CD | http://127.0.0.1:8083 | `admin` / `admin12345` |
 | Harbor | https://127.0.0.1:8084 | `admin` / `Harbor12345` |

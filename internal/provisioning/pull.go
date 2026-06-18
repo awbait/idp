@@ -18,7 +18,7 @@ func (s *Service) PullFromGit(ctx context.Context, u *models.User, id string) (*
 	if err != nil {
 		return nil, err
 	}
-	if !canModify(u, r.Team) {
+	if !canEdit(u, r.Team) {
 		return nil, ErrForbidden
 	}
 	if r.DeletedAt != nil {

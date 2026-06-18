@@ -38,13 +38,24 @@ const (
 	ActionDelete MRAction = "delete"
 )
 
-// Role is a portal authorization role.
+// Role is a portal authorization role. Exactly one role per user, derived from
+// Keycloak groups (see internal/auth/rbac.go) with this precedence:
+//
+//		admin > support > security > member > auditor
+//
+//	  - auditor  - default read-only principal (no team, no special group)
+//	  - member   - belongs to one or more teams; self-service over its own teams
+//	  - security - InfoSec; no team (its access is not team-scoped)
+//	  - support  - cross-team operations: view and edit orders of every team
+//	  - admin    - platform administrator; absolute access
 type Role string
 
 const (
-	RoleViewer Role = "viewer"
-	RoleMember Role = "member"
-	RoleAdmin  Role = "admin"
+	RoleAuditor  Role = "auditor"
+	RoleMember   Role = "member"
+	RoleSupport  Role = "support"
+	RoleSecurity Role = "security"
+	RoleAdmin    Role = "admin"
 )
 
 // User is the authenticated principal derived from the OIDC token.
@@ -59,6 +70,12 @@ type User struct {
 
 // IsAdmin reports whether the user has the admin role.
 func (u *User) IsAdmin() bool { return u.Role == RoleAdmin }
+
+// IsSupport reports whether the user has the support role (cross-team order ops).
+func (u *User) IsSupport() bool { return u.Role == RoleSupport }
+
+// IsSecurity reports whether the user has the security role (InfoSec).
+func (u *User) IsSecurity() bool { return u.Role == RoleSecurity }
 
 // InTeam reports whether the user belongs to the given team.
 func (u *User) InTeam(team string) bool {

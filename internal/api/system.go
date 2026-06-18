@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"idp/internal/auth"
 )
 
 // SystemInfo carries the configured backend modes + external UI URLs for the
@@ -92,6 +94,11 @@ func (s *Server) statusChecks() []componentCheck {
 // health. Always returns 200 - the body's `healthy` flag carries the verdict so
 // the page can render partial failures rather than erroring out.
 func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
+	// System status is a platform-admin tool (integration health, storage backends).
+	if u := auth.UserFrom(r.Context()); u == nil || !u.IsAdmin() {
+		writeErr(w, http.StatusForbidden, "forbidden", "system status is restricted to platform admins")
+		return
+	}
 	checks := s.statusChecks()
 
 	comps := make([]ComponentStatus, len(checks))

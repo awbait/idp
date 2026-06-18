@@ -25,11 +25,16 @@ import {
   IconChevronRight,
   IconCloud,
   IconHelp,
+  IconLayoutDashboard,
+  IconLayoutGrid,
   IconLayoutSidebarLeftCollapse,
   IconLayoutSidebarLeftExpand,
   IconLogout,
   IconPackages,
   IconPalette,
+  IconScan,
+  IconShieldCheck,
+  IconShieldLock,
   IconUser,
   IconUsersGroup,
 } from "@tabler/icons-react";
@@ -50,6 +55,33 @@ const navItems = [
 
 // Extra items for admins (publication approvals + categories).
 const adminNavItems = [{ to: "/admin/publications", label: "Публикации", Icon: IconChecklist }];
+
+// Top-level sidebar sections. The platform section is the default product
+// experience; the security (InfoSec) section swaps the lower nav for its own
+// pages. The switcher only appears when a role can see more than one section.
+type SectionId = "platform" | "security";
+
+const SECTIONS: { id: SectionId; label: string; home: string; Icon: typeof IconBox }[] = [
+  { id: "platform", label: "Платформа", home: "/catalog", Icon: IconLayoutGrid },
+  { id: "security", label: "ИБ", home: "/security", Icon: IconShieldLock },
+];
+
+// Lower-nav items of the security section. The overview matches its route
+// exactly so deeper pages don't also light it up.
+const securitySectionNav: { to: string; label: string; Icon: typeof IconBox; exact?: boolean }[] = [
+  { to: "/security", label: "Обзор", Icon: IconLayoutDashboard, exact: true },
+  { to: "/security/policies", label: "Согласование политик", Icon: IconShieldCheck },
+  { to: "/security/kyverno", label: "Kyverno UI", Icon: IconScan },
+];
+
+// Human-readable role labels for the profile menu.
+const ROLE_LABELS: Record<string, string> = {
+  auditor: "Аудитор",
+  member: "Участник",
+  support: "Поддержка",
+  security: "Информационная безопасность",
+  admin: "Администратор платформы",
+};
 
 export function Layout() {
   const { user, loading, unauthenticated } = useUser();
@@ -129,6 +161,17 @@ export function Layout() {
   if (loading) return <Spinner />;
   if (unauthenticated || !user) return <LoginScreen />;
 
+  // Sections by role: security sees only its own section, admin sees both,
+  // everyone else only the platform section. The active section follows the URL,
+  // clamped to what the role may actually see.
+  const availableSections = SECTIONS.filter((s) =>
+    s.id === "security" ? user.role === "security" || user.role === "admin" : user.role !== "security",
+  );
+  const pathSection: SectionId = pathname.startsWith("/security") ? "security" : "platform";
+  const activeSection: SectionId = availableSections.some((s) => s.id === pathSection)
+    ? pathSection
+    : (availableSections[0]?.id ?? "platform");
+
   return (
     <div className="flex h-screen bg-slate-50 text-slate-800">
       {/* LEFT NAV - full height; width animates (px->px) for a smooth collapse */}
@@ -149,29 +192,94 @@ export function Layout() {
           )}
         </div>
 
-        {/* flat group: Resources / Charts (active via navActive aria-current) */}
-        <nav className="px-2 py-3">
-          <ul className="flex flex-col gap-0.5">
-            {[...navItems, ...(user.role === "admin" ? adminNavItems : [])].map((n) => {
-              const Icon = n.Icon;
-              return (
-                <li key={n.to}>
+        {/* section switcher (only when a role can see more than one section) */}
+        {availableSections.length > 1 &&
+          (collapsed ? (
+            <nav className="flex flex-col gap-1 px-2 pt-3">
+              {availableSections.map((s) => {
+                const Icon = s.Icon;
+                return (
                   <Link
-                    to={n.to}
-                    title={collapsed ? n.label : undefined}
-                    aria-current={navActive(n.to) ? "page" : undefined}
-                    className="flex items-center gap-3 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 aria-[current=page]:bg-brand-50 aria-[current=page]:text-brand-700"
+                    key={s.id}
+                    to={s.home}
+                    title={s.label}
+                    aria-current={activeSection === s.id ? "page" : undefined}
+                    className="flex justify-center rounded-md px-3 py-2 text-slate-500 hover:bg-slate-50 aria-[current=page]:bg-brand-50 aria-[current=page]:text-brand-700"
                   >
-                    <Icon size={20} stroke={1.7} className="shrink-0" />
-                    {!collapsed && <span className="shrink-0">{n.label}</span>}
+                    <Icon size={20} stroke={1.7} />
                   </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
+                );
+              })}
+            </nav>
+          ) : (
+            <div className="px-3 pt-3">
+              <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
+                {availableSections.map((s) => {
+                  const Icon = s.Icon;
+                  return (
+                    <Link
+                      key={s.id}
+                      to={s.home}
+                      aria-current={activeSection === s.id ? "page" : undefined}
+                      className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1.5 text-sm font-medium text-slate-500 outline-none hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-brand-500 aria-[current=page]:bg-surface aria-[current=page]:text-brand-700 aria-[current=page]:shadow-sm"
+                    >
+                      <Icon size={16} stroke={1.7} />
+                      {s.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
 
-        <div className="mx-3 border-t border-slate-100" />
+        {activeSection === "security" ? (
+          /* security section: its own flat nav, no product categories */
+          <nav className="px-2 py-3">
+            <ul className="flex flex-col gap-0.5">
+              {securitySectionNav.map((n) => {
+                const Icon = n.Icon;
+                const active = n.exact ? pathname === n.to : navActive(n.to);
+                return (
+                  <li key={n.to}>
+                    <Link
+                      to={n.to}
+                      title={collapsed ? n.label : undefined}
+                      aria-current={active ? "page" : undefined}
+                      className="flex items-center gap-3 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 aria-[current=page]:bg-brand-50 aria-[current=page]:text-brand-700"
+                    >
+                      <Icon size={20} stroke={1.7} className="shrink-0" />
+                      {!collapsed && <span className="shrink-0">{n.label}</span>}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+        ) : (
+          <>
+            {/* flat group: Resources / Charts (active via navActive aria-current) */}
+            <nav className="px-2 py-3">
+              <ul className="flex flex-col gap-0.5">
+                {[...navItems, ...(user.role === "admin" ? adminNavItems : [])].map((n) => {
+                  const Icon = n.Icon;
+                  return (
+                    <li key={n.to}>
+                      <Link
+                        to={n.to}
+                        title={collapsed ? n.label : undefined}
+                        aria-current={navActive(n.to) ? "page" : undefined}
+                        className="flex items-center gap-3 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 aria-[current=page]:bg-brand-50 aria-[current=page]:text-brand-700"
+                      >
+                        <Icon size={20} stroke={1.7} className="shrink-0" />
+                        {!collapsed && <span className="shrink-0">{n.label}</span>}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+
+            <div className="mx-3 border-t border-slate-100" />
 
         {/* product categories (dynamic: published charts with an order view) */}
         {collapsed ? (
@@ -237,6 +345,8 @@ export function Layout() {
               );
             })}
           </DisclosureGroup>
+            )}
+          </>
         )}
 
         {/* collapse toggle */}
@@ -263,15 +373,18 @@ export function Layout() {
       <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-surface px-4">
         <OrgSelector />
         <div className="flex items-center gap-1">
-          <Link
-            to="/status"
-            aria-label="Статус системы"
-            title="Статус системы"
-            aria-current={pathname.startsWith("/status") ? "page" : undefined}
-            className="rounded-md p-2 text-slate-500 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-brand-500 aria-[current=page]:bg-brand-50 aria-[current=page]:text-brand-700"
-          >
-            <IconActivity size={20} stroke={1.7} />
-          </Link>
+          {/* System status is a platform-admin tool only. */}
+          {user.role === "admin" && (
+            <Link
+              to="/status"
+              aria-label="Статус системы"
+              title="Статус системы"
+              aria-current={pathname.startsWith("/status") ? "page" : undefined}
+              className="rounded-md p-2 text-slate-500 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-brand-500 aria-[current=page]:bg-brand-50 aria-[current=page]:text-brand-700"
+            >
+              <IconActivity size={20} stroke={1.7} />
+            </Link>
+          )}
           <ThemeMenu />
           <Link
             to="/docs"
@@ -435,7 +548,7 @@ function UserMenu() {
         </span>
         <span className="text-left text-xs leading-tight">
           <span className="block font-medium text-slate-800">{user.name || user.preferred_username}</span>
-          <span className="block text-slate-400">{user.role}</span>
+          <span className="block text-slate-400">{ROLE_LABELS[user.role] ?? user.role}</span>
         </span>
       </Button>
       <Popover className="min-w-44 rounded-md border border-slate-200 bg-surface py-1 shadow-lg outline-none entering:animate-in entering:fade-in">

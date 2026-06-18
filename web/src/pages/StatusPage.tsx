@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { IconExternalLink } from "@tabler/icons-react";
 import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
+import { useUser } from "../auth/UserContext";
 import { Button, ErrorBox, Spinner } from "../components/ui";
 import type { ComponentStatus } from "../api/types";
 
@@ -20,6 +21,7 @@ const LABELS: Record<string, string> = {
 const BACKEND_LABELS: Record<string, string> = { postgres: "PostgreSQL", redis: "Redis" };
 
 export function StatusPage() {
+  const { user } = useUser();
   const { data, error, loading, reload } = useAsync(() => api.getSystemStatus(), []);
 
   // Auto-refresh: status is live, keep the page fresh without manual reload.
@@ -28,6 +30,16 @@ export function StatusPage() {
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // System status is a platform-admin tool (the topbar link is hidden for others;
+  // this guards a direct URL visit too).
+  if (user?.role !== "admin") {
+    return (
+      <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        Раздел доступен только администраторам платформы.
+      </div>
+    );
+  }
 
   const integrations = (data?.components ?? []).filter((c) => c.kind === "integration");
   const storage = (data?.components ?? []).filter((c) => c.kind === "storage");

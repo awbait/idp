@@ -119,7 +119,7 @@ export function ChartManagePage() {
       ) : (
         <RegisterCard project={project} name={name} onCreated={reloadPub} />
       )}
-      {!pub && user?.role === "viewer" && (
+      {!pub && user?.role !== "admin" && (user?.teams?.length ?? 0) === 0 && (
         <p className="text-sm text-gray-500">Публиковать чарты могут участники команд.</p>
       )}
     </div>
@@ -139,7 +139,7 @@ function RegisterCard({
   const { user } = useUser();
   const { categories, reload: reloadCatalog } = useCatalog();
   const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [ownerTeam, setOwnerTeam] = useState<string | null>(user?.teams[0] ?? null);
+  const [ownerTeam, setOwnerTeam] = useState<string | null>(user?.teams?.[0] ?? null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -1122,7 +1122,7 @@ function PreviewPane({
     setMode(next);
   }
 
-  const team = user?.teams[0] ?? "team";
+  const team = user?.teams?.[0] ?? "team";
   const svcName = (identity ? readPointer(values, identity) : serviceName) || "demo-service";
 
   // Synthetic order: lets the preview render with the real product components

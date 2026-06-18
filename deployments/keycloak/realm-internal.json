@@ -45,7 +45,9 @@
     { "name": "team-core" },
     { "name": "team-dbaas" },
     { "name": "team-payments" },
-    { "name": "platform-admins" }
+    { "name": "platform-admins" },
+    { "name": "support" },
+    { "name": "security" }
   ],
   "users": [
     {
@@ -67,6 +69,26 @@
       "lastName": "Admin",
       "credentials": [{ "type": "password", "value": "padmin", "temporary": false }],
       "groups": ["/platform-admins", "/team-core", "/team-dbaas"]
+    },
+    {
+      "username": "support",
+      "enabled": true,
+      "email": "support@example.com",
+      "emailVerified": true,
+      "firstName": "Sam",
+      "lastName": "Support",
+      "credentials": [{ "type": "password", "value": "support", "temporary": false }],
+      "groups": ["/support"]
+    },
+    {
+      "username": "security",
+      "enabled": true,
+      "email": "security@example.com",
+      "emailVerified": true,
+      "firstName": "Ivy",
+      "lastName": "Security",
+      "credentials": [{ "type": "password", "value": "security", "temporary": false }],
+      "groups": ["/security"]
     }
   ]
 }
