@@ -15,6 +15,12 @@ services:
       interval: 3s
       timeout: 3s
       retries: 10
+      # First-time initdb + fsync can take minutes on slow disks (Docker Desktop
+      # on Windows): data is ephemeral here, so every fresh `up` pays that cost.
+      # During start_period failing checks do not count toward retries, while the
+      # first success flips to healthy immediately - so fast hosts are unaffected
+      # and slow ones do not get marked failed before init finishes.
+      start_period: 180s
 
   # Valkey: drop-in RESP-compatible Redis fork (BSD-licensed). The portal speaks
   # the same redis:// protocol via go-redis, so CACHE=redis / REDIS_URL stay.
