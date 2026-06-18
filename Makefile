@@ -1,5 +1,5 @@
 .PHONY: build run run-oidc web infra obs test vet lint tidy cover hooks up down docker \
-	up-upstreams down-upstreams gitlab-seed \
+	up-upstreams up-upstreams-infra down-upstreams gitlab-seed \
 	stand-up stand-down stand-charts stand-appset stand-token stand-reset seed-import
 
 build:
@@ -9,10 +9,10 @@ build:
 # Typical: `make infra` once, then `make run` (or `make run-oidc`) and `make web`
 # in separate terminals. Open http://localhost:5173.
 
-# Infra only: Postgres + Redis + Keycloak. The portal and SPA run from source
+# Infra only: Postgres + Valkey + Keycloak. The portal and SPA run from source
 # (targets below) so backend/frontend changes hot-reload.
 infra:
-	docker compose -f deployments/docker-compose.yml up -d postgres redis keycloak
+	docker compose -f deployments/docker-compose.yml up -d postgres valkey keycloak
 
 # Observability: Prometheus (scrapes the portal's /metrics) + Grafana with the
 # IDP dashboard auto-provisioned. Works with the host-run portal (`make run`).
@@ -27,7 +27,7 @@ run:
 	go run ./cmd/portal
 
 # Backend against the compose infra with real Keycloak login (run `make infra`
-# first). Postgres + Redis so orders/sessions persist across restarts. Browser
+# first). Postgres + Valkey so orders/sessions persist across restarts. Browser
 # and portal share issuer http://localhost:8081/realms/internal.
 # Log in as alice/alice (team-core) or padmin/padmin (platform-admins).
 run-oidc:
@@ -83,12 +83,22 @@ up:
 down:
 	docker compose -f deployments/docker-compose.yml down -v
 
-# Same stack but with a real GitLab CE + real Argo CD (the KinD stand).
+# Real-upstreams stack with a real GitLab CE + the KinD stand's Argo CD/Harbor.
 # Bring the stand up first (`make stand-up`); it writes ARGOCD_TOKEN into
 # deployments/.env automatically. After GitLab is healthy, run `make gitlab-seed`
 # once. Detached (GitLab boots for minutes): watch with `docker compose ps` / logs.
+#
+# Two variants:
+#  - up-upstreams: EVERYTHING in Docker, incl. portal + web (no-source run/demo).
+#    SPA on http://localhost:8088.
+#  - up-upstreams-infra: only the backing services (GitLab + Postgres + Valkey +
+#    Keycloak); run portal + web locally for hot reload
+#    (deployments/scripts/run-oidc.ps1 -RealGitlab, plus `make web`). SPA on :5173.
 up-upstreams:
 	docker compose --env-file deployments/.env -f deployments/docker-compose.yml -f deployments/docker-compose.upstreams.yml up --build -d
+
+up-upstreams-infra:
+	docker compose --env-file deployments/.env -f deployments/docker-compose.yml -f deployments/docker-compose.upstreams.yml up -d postgres valkey keycloak gitlab
 
 down-upstreams:
 	docker compose -f deployments/docker-compose.yml -f deployments/docker-compose.upstreams.yml down -v
@@ -121,7 +131,7 @@ stand-appset:
 stand-token:
 	powershell -ExecutionPolicy Bypass -File deployments/kind/token.ps1
 
-# Reset demo state WITHOUT rebuilding the stand: wipes Postgres + Redis + Argo CD
+# Reset demo state WITHOUT rebuilding the stand: wipes Postgres + Valkey + Argo CD
 # Applications + the portal's GitLab repos. Harbor (charts) and the KinD cluster
 # are left intact. Destructive - pass -Yes (see deployments/scripts/reset-state.ps1).
 stand-reset:

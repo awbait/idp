@@ -1,17 +1,22 @@
-# Opt-in overlay: replaces the fake GitLab with a real GitLab CE and points the
-# portal at a REAL Argo CD running in the local KinD e2e stand (see
-# scripts/stand/). Bring the stand up FIRST (`make stand-up`) and copy the
-# printed ARGOCD_TOKEN into deployments/.env, then:
+# Opt-in overlay for the real-upstreams flow: adds a real GitLab CE and points the
+# portal at the REAL Argo CD + Harbor from the local KinD stand (see
+# deployments/kind/). Bring the stand up FIRST (`make stand-up`) - it writes
+# ARGOCD_TOKEN into deployments/.env. Then pick a variant:
 #
-#   docker compose -f deployments/docker-compose.yml \
-#                  -f deployments/docker-compose.upstreams.yml up --build
+#   make up-upstreams         # ALL in Docker, incl. portal + web (SPA :8088)
+#   make up-upstreams-infra   # only GitLab + Postgres + Valkey + Keycloak;
+#                             # run portal + web locally for hot reload (SPA :5173)
+#   make gitlab-seed          # once GitLab reports healthy (either variant)
 #
-# GitLab is heavy (~4 GB RAM, ~3-5 min to boot). After it reports healthy, seed
-# the GitOps groups + a fixed API token once:  make gitlab-seed
+# Local run (the -infra variant): deployments/scripts/run-oidc.ps1 -RealGitlab
+# (portal in real mode, reads ARGOCD_TOKEN from .env) plus `make web`. The portal
+# service override below is what the all-Docker variant uses; the local run sets
+# the same vars via env (URLs go through the published host ports).
 #
-# GitLab uses external_url host.docker.internal:8929 so the SAME repoURL resolves
-# from the host browser (clickable MR links), the portal container, AND the Argo
-# pods inside KinD (via the CoreDNS patch in scripts/stand/10-coredns.ps1).
+# GitLab is heavy (~4 GB RAM, ~3-5 min to boot). It uses external_url
+# host.docker.internal:8929 so the SAME repoURL resolves from the host browser
+# (clickable MR links), the portal container, AND the Argo pods inside KinD (via
+# the CoreDNS patch in deployments/kind/10-coredns.ps1).
 services:
   gitlab:
     image: gitlab/gitlab-ce:17.5.1-ce.0
@@ -26,7 +31,7 @@ services:
         gitlab_rails['initial_root_password'] = 'changeme-please-12345'
         # trim everything the GitOps flow doesn't need, to fit a laptop.
         # prometheus_monitoring disables the whole bundle (prometheus, exporters,
-        # alertmanager). Grafana was removed from omnibus in 16.0 — no key for it.
+        # alertmanager). Grafana was removed from omnibus in 16.0 - no key for it.
         prometheus_monitoring['enable'] = false
         gitlab_kas['enable'] = false
         registry['enable'] = false
@@ -73,7 +78,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      valkey:
         condition: service_healthy
       gitlab:
         condition: service_healthy

@@ -1,4 +1,4 @@
-# Local stack: Postgres + Redis + portal (fakes-only upstreams).
+# Local stack: Postgres + Valkey + portal (fakes-only upstreams).
 # The fakes simulate Harbor/GitLab/ArgoCD so the full order happy-path runs
 # without any of those systems present.
 services:
@@ -16,12 +16,14 @@ services:
       timeout: 3s
       retries: 10
 
-  redis:
-    image: redis:7-alpine
+  # Valkey: drop-in RESP-compatible Redis fork (BSD-licensed). The portal speaks
+  # the same redis:// protocol via go-redis, so CACHE=redis / REDIS_URL stay.
+  valkey:
+    image: valkey/valkey:8-alpine
     ports:
       - "6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 3s
       timeout: 3s
       retries: 10
@@ -49,7 +51,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      valkey:
         condition: service_healthy
     environment:
       HTTP_PORT: "8080"
@@ -57,7 +59,7 @@ services:
       STORE: postgres
       CACHE: redis
       DATABASE_URL: postgres://portal:portal@postgres:5432/portal?sslmode=disable
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: redis://valkey:6379/0
       # upstreams: explicit fakes for this zero-infra dev stack (built-in default
       # is now "real"; the upstreams overlay sets real + URLs/tokens).
       HARBOR_MODE: fake
