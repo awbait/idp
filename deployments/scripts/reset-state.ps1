@@ -71,10 +71,10 @@ docker compose -f $compose exec -T postgres `
     psql -U portal -d portal -c "TRUNCATE requests, request_mrs, request_events RESTART IDENTITY CASCADE;" | Out-Host
 if ($LASTEXITCODE -ne 0) { Write-Host "[reset] WARN: psql truncate failed (is the postgres container up?)" -ForegroundColor Yellow }
 
-# --- 4. Redis: flush the cache -------------------------------------------------
-Write-Host "[reset] Redis: FLUSHALL..." -ForegroundColor Cyan
-docker compose -f $compose exec -T redis redis-cli FLUSHALL | Out-Host
-if ($LASTEXITCODE -ne 0) { Write-Host "[reset] WARN: redis FLUSHALL failed (is the redis container up?)" -ForegroundColor Yellow }
+# --- 4. Valkey: flush the cache ------------------------------------------------
+Write-Host "[reset] Valkey: FLUSHALL..." -ForegroundColor Cyan
+docker compose -f $compose exec -T valkey valkey-cli FLUSHALL | Out-Host
+if ($LASTEXITCODE -ne 0) { Write-Host "[reset] WARN: valkey FLUSHALL failed (is the valkey container up?)" -ForegroundColor Yellow }
 
 Write-Host ""
 Write-Host "[reset] done. Postgres/Redis/Argo/GitLab cleared; Harbor untouched." -ForegroundColor Green
