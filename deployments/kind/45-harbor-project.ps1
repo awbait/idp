@@ -8,8 +8,13 @@ $ErrorActionPreference = "Stop"
 # the host shell). This is Harbor's core API with HTTP Basic auth - it does not go
 # through the OCI token realm - so 127.0.0.1 works; -k skips the self-signed cert.
 $base = "https://127.0.0.1:8084/api/v2.0"
-# metadata.public as a string is Harbor's canonical form across 2.x.
-$body = "{`"project_name`":`"$Project`",`"metadata`":{`"public`":`"true`"}}"
+# metadata.public as a string is Harbor's canonical form across 2.x. Write the
+# JSON to a temp file and feed curl via -d "@file": passing a quoted body inline
+# is mangled by PowerShell's native-argument quoting (5.1 strips the inner double
+# quotes), so Harbor receives invalid JSON and answers 422. The file path goes
+# through verbatim regardless of the host's PowerShell version.
+$bodyFile = New-TemporaryFile
+Set-Content -Path $bodyFile -Value "{`"project_name`":`"$Project`",`"metadata`":{`"public`":`"true`"}}" -Encoding ascii -NoNewline
 
 # Harbor's /health flips to 200 a good minute before the project API can accept
 # writes - right after a (re)install the core rolls and POST returns a transient
@@ -25,7 +30,7 @@ for ($i = 1; $i -le 120; $i++) {
         Write-Host "[harbor] project '$Project' present - ok."; $done = $true; break
     }
     $code = (curl.exe -sk -o NUL -w "%{http_code}" -u "admin:Harbor12345" `
-        -X POST "$base/projects" -H "Content-Type: application/json" -d $body)
+        -X POST "$base/projects" -H "Content-Type: application/json" -d "@$($bodyFile.FullName)")
     switch ($code) {
         "201" { Write-Host "[harbor] project '$Project' created (public)."; $done = $true }
         "409" { Write-Host "[harbor] project '$Project' already exists - ok."; $done = $true }
@@ -36,4 +41,5 @@ for ($i = 1; $i -le 120; $i++) {
     }
     if ($done) { break }
 }
+Remove-Item -Path $bodyFile -Force -ErrorAction SilentlyContinue
 if (-not $done) { throw "harbor project create failed after retries (last HTTP $code)" }
