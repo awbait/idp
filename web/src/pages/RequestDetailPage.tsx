@@ -351,9 +351,9 @@ export function RequestDetailPage() {
         busyLabel="Удаляем…"
         message={
           isDraft ? (
-            <>Черновик «{r.display_name || r.service_name}» будет удалён без возможности восстановления.</>
+            <>Черновик <strong>{r.display_name || r.service_name}</strong> будет удалён без возможности восстановления.</>
           ) : (
-            <>Для сервиса «{r.service_name}» будет открыт merge request на удаление.</>
+            <>Сервис <strong>{r.service_name}</strong> будет удалён.</>
           )
         }
         onConfirm={onConfirmDelete}

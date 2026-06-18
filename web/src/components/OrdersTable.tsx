@@ -317,12 +317,12 @@ export function OrdersTable({ title, filter, orderTo, orderDisabledReason, empty
         message={
           deleting?.status === "DRAFT" ? (
             <>
-              Черновик «{deleting?.display_name || deleting?.service_name}» будет удалён без
-              возможности восстановления.
+              Черновик <strong>{deleting?.display_name || deleting?.service_name}</strong> будет
+              удалён без возможности восстановления.
             </>
           ) : (
             <>
-              Для сервиса «{deleting?.service_name}» будет открыт merge request на удаление.
+              Сервис <strong>{deleting?.service_name}</strong> будет удалён.
             </>
           )
         }
