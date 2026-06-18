@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // Postgres is the production Store backed by pgx.

@@ -1,4 +1,4 @@
-module idp
+module console
 
 go 1.26.1
 

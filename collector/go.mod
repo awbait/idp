@@ -1,4 +1,4 @@
-module idp-collector
+module console-collector
 
 go 1.26.1
 

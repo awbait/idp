@@ -6,9 +6,9 @@ import (
 	"errors"
 	"testing"
 
-	"idp/internal/publications"
-	"idp/internal/store"
-	"idp/pkg/models"
+	"console/internal/publications"
+	"console/internal/store"
+	"console/pkg/models"
 )
 
 func member(teams ...string) *models.User {

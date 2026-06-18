@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"idp/internal/cache"
-	"idp/pkg/models"
+	"console/internal/cache"
+	"console/pkg/models"
 )
 
 func TestSessionStoreSaveRoundTrip(t *testing.T) {

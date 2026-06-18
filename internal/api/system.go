@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"idp/internal/auth"
+	"console/internal/auth"
 )
 
 // SystemInfo carries the configured backend modes + external UI URLs for the

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"idp/internal/argocd"
-	"idp/pkg/models"
+	"console/internal/argocd"
+	"console/pkg/models"
 )
 
 // seedApps returns a fake ArgoCD with one portal-managed app per team.

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"idp/internal/cache"
-	"idp/pkg/models"
+	"console/internal/cache"
+	"console/pkg/models"
 	"github.com/google/uuid"
 )
 

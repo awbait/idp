@@ -5,10 +5,10 @@ import (
 	"errors"
 	"net/http"
 
-	"idp/internal/auth"
-	"idp/internal/provisioning"
-	"idp/internal/publications"
-	"idp/pkg/models"
+	"console/internal/auth"
+	"console/internal/provisioning"
+	"console/internal/publications"
+	"console/pkg/models"
 )
 
 type errorBody struct {

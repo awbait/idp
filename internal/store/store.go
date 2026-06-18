@@ -5,7 +5,7 @@ package store
 import (
 	"context"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // RequestFilter narrows ListRequests. Teams scopes visibility to the caller's

@@ -4,7 +4,7 @@ import (
 	"context"
 	"sort"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // --- categories ---

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"idp/internal/argocd"
-	"idp/pkg/models"
+	"console/internal/argocd"
+	"console/pkg/models"
 )
 
 // Reconcile advances every active order based on its MR and ArgoCD state.

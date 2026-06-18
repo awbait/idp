@@ -8,9 +8,9 @@ import (
 
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
-	"idp/internal/gitlab"
-	"idp/internal/store"
-	"idp/pkg/models"
+	"console/internal/gitlab"
+	"console/internal/store"
+	"console/pkg/models"
 )
 
 // ImportFromGit discovers application.yaml manifests committed under the GitOps

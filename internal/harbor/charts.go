@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // Real Helm charts vendored for the fakes-only dev/demo run. The chart is the

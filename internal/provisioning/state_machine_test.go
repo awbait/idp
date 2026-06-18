@@ -3,7 +3,7 @@ package provisioning
 import (
 	"testing"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 func TestCanTransition(t *testing.T) {

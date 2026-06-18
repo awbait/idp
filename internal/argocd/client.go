@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // Client is the real ArgoCD implementation of Port. It speaks the ArgoCD

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"idp/internal/gitlab"
-	"idp/pkg/models"
+	"console/internal/gitlab"
+	"console/pkg/models"
 )
 
 // newServer spins up a stub GitLab and a Client pointed at it. The handler

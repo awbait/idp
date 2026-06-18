@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // Client is the real GitLab REST API v4 implementation of Port. It speaks the

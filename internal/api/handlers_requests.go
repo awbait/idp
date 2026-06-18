@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"idp/internal/auth"
-	"idp/internal/provisioning"
-	"idp/internal/store"
-	"idp/pkg/models"
+	"console/internal/auth"
+	"console/internal/provisioning"
+	"console/internal/store"
+	"console/pkg/models"
 )
 
 type createReq struct {

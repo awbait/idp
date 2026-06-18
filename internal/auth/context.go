@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 type ctxKey int

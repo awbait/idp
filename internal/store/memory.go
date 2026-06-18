@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // Memory is an in-memory Store for tests and local fakes-only runs.

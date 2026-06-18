@@ -5,7 +5,7 @@ package gitlab
 import (
 	"context"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // Group is a GitLab group/subgroup.

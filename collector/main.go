@@ -1,4 +1,4 @@
-// Command idp-collector periodically lists labeled namespaces and their
+// Command console-collector periodically lists labeled namespaces and their
 // workloads (Deployment/StatefulSet/DaemonSet) and writes a read-only snapshot
 // into Valkey/Redis for the IDP console to consume. The console never talks to
 // the Kubernetes API: it only reads the snapshot from Valkey.

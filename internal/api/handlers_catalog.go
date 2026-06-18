@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"idp/internal/auth"
+	"console/internal/auth"
 	"github.com/go-chi/chi/v5"
 )
 

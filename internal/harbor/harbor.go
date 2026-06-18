@@ -5,7 +5,7 @@ package harbor
 import (
 	"context"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // Port is the catalog's view of Harbor. Both the real HTTP client and the

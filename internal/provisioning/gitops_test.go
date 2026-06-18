@@ -3,7 +3,7 @@ package provisioning_test
 import (
 	"testing"
 
-	"idp/internal/provisioning"
+	"console/internal/provisioning"
 )
 
 func newGitOps(t *testing.T) *provisioning.GitOps {

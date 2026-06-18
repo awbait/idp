@@ -13,12 +13,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/santhosh-tekuri/jsonschema/v5"
 	"gopkg.in/yaml.v3"
-	"idp/internal/argocd"
-	"idp/internal/catalog"
-	"idp/internal/events"
-	"idp/internal/gitlab"
-	"idp/internal/store"
-	"idp/pkg/models"
+	"console/internal/argocd"
+	"console/internal/catalog"
+	"console/internal/events"
+	"console/internal/gitlab"
+	"console/internal/store"
+	"console/pkg/models"
 )
 
 var nameRe = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)

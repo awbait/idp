@@ -8,7 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // --- categories ---

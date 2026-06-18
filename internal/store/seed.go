@@ -6,7 +6,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // Canonical ingress-gateway view document (formerly

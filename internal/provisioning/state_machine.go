@@ -1,6 +1,6 @@
 package provisioning
 
-import "idp/pkg/models"
+import "console/pkg/models"
 
 // transitions is the allowed FSM edges (see spec lifecycle diagram).
 var transitions = map[models.RequestStatus]map[models.RequestStatus]bool{

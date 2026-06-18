@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"idp/internal/views"
+	"console/internal/views"
 )
 
 // A schema in the spirit of the real ingress-gateway: definitions + $ref + nesting.

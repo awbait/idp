@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // Client is the real Harbor implementation of Port. Catalog metadata (projects,

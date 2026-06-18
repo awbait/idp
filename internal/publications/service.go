@@ -15,9 +15,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"idp/internal/store"
-	"idp/internal/views"
-	"idp/pkg/models"
+	"console/internal/store"
+	"console/internal/views"
+	"console/pkg/models"
 )
 
 var (

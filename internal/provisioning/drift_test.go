@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"idp/internal/gitlab"
-	"idp/internal/provisioning"
-	"idp/pkg/models"
+	"console/internal/gitlab"
+	"console/internal/provisioning"
+	"console/pkg/models"
 )
 
 // drives a fresh order (core/pg1) to HEALTHY so its manifests live on the

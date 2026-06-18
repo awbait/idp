@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"testing"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 func TestBuildUser(t *testing.T) {

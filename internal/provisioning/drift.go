@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // CheckDrift compares each deployed order's committed Git state (values.yaml +

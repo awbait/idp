@@ -5,8 +5,8 @@ package status
 import (
 	"context"
 
-	"idp/internal/argocd"
-	"idp/pkg/models"
+	"console/internal/argocd"
+	"console/pkg/models"
 )
 
 // Service is the read-only ArgoCD view for the /applications endpoints.

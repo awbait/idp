@@ -8,8 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"idp/internal/argocd"
-	"idp/pkg/models"
+	"console/internal/argocd"
+	"console/pkg/models"
 )
 
 // newServer spins up a stub argocd-server and a Client pointed at it.

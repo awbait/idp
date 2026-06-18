@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // PullFromGit adopts the order's current Git state into the portal: it reads the

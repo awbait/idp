@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"idp/internal/observability"
-	"idp/internal/store"
-	"idp/pkg/models"
+	"console/internal/observability"
+	"console/internal/store"
+	"console/pkg/models"
 )
 
 // orderStatuses is the full set of order lifecycle states, used to reset drained

@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"idp/internal/observability"
+	"console/internal/observability"
 )
 
 // Reconciler advances state on each tick. Both the fake ArgoCD (materialise

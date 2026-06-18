@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	"idp/internal/cache"
-	"idp/internal/changelog"
-	"idp/internal/harbor"
-	"idp/pkg/models"
+	"console/internal/cache"
+	"console/internal/changelog"
+	"console/internal/harbor"
+	"console/pkg/models"
 )
 
 // Service is the catalog domain.

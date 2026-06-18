@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"idp/internal/gitlab"
-	"idp/pkg/models"
+	"console/internal/gitlab"
+	"console/pkg/models"
 )
 
 // When an order's manifests are already gone from Git (e.g. an imported order

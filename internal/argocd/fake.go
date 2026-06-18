@@ -5,7 +5,7 @@ import (
 	"sort"
 	"sync"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 	"gopkg.in/yaml.v3"
 )
 

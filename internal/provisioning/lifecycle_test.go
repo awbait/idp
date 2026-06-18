@@ -5,15 +5,15 @@ import (
 	"errors"
 	"testing"
 
-	"idp/internal/argocd"
-	"idp/internal/cache"
-	"idp/internal/catalog"
-	"idp/internal/events"
-	"idp/internal/gitlab"
-	"idp/internal/harbor"
-	"idp/internal/provisioning"
-	"idp/internal/store"
-	"idp/pkg/models"
+	"console/internal/argocd"
+	"console/internal/cache"
+	"console/internal/catalog"
+	"console/internal/events"
+	"console/internal/gitlab"
+	"console/internal/harbor"
+	"console/internal/provisioning"
+	"console/internal/store"
+	"console/pkg/models"
 )
 
 type stack struct {

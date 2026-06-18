@@ -6,7 +6,7 @@ import (
 	"strings"
 	"text/template"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // GitOps encapsulates the GitOps repo convention:

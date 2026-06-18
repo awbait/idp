@@ -11,7 +11,7 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // OIDC authenticates via Keycloak Authorization Code flow (PKCE-ready) and keeps

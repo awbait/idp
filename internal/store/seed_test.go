@@ -3,7 +3,7 @@ package store
 import (
 	"testing"
 
-	"idp/internal/views"
+	"console/internal/views"
 )
 
 // The ingress-gateway seed document must pass format validation - otherwise

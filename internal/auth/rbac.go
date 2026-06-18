@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // RBAC maps Keycloak groups to portal teams and roles. It is deliberately

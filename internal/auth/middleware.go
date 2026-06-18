@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // ErrUnauthenticated is returned by Authenticate when no valid session exists.

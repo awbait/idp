@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 func TestPullFromGit(t *testing.T) {

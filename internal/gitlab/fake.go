@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 type fakeProject struct {

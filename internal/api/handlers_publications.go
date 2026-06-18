@@ -7,12 +7,12 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"idp/internal/auth"
-	"idp/internal/catalog"
-	"idp/internal/publications"
-	"idp/internal/store"
-	"idp/internal/views"
-	"idp/pkg/models"
+	"console/internal/auth"
+	"console/internal/catalog"
+	"console/internal/publications"
+	"console/internal/store"
+	"console/internal/views"
+	"console/pkg/models"
 )
 
 // --- categories ---

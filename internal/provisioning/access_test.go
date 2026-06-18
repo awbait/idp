@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"idp/internal/provisioning"
-	"idp/internal/store"
-	"idp/pkg/models"
+	"console/internal/provisioning"
+	"console/internal/store"
+	"console/pkg/models"
 )
 
 func support() *models.User {

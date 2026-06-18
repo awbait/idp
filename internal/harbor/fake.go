@@ -5,7 +5,7 @@ import (
 	"sort"
 	"time"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // fakeVersion bundles a version's metadata and its file bodies.

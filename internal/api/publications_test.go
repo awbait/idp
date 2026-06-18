@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // TestHTTPCheckChart: check a chart by path: fixture chart is complete,

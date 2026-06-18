@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // Dev is a no-Keycloak authenticator for local runs and tests. The user can be

@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"idp/internal/gitlab"
-	"idp/internal/store"
-	"idp/pkg/models"
+	"console/internal/gitlab"
+	"console/internal/store"
+	"console/pkg/models"
 )
 
 // makeRepoByID creates a chart repo under team-core and commits the given files

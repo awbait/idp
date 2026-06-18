@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"idp/internal/auth"
+	"console/internal/auth"
 )
 
 func (s *Server) handleListApplications(w http.ResponseWriter, r *http.Request) {

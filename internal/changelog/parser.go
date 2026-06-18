@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"idp/pkg/models"
+	"console/pkg/models"
 )
 
 // header matches lines like: ## [15.4.2] - 2026-05-20  (date optional). The
