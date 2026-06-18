@@ -34,7 +34,11 @@ $env:AUTH_MODE = "oidc"
 $env:OIDC_ISSUER = "http://${BindHost}:8081/realms/internal"
 $env:OIDC_CLIENT_ID = "portal"
 $env:OIDC_CLIENT_SECRET = "portal-secret"
-$env:OIDC_REDIRECT_URL = "http://${BindHost}:8080/api/v1/auth/callback"
+# Host-dev UI lives on the Vite origin (:5173); the SPA starts login there and
+# Vite proxies /api to the portal. The OIDC callback must return to the SAME
+# origin or the oauth_state cookie set on :5173 is absent on :8080 -> "invalid
+# state". The :5173 callback URI is registered in realm-internal.json.
+$env:OIDC_REDIRECT_URL = "http://${BindHost}:5173/api/v1/auth/callback"
 $env:OIDC_POST_LOGIN_REDIRECT = "http://${BindHost}:5173/"
 $env:OIDC_POST_LOGOUT_REDIRECT = "http://${BindHost}:5173/"
 $env:OIDC_SCOPES = "openid,profile,email"
