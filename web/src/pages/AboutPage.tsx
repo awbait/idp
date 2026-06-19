@@ -13,12 +13,12 @@ import { useAsync } from "../hooks/useAsync";
 import { useUser } from "../auth/UserContext";
 import { Card, ErrorBox, Spinner } from "../components/ui";
 
-// Build-metadata rows shown as stat cards, in display order.
-const META: { key: "version" | "commit" | "build_date" | "go_version"; label: string }[] = [
-  { key: "version", label: "Версия" },
+// Build-metadata stat cards. The release version (injected at build via ldflags;
+// "dev" locally) is the headline shown in the hero badge, so it is not repeated
+// here; the Go runtime version is intentionally not surfaced on a user page.
+const META: { key: "commit" | "build_date"; label: string }[] = [
   { key: "commit", label: "Коммит" },
   { key: "build_date", label: "Дата сборки" },
-  { key: "go_version", label: "Go" },
 ];
 
 export function AboutPage() {
@@ -56,7 +56,7 @@ export function AboutPage() {
               </span>
               <div>
                 <div className="text-base font-semibold text-slate-900">Console</div>
-                <div className="text-sm text-slate-500">Портал самообслуживания платформы</div>
+                <div className="text-sm text-slate-500">Заказ и управление сервисами платформы</div>
               </div>
             </div>
             <span className="shrink-0 rounded-full bg-brand-50 px-3 py-1 font-mono text-sm font-medium text-brand-700">
