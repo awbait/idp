@@ -5,6 +5,8 @@
 
 # Env / secrets
 .env
+*.pem
+*.key
 
 # Go
 /vendor/
