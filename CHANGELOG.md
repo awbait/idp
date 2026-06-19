@@ -39,5 +39,5 @@ chart publications, OIDC auth, and observability.
   merging a `release/*` PR, and multi-arch image publish to GHCR for portal and
   collector on `v*` tags.
 
-[Unreleased]: https://github.com/awbait/idp/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/awbait/idp/releases/tag/v0.1.0
+[Unreleased]: https://github.com/awbait/console/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/awbait/console/releases/tag/v0.1.0

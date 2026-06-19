@@ -39,5 +39,5 @@
   мерже `release/*` PR, сборка и публикация multi-arch образов portal и collector
   в GHCR по тегам `v*`.
 
-[Unreleased]: https://github.com/awbait/idp/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/awbait/idp/releases/tag/v0.1.0
+[Unreleased]: https://github.com/awbait/console/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/awbait/console/releases/tag/v0.1.0
