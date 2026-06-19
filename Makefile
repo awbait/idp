@@ -2,6 +2,14 @@
 	up-upstreams-infra down-upstreams gitlab-seed \
 	stand-up stand-down stand-charts stand-appset stand-token stand-reset seed-import
 
+# Version/commit/date stamped into the binary for the "About" page. `go run`
+# does not apply VCS stamping, so inject via ldflags (best-effort: empty when
+# git/date is unavailable, then buildinfo falls back to any VCS info present).
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null)
+DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
+GO_LDFLAGS := -X console/internal/buildinfo.Version=$(VERSION) -X console/internal/buildinfo.Commit=$(COMMIT) -X console/internal/buildinfo.Date=$(DATE)
+
 build:
 	go build ./...
 
@@ -40,7 +48,7 @@ run-oidc:
 	RBAC_ADMIN_GROUPS=platform-admins \
 	RBAC_SUPPORT_GROUPS=support \
 	RBAC_SECURITY_GROUPS=security \
-	go run ./cmd/portal
+	go run -ldflags "$(GO_LDFLAGS)" ./cmd/portal
 
 # Frontend dev server (Vite) on :5173 with live reload; proxies /api -> :8080.
 # --host binds all interfaces (incl. IPv4); without it Vite is IPv6-only, which
@@ -90,8 +98,15 @@ down-upstreams:
 gitlab-seed:
 	docker compose -f deployments/docker-compose.yml -f deployments/docker-compose.upstreams.yml exec -T gitlab gitlab-rails runner /seed.rb
 
+# .dockerignore excludes .git, so the toolchain can't VCS-stamp inside the build;
+# pass version/commit/date (resolved from the host's git) as build args instead.
+# Release pipelines should likewise pass --build-arg VERSION=<tag>.
 docker:
-	docker build -t console:dev .
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		--build-arg DATE=$(DATE) \
+		-t console:dev .
 
 # --- Local e2e stand: KinD + Argo CD + Harbor (Windows/PowerShell) ---
 # Full bring-up; writes ARGOCD_TOKEN into deployments/.env at the end, then run

@@ -24,6 +24,7 @@ import {
   KyvernoPage,
 } from "./pages/SecuritySection";
 import { StatusPage } from "./pages/StatusPage";
+import { AboutPage } from "./pages/AboutPage";
 import { DocsPage } from "./pages/DocsPage";
 import { NotFound } from "./components/NotFound";
 
@@ -50,6 +51,8 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { index: true, element: <RoleHome /> },
+      // About is informational and available to every role (outside PlatformOnly).
+      { path: "about", element: <AboutPage /> },
       {
         path: "security",
         element: <SecuritySection />,

@@ -120,9 +120,18 @@ if ($RealGitlab) {
 
 Write-Host "Portal -> OIDC mode on :8080 (Keycloak http://${BindHost}:8081). Open the SPA at http://${BindHost}:5173" -ForegroundColor Green
 
+# Stamp version/commit/date into the binary so the "About" page is populated.
+# `go run` does NOT apply the toolchain's VCS stamping, so inject explicitly.
+$pkg = "console/internal/buildinfo"
+$version = (& git -C $root describe --tags --always --dirty 2>$null)
+if (-not $version) { $version = "dev" }
+$commit = (& git -C $root rev-parse --short HEAD 2>$null)
+$date = [DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
+$ldflags = "-X $pkg.Version=$version -X $pkg.Commit=$commit -X $pkg.Date=$date"
+
 Push-Location $root
 try {
-  go run ./cmd/portal
+  go run -ldflags $ldflags ./cmd/portal
 } finally {
   Pop-Location
 }

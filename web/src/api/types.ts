@@ -129,6 +129,21 @@ export interface SystemStatus {
   components: ComponentStatus[];
 }
 
+// About page (GET /api/v1/info): portal build metadata.
+export interface AboutInfo {
+  version: string;
+  commit?: string;
+  build_date?: string;
+  go_version: string;
+}
+
+// Portal release notes (GET /api/v1/changelog), newest first. body is markdown.
+export interface ChangelogRelease {
+  version: string;
+  date?: string;
+  body: string;
+}
+
 // --- chart publications (catalog with metadata) ---
 
 // Lifecycle of a publication view-document draft.
