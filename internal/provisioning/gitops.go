@@ -65,9 +65,14 @@ func (g *GitOps) RepoPath(team, chart string) string {
 	return g.SubgroupPath(team) + "/" + chart
 }
 
-// AppName renders the ArgoCD Application name (computed once at creation).
-func (g *GitOps) AppName(team, service string) string {
-	return render(g.AppNameTmpl, tmplData{Team: team, ServiceName: service})
+// AppName renders the ArgoCD Application name (computed once at creation). The
+// chart is part of the name so two different charts ordered with the same
+// service_name into one namespace do not produce two application.yaml files that
+// define the same-named Application CR (which would make their app-of-apps repos
+// fight over a single object). Mirrors the active-service key (team, chart,
+// service, cluster).
+func (g *GitOps) AppName(team, chart, service string) string {
+	return render(g.AppNameTmpl, tmplData{Team: team, Chart: chart, ServiceName: service})
 }
 
 // TeamFromSubgroup reverses SubgroupTmpl to recover the team from a subgroup

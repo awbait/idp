@@ -204,7 +204,7 @@ func (s *Service) Create(ctx context.Context, u *models.User, in CreateInput) (*
 		ValuesYAML:    valuesYAML,
 		Status:        models.StatusDraft,
 	}
-	r.ArgoCDAppName = s.gitops.AppName(r.Team, r.ServiceName) // computed once
+	r.ArgoCDAppName = s.gitops.AppName(r.Team, r.ChartName, r.ServiceName) // computed once
 
 	if err := s.store.CreateRequest(ctx, r); err != nil {
 		return nil, err // ErrConflict -> 409
@@ -359,7 +359,7 @@ func (s *Service) updateDraft(ctx context.Context, u *models.User, r *models.Req
 			return nil, &ValidationError{Message: "service_name must be a valid Kubernetes name"}
 		}
 		r.ServiceName = in.ServiceName
-		r.ArgoCDAppName = s.gitops.AppName(r.Team, r.ServiceName)
+		r.ArgoCDAppName = s.gitops.AppName(r.Team, r.ChartName, r.ServiceName)
 	}
 	if in.DisplayName != "" {
 		r.DisplayName = in.DisplayName

@@ -9,7 +9,7 @@ import (
 func newGitOps(t *testing.T) *provisioning.GitOps {
 	t.Helper()
 	g, err := provisioning.NewGitOps("managed-services", "team-{{.Team}}",
-		"{{.Team}}-{{.ServiceName}}", "portal-managed", "main")
+		"{{.Team}}-{{.Chart}}-{{.ServiceName}}", "portal-managed", "main")
 	if err != nil {
 		t.Fatal(err)
 	}

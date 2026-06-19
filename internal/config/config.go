@@ -84,7 +84,7 @@ type Config struct {
 	ArgoCDToken       string `env:"ARGOCD_TOKEN"`
 	ArgoCDProject     string `env:"ARGOCD_PROJECT" envDefault:"portal-managed"`
 	ArgoCDCluster     string `env:"ARGOCD_DEFAULT_CLUSTER" envDefault:"in-cluster"`
-	ArgoCDAppNameTmpl string `env:"ARGOCD_APP_NAME_TEMPLATE" envDefault:"{{.Team}}-{{.ServiceName}}"`
+	ArgoCDAppNameTmpl string `env:"ARGOCD_APP_NAME_TEMPLATE" envDefault:"{{.Team}}-{{.Chart}}-{{.ServiceName}}"`
 	// ChartRegistry is the OCI/Helm registry base the committed application.yaml
 	// points its chart source at, e.g. "host.docker.internal:8084" on the stand
 	// (the chart repoURL becomes "{ChartRegistry}/{chart_project}"). This is the

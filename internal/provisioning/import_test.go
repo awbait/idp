@@ -42,7 +42,7 @@ func TestImportFromGit(t *testing.T) {
 	want := &models.Request{
 		Team: "core", ChartProject: "platform", ChartName: "postgres", ChartVersion: "15.4.2",
 		ServiceName: "pg9", Cluster: "in-cluster", Namespace: "pg9-ns",
-		ArgoCDAppName: "core-pg9",
+		ArgoCDAppName: "core-postgres-pg9",
 	}
 	appYAML, err := s.gitops.RenderApplication(want, webURL)
 	if err != nil {
@@ -56,7 +56,7 @@ func TestImportFromGit(t *testing.T) {
 	// Invalid #1: conforming application.yaml but NO values.yaml -> not imported.
 	noValues := mustRender(t, s, "managed-services/team-core/redis",
 		&models.Request{Team: "core", ChartProject: "platform", ChartName: "redis", ChartVersion: "1.0.0",
-			ServiceName: "cache1", Cluster: "in-cluster", Namespace: "cache1", ArgoCDAppName: "core-cache1"})
+			ServiceName: "cache1", Cluster: "in-cluster", Namespace: "cache1", ArgoCDAppName: "core-redis-cache1"})
 	makeRepoByID(ctx, t, s.gl, "redis", map[string]string{
 		"in-cluster/cache1/application.yaml": noValues,
 	})
@@ -88,7 +88,7 @@ spec:
 		t.Fatalf("want exactly 1 imported (the valid one), got %d: %+v", len(all), all)
 	}
 	pg := all[0]
-	if !pg.Imported || pg.ArgoCDAppName != "core-pg9" || pg.ChartName != "postgres" ||
+	if !pg.Imported || pg.ArgoCDAppName != "core-postgres-pg9" || pg.ChartName != "postgres" ||
 		pg.ChartVersion != "15.4.2" || pg.ServiceName != "pg9" || pg.ChartProject != "platform" ||
 		pg.Namespace != "pg9-ns" || pg.ValuesYAML == "" {
 		t.Fatalf("imported order wrong: %+v", pg)
