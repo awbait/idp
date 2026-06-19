@@ -15,11 +15,15 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=web /web/dist ./internal/spa/dist
-# VERSION stamps the "About" page; pass --build-arg VERSION=vX.Y.Z at release time
-# (defaults to "dev"). Commit/date come from the toolchain's VCS stamping.
+# Build metadata for the "About" page; pass --build-arg at release time. VERSION
+# defaults to "dev"; COMMIT/DATE are optional (the build context usually omits
+# .git, so VCS stamping is unavailable here - inject them explicitly to populate
+# the page).
 ARG VERSION=dev
+ARG COMMIT=
+ARG DATE=
 RUN CGO_ENABLED=0 go build -trimpath \
-	-ldflags="-s -w -X console/internal/buildinfo.Version=${VERSION}" \
+	-ldflags="-s -w -X console/internal/buildinfo.Version=${VERSION} -X console/internal/buildinfo.Commit=${COMMIT} -X console/internal/buildinfo.Date=${DATE}" \
 	-o /out/portal ./cmd/portal
 
 FROM gcr.io/distroless/static-debian12:nonroot

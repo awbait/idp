@@ -1,7 +1,8 @@
-// Package buildinfo exposes the portal's version and build metadata. Version is
-// injected at release time via ldflags; commit and date come for free from the
-// Go toolchain's VCS stamping (debug.ReadBuildInfo) when building inside the
-// repo.
+// Package buildinfo exposes the portal's version and build metadata. The values
+// are injected at build time via ldflags; whatever is not injected falls back to
+// the Go toolchain's VCS stamping (debug.ReadBuildInfo), which is present for
+// `go build` inside the repo but NOT for `go run` - hence the explicit ldflags
+// in the run scripts and Dockerfile.
 package buildinfo
 
 import (
@@ -9,12 +10,13 @@ import (
 	"runtime/debug"
 )
 
-// Version is the release version, set at build time with
-//
-//	-ldflags "-X console/internal/buildinfo.Version=v1.2.3"
-//
-// It stays "dev" in unstamped (local) builds.
-var Version = "dev"
+// Injected via -ldflags "-X console/internal/buildinfo.<Name>=<value>". They stay
+// at their zero values in unstamped builds, where Get falls back to VCS info.
+var (
+	Version = "dev"
+	Commit  = ""
+	Date    = ""
+)
 
 // Info is the resolved build metadata returned to callers.
 type Info struct {
@@ -24,28 +26,37 @@ type Info struct {
 	GoVersion string `json:"go_version"`
 }
 
-// Get resolves the build metadata: Version from ldflags, commit/date from the
-// toolchain's VCS stamping (present when built from a git work tree), Go version
-// from the runtime.
+// Get resolves the build metadata: ldflags-injected values first, then the
+// toolchain's VCS stamping for any commit/date left empty, plus the Go runtime.
 func Get() Info {
-	info := Info{Version: Version, GoVersion: runtime.Version()}
+	info := Info{Version: Version, Commit: Commit, BuildDate: Date, GoVersion: runtime.Version()}
+	if info.Commit != "" && info.BuildDate != "" {
+		return info
+	}
 	bi, ok := debug.ReadBuildInfo()
 	if !ok {
 		return info
 	}
+	var rev, when string
 	dirty := false
 	for _, s := range bi.Settings {
 		switch s.Key {
 		case "vcs.revision":
-			info.Commit = shortCommit(s.Value)
+			rev = shortCommit(s.Value)
 		case "vcs.time":
-			info.BuildDate = s.Value
+			when = s.Value
 		case "vcs.modified":
 			dirty = s.Value == "true"
 		}
 	}
-	if dirty && info.Commit != "" {
-		info.Commit += "-dirty"
+	if dirty && rev != "" {
+		rev += "-dirty"
+	}
+	if info.Commit == "" {
+		info.Commit = rev
+	}
+	if info.BuildDate == "" {
+		info.BuildDate = when
 	}
 	return info
 }

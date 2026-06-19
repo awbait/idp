@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   IconArrowUpRight,
   IconBook,
   IconBox,
-  IconHistory,
   IconInfoCircle,
   IconPackages,
 } from "@tabler/icons-react";
@@ -13,40 +14,59 @@ import { useAsync } from "../hooks/useAsync";
 import { useUser } from "../auth/UserContext";
 import { Card, ErrorBox, Spinner } from "../components/ui";
 
-// Build-metadata stat cards. The release version (injected at build via ldflags;
-// "dev" locally) is the headline shown in the hero badge, so it is not repeated
-// here; the Go runtime version is intentionally not surfaced on a user page.
-const META: { key: "commit" | "build_date"; label: string }[] = [
-  { key: "commit", label: "Коммит" },
-  { key: "build_date", label: "Дата сборки" },
-];
+// Markdown styling for changelog bodies (subheadings + bullets + inline code).
+const MD: Components = {
+  h3: ({ children }) => (
+    <div className="mt-3 mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+      {children}
+    </div>
+  ),
+  ul: ({ children }) => <ul className="ml-4 list-disc space-y-1">{children}</ul>,
+  li: ({ children }) => <li className="text-sm text-slate-700 marker:text-slate-300">{children}</li>,
+  p: ({ children }) => <p className="text-sm text-slate-700">{children}</p>,
+  a: ({ href, children }) => (
+    <a href={href} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">
+      {children}
+    </a>
+  ),
+  code: ({ children }) => (
+    <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs text-slate-800">
+      {children}
+    </code>
+  ),
+  strong: ({ children }) => <strong className="font-semibold text-slate-800">{children}</strong>,
+};
 
 export function AboutPage() {
   const { user } = useUser();
-  const { data, error, loading } = useAsync(() => api.getAbout(), []);
+  const about = useAsync(() => api.getAbout(), []);
+  const changelog = useAsync(() => api.getChangelog(), []);
 
   // User-facing portal links (not infra consoles - those live on the status page).
-  // The security role has no catalog/orders, so show it only documentation.
+  // The security role has no catalog/orders, so it only gets documentation.
   const platform = user?.role !== "security";
   const links = [
-    { to: "/docs", label: "Документация", hint: "Гайды и справка по платформе", Icon: IconBook },
+    { to: "/docs", label: "Документация", hint: "Гайды и справка", Icon: IconBook },
     ...(platform
       ? [
-          { to: "/catalog", label: "Каталог чартов", hint: "Доступные сервисы для заказа", Icon: IconPackages },
-          { to: "/requests", label: "Мои заказы", hint: "Список и статусы инстансов", Icon: IconBox },
+          { to: "/catalog", label: "Каталог чартов", hint: "Сервисы для заказа", Icon: IconPackages },
+          { to: "/requests", label: "Мои заказы", hint: "Инстансы и статусы", Icon: IconBox },
         ]
       : []),
   ];
 
+  const info = about.data;
+  const hasBuild = info && (info.commit || info.build_date);
+
   return (
-    <div className="flex max-w-3xl flex-col gap-6">
+    <div className="flex max-w-5xl flex-col gap-6">
       <h1 className="text-xl font-semibold text-slate-900">О портале</h1>
 
-      {loading && !data ? (
+      {about.loading && !info ? (
         <Spinner />
-      ) : error ? (
-        <ErrorBox error={error} />
-      ) : data ? (
+      ) : about.error ? (
+        <ErrorBox error={about.error} />
+      ) : info ? (
         <>
           {/* Hero */}
           <Card className="flex items-center justify-between gap-4">
@@ -60,37 +80,62 @@ export function AboutPage() {
               </div>
             </div>
             <span className="shrink-0 rounded-full bg-brand-50 px-3 py-1 font-mono text-sm font-medium text-brand-700">
-              {data.version}
+              {info.version}
             </span>
           </Card>
 
-          {/* Build metadata */}
-          <Section title="Сборка">
-            <div className="grid grid-cols-2 gap-3">
-              {META.map(({ key, label }) => {
-                const value = data[key];
-                if (!value) return null;
-                return <Stat key={key} label={label} value={value} />;
-              })}
+          <div className="grid gap-6 lg:grid-cols-3">
+            {/* Main column: changelog */}
+            <div className="lg:col-span-2">
+              <Section title="Журнал изменений">
+                {changelog.loading && !changelog.data ? (
+                  <Spinner />
+                ) : changelog.error ? (
+                  <ErrorBox error={changelog.error} />
+                ) : changelog.data && changelog.data.length > 0 ? (
+                  <div className="flex flex-col gap-3">
+                    {changelog.data.map((r) => (
+                      <Card key={r.version}>
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="font-mono text-sm font-semibold text-slate-900">
+                            {r.version}
+                          </span>
+                          {r.date && <span className="text-xs text-slate-400">{r.date}</span>}
+                        </div>
+                        <div className="mt-2">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD}>
+                            {r.body}
+                          </ReactMarkdown>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="text-sm text-slate-400">Пока нет записей.</Card>
+                )}
+              </Section>
             </div>
-          </Section>
 
-          {/* Useful links */}
-          <Section title="Полезные ссылки">
-            <div className="grid grid-cols-2 gap-3">
-              {links.map((l) => (
-                <LinkCard key={l.to} {...l} />
-              ))}
+            {/* Sidebar: build info + links */}
+            <div className="flex flex-col gap-6">
+              {hasBuild && (
+                <Section title="Сборка">
+                  <Card className="flex flex-col gap-2">
+                    {info.commit && <Row label="Коммит" value={info.commit} />}
+                    {info.build_date && <Row label="Дата сборки" value={info.build_date} />}
+                  </Card>
+                </Section>
+              )}
+
+              <Section title="Полезные ссылки">
+                <div className="flex flex-col gap-3">
+                  {links.map((l) => (
+                    <LinkCard key={l.to} {...l} />
+                  ))}
+                </div>
+              </Section>
             </div>
-          </Section>
-
-          {/* Changelog (placeholder) */}
-          <Section title="Изменения по версиям">
-            <Card className="flex items-center gap-3 text-slate-400">
-              <IconHistory size={20} stroke={1.7} className="shrink-0" />
-              <span className="text-sm">Журнал изменений по версиям появится здесь.</span>
-            </Card>
-          </Section>
+          </div>
         </>
       ) : null}
     </div>
@@ -106,12 +151,12 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Row({ label, value }: { label: string; value: string }) {
   return (
-    <Card>
-      <div className="text-xs uppercase tracking-wide text-slate-400">{label}</div>
-      <div className="mt-1 break-all font-mono text-sm text-slate-800">{value}</div>
-    </Card>
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-sm text-slate-500">{label}</span>
+      <span className="break-all font-mono text-sm text-slate-800">{value}</span>
+    </div>
   );
 }
 

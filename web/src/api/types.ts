@@ -137,6 +137,13 @@ export interface AboutInfo {
   go_version: string;
 }
 
+// Portal release notes (GET /api/v1/changelog), newest first. body is markdown.
+export interface ChangelogRelease {
+  version: string;
+  date?: string;
+  body: string;
+}
+
 // --- chart publications (catalog with metadata) ---
 
 // Lifecycle of a publication view-document draft.

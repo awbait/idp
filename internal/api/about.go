@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"console/internal/buildinfo"
+	"console/internal/changelog"
 )
 
 // AboutInfo is the payload for GET /api/v1/info: portal build metadata. Available
@@ -25,4 +26,10 @@ func (s *Server) handleAbout(w http.ResponseWriter, _ *http.Request) {
 		BuildDate: bi.BuildDate,
 		GoVersion: bi.GoVersion,
 	})
+}
+
+// handleChangelog returns the portal's release notes, newest first, parsed from
+// the embedded CHANGELOG.md.
+func (s *Server) handleChangelog(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, changelog.Releases())
 }
