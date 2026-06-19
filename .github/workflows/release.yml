@@ -55,9 +55,13 @@ jobs:
       - name: Extract changelog notes
         run: |
           version='${{ steps.ver.outputs.version }}'
-          awk -v v="${version#v}" '
-            $0 ~ "^## \\[" v "\\]" { flag=1; next }
-            /^## \[/ { flag=0 }
+          # Print the lines of the version's section, stopping at the next
+          # version heading ("## [") or the link-reference block ("["). index()
+          # is used instead of a regex so the literal brackets need no escaping.
+          awk -v tag='## [' -v v="${version#v}" '
+            index($0, tag v "]") == 1 { flag=1; next }
+            index($0, tag) == 1 { flag=0 }
+            index($0, "[") == 1 { flag=0 }
             flag { print }
           ' CHANGELOG.md > RELEASE_NOTES.md
           echo "--- release notes ---"; cat RELEASE_NOTES.md
