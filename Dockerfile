@@ -1,15 +1,20 @@
 # syntax=docker/dockerfile:1
 
-# 1) Build the SPA bundle.
-FROM oven/bun:1-alpine AS web
+# 1) Build the SPA bundle on the build platform (native) once; the static output
+#    is arch-independent and reused for every target arch.
+FROM --platform=$BUILDPLATFORM oven/bun:1-alpine AS web
 WORKDIR /web
 COPY web/package.json web/bun.lock ./
 RUN bun install --frozen-lockfile
 COPY web/ ./
 RUN bun run build
 
-# 2) Build the Go portal with the SPA embedded (web/dist -> internal/spa/dist).
-FROM golang:1.26 AS build
+# 2) Cross-compile the Go portal with the SPA embedded (web/dist ->
+#    internal/spa/dist). Building on the build platform with GOOS/GOARCH (CGO is
+#    off) cross-compiles natively, so a multi-arch build avoids QEMU emulation.
+FROM --platform=$BUILDPLATFORM golang:1.26 AS build
+ARG TARGETOS
+ARG TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -22,7 +27,7 @@ COPY --from=web /web/dist ./internal/spa/dist
 ARG VERSION=dev
 ARG COMMIT=
 ARG DATE=
-RUN CGO_ENABLED=0 go build -trimpath \
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath \
 	-ldflags="-s -w -X console/internal/buildinfo.Version=${VERSION} -X console/internal/buildinfo.Commit=${COMMIT} -X console/internal/buildinfo.Date=${DATE}" \
 	-o /out/portal ./cmd/portal
 
