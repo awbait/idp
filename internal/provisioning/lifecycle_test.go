@@ -33,7 +33,7 @@ func newStack(t *testing.T) *stack {
 	argo := argocd.NewFake(gl)
 	cat := catalog.New(hb, c)
 	gitops, err := provisioning.NewGitOps("managed-services", "team-{{.Team}}",
-		"{{.Team}}-{{.ServiceName}}", "portal-managed", "main")
+		"{{.Team}}-{{.Chart}}-{{.ServiceName}}", "portal-managed", "main")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestOrderLifecycle(t *testing.T) {
 	if req.Status != models.StatusMRCreated {
 		t.Fatalf("want MR_CREATED, got %s", req.Status)
 	}
-	if req.ArgoCDAppName != "core-pg1" {
+	if req.ArgoCDAppName != "core-postgres-pg1" {
 		t.Fatalf("unexpected app name: %s", req.ArgoCDAppName)
 	}
 
@@ -96,7 +96,7 @@ func TestOrderLifecycle(t *testing.T) {
 		t.Fatalf("after tick2 want HEALTHY, got %s", got)
 	}
 
-	if app, err := s.argo.GetApplication(ctx, "core-pg1"); err != nil || app.Health != argocd.HealthHealthy {
+	if app, err := s.argo.GetApplication(ctx, "core-postgres-pg1"); err != nil || app.Health != argocd.HealthHealthy {
 		t.Fatalf("app not healthy: %+v err=%v", app, err)
 	}
 
@@ -343,7 +343,7 @@ func TestDraftIdentityChange(t *testing.T) {
 	if err != nil {
 		t.Fatalf("rename draft: %v", err)
 	}
-	if upd.ServiceName != "pg3" || upd.ArgoCDAppName != "core-pg3" {
+	if upd.ServiceName != "pg3" || upd.ArgoCDAppName != "core-postgres-pg3" {
 		t.Fatalf("got service=%q app=%q", upd.ServiceName, upd.ArgoCDAppName)
 	}
 
@@ -364,7 +364,7 @@ func TestPollerAutoMerge(t *testing.T) {
 	argo := argocd.NewFake(gl)
 	cat := catalog.New(hb, c)
 	gitops, err := provisioning.NewGitOps("managed-services", "team-{{.Team}}",
-		"{{.Team}}-{{.ServiceName}}", "portal-managed", "main")
+		"{{.Team}}-{{.Chart}}-{{.ServiceName}}", "portal-managed", "main")
 	if err != nil {
 		t.Fatal(err)
 	}

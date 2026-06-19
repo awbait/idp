@@ -169,7 +169,7 @@ func (s *Service) parseDiscovered(d gitlab.DiscoveredApp) *models.Request {
 	}
 
 	cluster := firstNonEmpty(m.Spec.Destination.Name, s.defaultCluster)
-	appName := firstNonEmpty(m.Metadata.Name, s.gitops.AppName(team, service))
+	appName := firstNonEmpty(m.Metadata.Name, s.gitops.AppName(team, chart, service))
 
 	return &models.Request{
 		ID:            uuid.NewString(),

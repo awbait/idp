@@ -26,7 +26,7 @@ func newAutoStack(t *testing.T) *stack {
 	argo := argocd.NewFake(gl)
 	cat := catalog.New(hb, c)
 	gitops, err := provisioning.NewGitOps("managed-services", "team-{{.Team}}",
-		"{{.Team}}-{{.ServiceName}}", "portal-managed", "main")
+		"{{.Team}}-{{.Chart}}-{{.ServiceName}}", "portal-managed", "main")
 	if err != nil {
 		t.Fatal(err)
 	}
