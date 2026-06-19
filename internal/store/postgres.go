@@ -63,10 +63,10 @@ func (p *Postgres) CreateRequest(ctx context.Context, r *models.Request) error {
 	_, err := p.pool.Exec(ctx, `
 		INSERT INTO requests
 		(id, created_by, created_by_name, team, chart_project, chart_name, chart_version,
-		 service_name, display_name, cluster, namespace, values_yaml, status, argocd_app_name, version, imported)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+		 service_name, display_name, cluster, namespace, values_yaml, status, argocd_app_name, version, imported, resource_identity)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
 		r.ID, r.CreatedBy, r.CreatedByName, r.Team, r.ChartProject, r.ChartName, r.ChartVersion,
-		r.ServiceName, r.DisplayName, r.Cluster, r.Namespace, r.ValuesYAML, r.Status, nullStr(r.ArgoCDAppName), r.Version, r.Imported)
+		r.ServiceName, r.DisplayName, r.Cluster, r.Namespace, r.ValuesYAML, r.Status, nullStr(r.ArgoCDAppName), r.Version, r.Imported, r.ResourceIdentity)
 	if isUniqueViolation(err) {
 		return models.ErrConflict
 	}
@@ -75,13 +75,13 @@ func (p *Postgres) CreateRequest(ctx context.Context, r *models.Request) error {
 
 const reqCols = `id, created_by, created_by_name, team, chart_project, chart_name, chart_version,
 	service_name, COALESCE(display_name,''), cluster, COALESCE(namespace,''), values_yaml, status, COALESCE(argocd_app_name,''), version,
-	created_at, updated_at, deleted_at, COALESCE(drifted,false), COALESCE(drift_detail,''), COALESCE(imported,false)`
+	created_at, updated_at, deleted_at, COALESCE(drifted,false), COALESCE(drift_detail,''), COALESCE(imported,false), COALESCE(resource_identity,'')`
 
 func scanRequest(row pgx.Row) (*models.Request, error) {
 	var r models.Request
 	err := row.Scan(&r.ID, &r.CreatedBy, &r.CreatedByName, &r.Team, &r.ChartProject, &r.ChartName,
 		&r.ChartVersion, &r.ServiceName, &r.DisplayName, &r.Cluster, &r.Namespace, &r.ValuesYAML, &r.Status, &r.ArgoCDAppName,
-		&r.Version, &r.CreatedAt, &r.UpdatedAt, &r.DeletedAt, &r.Drifted, &r.DriftDetail, &r.Imported)
+		&r.Version, &r.CreatedAt, &r.UpdatedAt, &r.DeletedAt, &r.Drifted, &r.DriftDetail, &r.Imported, &r.ResourceIdentity)
 	if errors.Is(err, pgx.ErrNoRows) || isInvalidUUID(err) {
 		return nil, models.ErrNotFound
 	}
@@ -138,10 +138,10 @@ func (p *Postgres) UpdateRequest(ctx context.Context, r *models.Request) error {
 	tag, err := p.pool.Exec(ctx, `
 		UPDATE requests SET
 		  chart_version=$1, values_yaml=$2, status=$3, argocd_app_name=$4, display_name=$5,
-		  service_name=$6, cluster=$7, namespace=$8, deleted_at=$9, version=version+1, updated_at=NOW()
-		WHERE id=$10 AND version=$11`,
+		  service_name=$6, cluster=$7, namespace=$8, resource_identity=$9, deleted_at=$10, version=version+1, updated_at=NOW()
+		WHERE id=$11 AND version=$12`,
 		r.ChartVersion, r.ValuesYAML, r.Status, nullStr(r.ArgoCDAppName), r.DisplayName,
-		r.ServiceName, r.Cluster, r.Namespace, r.DeletedAt, r.ID, r.Version)
+		r.ServiceName, r.Cluster, r.Namespace, r.ResourceIdentity, r.DeletedAt, r.ID, r.Version)
 	if isUniqueViolation(err) {
 		return models.ErrConflict // identity collides with another active order
 	}

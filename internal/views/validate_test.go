@@ -97,6 +97,7 @@ func TestStructuralIssues(t *testing.T) {
 		{"include not array", `{"views":{"order":{"include":"naming"}}}`, "/views/order/include", "массивом"},
 		{"bad widget", `{"views":{"order":{"overrides":{"x":{"ui:widget":"fancy"}}}}}`, "ui:widget", "single"},
 		{"identity not pointer", `{"views":{"order":{"identity":"gateways"}}}`, "/identity", "pointer"},
+		{"order missing identity", `{"views":{"order":{"include":["x"]}}}`, "/views/order", "должна объявлять"},
 		{"identity nested", `{"views":{"order":{"overrides":{"x":{"ui:view":{"identity":"/a"}}}}}}`, "ui:view/identity", "верхнем уровне"},
 		// view "order", exactly one.
 		{"order missing", `{"views":{"routes":{}}}`, "", `Не хватает view "order"`},
@@ -157,6 +158,7 @@ func TestSchemaCrossChecks(t *testing.T) {
 // A correctly written nested include (gateways[].listeners) passes without errors.
 func TestNestedIncludeValid(t *testing.T) {
 	doc := `{"views":{"order":{
+		"identity":"/gateways/0/name",
 		"include":["gateways"],
 		"overrides":{"gateways":{"ui:widget":"single","ui:view":{"include":["listeners"]}}}
 	}}}`
@@ -167,7 +169,7 @@ func TestNestedIncludeValid(t *testing.T) {
 
 // tabs section: list tabs (items + form + ui:table).
 func TestTabsValid(t *testing.T) {
-	doc := `{"views":{"order":{},"listener":{}},"tabs":[
+	doc := `{"views":{"order":{"identity":"/gateways/0/name"},"listener":{}},"tabs":[
 		{"id":"listeners","title":"Слушатели","items":"/gateways/0/listeners","form":"listener",
 		 "ui:table":[{"path":"name","label":"Имя"},{"path":"port"}]}
 	]}`
@@ -202,7 +204,7 @@ func TestTabsIssues(t *testing.T) {
 
 // enums (dynamic enums) + lookup columns: a valid document against the schema.
 func TestTabsEnumsLookupValid(t *testing.T) {
-	doc := `{"views":{"order":{},"route":{}},"tabs":[
+	doc := `{"views":{"order":{"identity":"/gateways/0/name"},"route":{}},"tabs":[
 		{"id":"routes","items":"/xroutes","form":"route",
 		 "enums":[{"at":"/parentRefs/0/sectionName","from":"/gateways/0/listeners","value":"name"}],
 		 "ui:table":[{"path":"name","label":"Имя"},
@@ -237,7 +239,7 @@ func TestTabsEnumsLookupIssues(t *testing.T) {
 
 // actions section: placement of a view form in "Actions" (info and a tab from tabs).
 func TestActionsValid(t *testing.T) {
-	doc := `{"views":{"order":{},"resources":{},"listener":{}},
+	doc := `{"views":{"order":{"identity":"/gateways/0/name"},"resources":{},"listener":{}},
 		"tabs":[{"id":"listeners","items":"/x","form":"listener"}],
 		"actions":[
 			{"view":"resources","in":"info","label":"Редактировать ресурсы"},
@@ -280,7 +282,7 @@ func TestNoSchemaSkipsCrossChecks(t *testing.T) {
 // Free-form parts of the schema (an object without properties) produce no false errors.
 func TestFreeFormObjectTolerated(t *testing.T) {
 	loose := `{"type":"object","properties":{"cfg":{"type":"object"}}}`
-	doc := `{"views":{"order":{"overrides":{"cfg":{"ui:view":{"include":["whatever"]}}}}}}`
+	doc := `{"views":{"order":{"identity":"/cfg","overrides":{"cfg":{"ui:view":{"include":["whatever"]}}}}}}`
 	if issues := views.Validate([]byte(doc), []byte(loose)); len(issues) > 0 {
 		t.Fatalf("want no issues on free-form object, got %+v", issues)
 	}

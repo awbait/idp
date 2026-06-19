@@ -28,8 +28,8 @@ func setup(t *testing.T) (*publications.Service, *store.Memory) {
 	return publications.New(st, nil), st
 }
 
-var viewV1 = json.RawMessage(`{"views":{"order":{"include":["gateways"]}}}`)
-var viewV2 = json.RawMessage(`{"views":{"order":{"include":["gateways","naming"]}}}`)
+var viewV1 = json.RawMessage(`{"views":{"order":{"identity":"/gateways/0/name","include":["gateways"]}}}`)
+var viewV2 = json.RawMessage(`{"views":{"order":{"identity":"/gateways/0/name","include":["gateways","naming"]}}}`)
 
 func TestPublicationLifecycle(t *testing.T) {
 	ctx := context.Background()

@@ -56,12 +56,32 @@ func activeKey(r *models.Request) string {
 	return r.Team + "\x00" + r.ChartName + "\x00" + r.ServiceName + "\x00" + r.Cluster
 }
 
+// namespaceKey mirrors the partial unique index uniq_active_namespace_identity:
+// two orders of one chart must not render colliding resource names into the same
+// namespace. Only meaningful when both namespace and resource_identity are set
+// (see namespaceGuarded).
+func namespaceKey(r *models.Request) string {
+	return r.Cluster + "\x00" + r.Namespace + "\x00" + r.ChartName + "\x00" + r.ResourceIdentity
+}
+
+// namespaceGuarded reports whether r participates in the namespace-identity
+// uniqueness check (matches the index WHERE clause).
+func namespaceGuarded(r *models.Request) bool {
+	return r.Namespace != "" && r.ResourceIdentity != ""
+}
+
 func (m *Memory) CreateRequest(ctx context.Context, r *models.Request) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if r.DeletedAt == nil {
 		for _, ex := range m.requests {
-			if ex.DeletedAt == nil && activeKey(ex) == activeKey(r) {
+			if ex.DeletedAt != nil {
+				continue
+			}
+			if activeKey(ex) == activeKey(r) {
+				return models.ErrConflict
+			}
+			if namespaceGuarded(r) && namespaceKey(ex) == namespaceKey(r) {
 				return models.ErrConflict
 			}
 		}
@@ -125,10 +145,17 @@ func (m *Memory) UpdateRequest(ctx context.Context, r *models.Request) error {
 		return models.ErrStaleVersion
 	}
 	// Identity may change while a DRAFT; guard against colliding with another
-	// active order (mirrors the partial unique index in Postgres).
-	if r.DeletedAt == nil && activeKey(r) != activeKey(cur) {
+	// active order (mirrors the partial unique indexes in Postgres: the
+	// team/chart/service key and the namespace/identity key).
+	if r.DeletedAt == nil {
 		for id, ex := range m.requests {
-			if id != r.ID && ex.DeletedAt == nil && activeKey(ex) == activeKey(r) {
+			if id == r.ID || ex.DeletedAt != nil {
+				continue
+			}
+			if activeKey(ex) == activeKey(r) {
+				return models.ErrConflict
+			}
+			if namespaceGuarded(r) && namespaceKey(ex) == namespaceKey(r) {
 				return models.ErrConflict
 			}
 		}
