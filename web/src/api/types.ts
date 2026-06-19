@@ -129,17 +129,12 @@ export interface SystemStatus {
   components: ComponentStatus[];
 }
 
-// About page (GET /api/v1/info): build metadata + useful external links.
-export interface AboutLink {
-  label: string;
-  url: string;
-}
+// About page (GET /api/v1/info): portal build metadata.
 export interface AboutInfo {
   version: string;
   commit?: string;
   build_date?: string;
   go_version: string;
-  links: AboutLink[];
 }
 
 // --- chart publications (catalog with metadata) ---

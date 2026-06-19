@@ -11,11 +11,6 @@ import (
 
 func TestHTTPAbout(t *testing.T) {
 	srv, _, _ := newServer(t)
-	// Configure a couple of upstreams so links are surfaced; others stay empty.
-	srv.System = api.SystemInfo{
-		HarborURL:  "https://harbor.example",
-		OIDCIssuer: "https://kc.example/realms/platform",
-	}
 	h := srv.Router()
 
 	rec := httptest.NewRecorder()
@@ -33,19 +28,5 @@ func TestHTTPAbout(t *testing.T) {
 	}
 	if got.GoVersion == "" {
 		t.Error("go_version must not be empty")
-	}
-	// Only configured upstreams appear (Harbor + Keycloak); GitLab/ArgoCD are empty.
-	labels := map[string]string{}
-	for _, l := range got.Links {
-		labels[l.Label] = l.URL
-	}
-	if labels["Harbor"] != "https://harbor.example" {
-		t.Errorf("want Harbor link, got %+v", got.Links)
-	}
-	if _, ok := labels["Keycloak"]; !ok {
-		t.Errorf("want Keycloak link, got %+v", got.Links)
-	}
-	if _, ok := labels["GitLab"]; ok {
-		t.Errorf("GitLab should be absent when unconfigured, got %+v", got.Links)
 	}
 }
