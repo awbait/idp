@@ -89,24 +89,29 @@ func (u *User) InTeam(team string) bool {
 
 // Request is a self-service order for a managed service instance.
 type Request struct {
-	ID            string        `json:"id"`
-	CreatedBy     string        `json:"created_by"`
-	CreatedByName string        `json:"created_by_name"`
-	Team          string        `json:"team"`
-	ChartProject  string        `json:"chart_project"`
-	ChartName     string        `json:"chart_name"`
-	ChartVersion  string        `json:"chart_version"`
-	ServiceName   string        `json:"service_name"` // deploy identity: GitOps folder, ArgoCD app, unique index
-	DisplayName   string        `json:"display_name"` // cosmetic, user-facing, mutable; no deploy impact
-	Cluster       string        `json:"cluster"`      // ArgoCD Application destination.name
-	Namespace     string        `json:"namespace"`    // ArgoCD Application destination.namespace (empty -> service_name)
-	ValuesYAML    string        `json:"values_yaml"`
-	Status        RequestStatus `json:"status"`
-	ArgoCDAppName string        `json:"argocd_app_name"`
-	Version       int           `json:"version"` // optimistic lock
-	CreatedAt     time.Time     `json:"created_at"`
-	UpdatedAt     time.Time     `json:"updated_at"`
-	DeletedAt     *time.Time    `json:"deleted_at,omitempty"`
+	ID            string `json:"id"`
+	CreatedBy     string `json:"created_by"`
+	CreatedByName string `json:"created_by_name"`
+	Team          string `json:"team"`
+	ChartProject  string `json:"chart_project"`
+	ChartName     string `json:"chart_name"`
+	ChartVersion  string `json:"chart_version"`
+	ServiceName   string `json:"service_name"` // deploy identity: GitOps folder, ArgoCD app, unique index
+	DisplayName   string `json:"display_name"` // cosmetic, user-facing, mutable; no deploy impact
+	Cluster       string `json:"cluster"`      // ArgoCD Application destination.name
+	Namespace     string `json:"namespace"`    // ArgoCD Application destination.namespace (empty -> service_name)
+	// ResourceIdentity is the values field that names the rendered resources (the
+	// chart view's "identity" pointer, e.g. gateways[0].name), or service_name as
+	// a fallback. Unique per (cluster, namespace, chart_name): prevents two orders
+	// of one chart from colliding on resource names in a namespace.
+	ResourceIdentity string        `json:"resource_identity"`
+	ValuesYAML       string        `json:"values_yaml"`
+	Status           RequestStatus `json:"status"`
+	ArgoCDAppName    string        `json:"argocd_app_name"`
+	Version          int           `json:"version"` // optimistic lock
+	CreatedAt        time.Time     `json:"created_at"`
+	UpdatedAt        time.Time     `json:"updated_at"`
+	DeletedAt        *time.Time    `json:"deleted_at,omitempty"`
 	// Drifted is set by the drift reconciler when the order's committed Git state
 	// (values.yaml / chart version) was changed outside the portal. DriftDetail
 	// holds a human-readable summary of what diverged. Read-only signal - the

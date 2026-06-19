@@ -18,6 +18,7 @@ import (
 	"console/internal/events"
 	"console/internal/gitlab"
 	"console/internal/store"
+	"console/internal/views"
 	"console/pkg/models"
 )
 
@@ -114,6 +115,51 @@ func shortID() string { return uuid.NewString()[:8] }
 // index locality and roughly creation-sortable, unlike random v4.
 func newID() string { return uuid.Must(uuid.NewV7()).String() }
 
+// resourceIdentity resolves the per-order identity used to detect resource-name
+// collisions within a namespace. It reads the chart's approved order view for the
+// "identity" JSON pointer and resolves it against the order's values, falling
+// back to serviceName when no view/identity is published or the pointer does not
+// resolve (still a usable, unique-per-service discriminator).
+func (s *Service) resourceIdentity(ctx context.Context, chartProject, chartName, serviceName string, values map[string]any) string {
+	pub, err := s.store.GetPublicationByChart(ctx, chartProject, chartName)
+	if err != nil || pub == nil || len(pub.ApprovedViewJSON) == 0 {
+		return serviceName
+	}
+	ptr := views.OrderIdentity(pub.ApprovedViewJSON)
+	if ptr == "" {
+		return serviceName
+	}
+	if v, ok := views.ResolvePointer(values, ptr); ok && v != "" {
+		return v
+	}
+	return serviceName
+}
+
+// checkNamespaceIdentity returns a friendly ValidationError when another active
+// order of the same chart already deploys the same resource identity into the
+// same namespace+cluster. The DB partial unique index is the race-safe backstop;
+// this pre-check exists only to turn a bare 409 into an actionable message.
+func (s *Service) checkNamespaceIdentity(ctx context.Context, r *models.Request) error {
+	if r.Namespace == "" || r.ResourceIdentity == "" {
+		return nil
+	}
+	list, err := s.store.ListRequests(ctx, store.RequestFilter{Admin: true, Chart: r.ChartName})
+	if err != nil {
+		return nil // best-effort; the unique index still guards
+	}
+	for _, ex := range list {
+		if ex.ID == r.ID || ex.DeletedAt != nil {
+			continue
+		}
+		if ex.Cluster == r.Cluster && ex.Namespace == r.Namespace && ex.ResourceIdentity == r.ResourceIdentity {
+			return conflict(
+				"в namespace %q уже есть инстанс чарта %q с идентификатором %q (заказ %q). Выберите другой идентификатор или добавьте ресурс в существующий заказ",
+				r.Namespace, r.ChartName, r.ResourceIdentity, ex.ServiceName)
+		}
+	}
+	return nil
+}
+
 // --- reads ---
 
 // Get returns an order the user is allowed to see.
@@ -205,6 +251,10 @@ func (s *Service) Create(ctx context.Context, u *models.User, in CreateInput) (*
 		Status:        models.StatusDraft,
 	}
 	r.ArgoCDAppName = s.gitops.AppName(r.Team, r.ChartName, r.ServiceName) // computed once
+	r.ResourceIdentity = s.resourceIdentity(ctx, r.ChartProject, r.ChartName, r.ServiceName, in.Values)
+	if err := s.checkNamespaceIdentity(ctx, r); err != nil {
+		return nil, err
+	}
 
 	if err := s.store.CreateRequest(ctx, r); err != nil {
 		return nil, err // ErrConflict -> 409
@@ -378,6 +428,10 @@ func (s *Service) updateDraft(ctx context.Context, u *models.User, r *models.Req
 		return nil, err
 	}
 	r.ValuesYAML = valuesYAML
+	r.ResourceIdentity = s.resourceIdentity(ctx, r.ChartProject, r.ChartName, r.ServiceName, in.Values)
+	if err := s.checkNamespaceIdentity(ctx, r); err != nil {
+		return nil, err
+	}
 	if err := s.store.UpdateRequest(ctx, r); err != nil {
 		return nil, err // ErrConflict (identity collision) / ErrStaleVersion
 	}

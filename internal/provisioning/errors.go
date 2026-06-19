@@ -1,6 +1,11 @@
 package provisioning
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+
+	"console/pkg/models"
+)
 
 // Domain errors mapped to HTTP codes by the API layer.
 var (
@@ -24,3 +29,16 @@ type ValidationError struct {
 }
 
 func (e *ValidationError) Error() string { return e.Message }
+
+// conflictError is a 409 carrying a human-readable reason. errors.Is(err,
+// models.ErrConflict) stays true (the API maps it to 409 and surfaces the
+// message), so a uniqueness collision reads as actionable text rather than a
+// bare "conflict". Mirrors the publications package pattern.
+type conflictError struct{ msg string }
+
+func (e *conflictError) Error() string        { return e.msg }
+func (e *conflictError) Is(target error) bool { return target == models.ErrConflict }
+
+func conflict(format string, a ...any) error {
+	return &conflictError{msg: fmt.Sprintf(format, a...)}
+}

@@ -149,7 +149,7 @@ func TestHTTPPublicationsFlow(t *testing.T) {
 	}
 
 	// draft + submit
-	view := map[string]any{"views": map[string]any{"order": map[string]any{"include": []string{"gateways"}}}}
+	view := map[string]any{"views": map[string]any{"order": map[string]any{"identity": "/gateways/0/name", "include": []string{"gateways"}}}}
 	if rec := do(devReq("PATCH", "/api/v1/publications/"+pub.ID, "core",
 		map[string]any{"view": view})); rec.Code != http.StatusOK {
 		t.Fatalf("patch view: %d %s", rec.Code, rec.Body.String())

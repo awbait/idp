@@ -184,7 +184,10 @@ func (s *Service) parseDiscovered(d gitlab.DiscoveredApp) *models.Request {
 		Cluster:       cluster,
 		Namespace:     m.Spec.Destination.Namespace,
 		ArgoCDAppName: appName,
-		Imported:      true,
+		// Imported orders adopt existing Git state rather than rendering values, so
+		// fall back to service_name (unique per Git folder) for the namespace key.
+		ResourceIdentity: service,
+		Imported:         true,
 	}
 }
 
