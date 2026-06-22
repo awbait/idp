@@ -1,3 +1,5 @@
+//go:build !prod
+
 package auth
 
 import (
@@ -8,7 +10,10 @@ import (
 )
 
 // Dev is a no-Keycloak authenticator used ONLY by tests (the binary always uses
-// OIDC; see cmd/portal buildAuth). The user can be overridden per-request with
+// OIDC; see cmd/portal buildAuth). It is excluded from the production binary at
+// compile time via the `prod` build tag (the Docker image builds with -tags prod),
+// so the X-Dev-Role header cannot grant roles even if AUTH_MODE were misconfigured.
+// The user can be overridden per-request with
 // headers:
 //
 //	X-Dev-Sub, X-Dev-Name, X-Dev-Teams (csv),

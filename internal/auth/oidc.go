@@ -92,10 +92,14 @@ type claims struct {
 	Groups   []string `json:"groups"`
 }
 
-func randState() string {
+// randState returns a cryptographically random URL-safe token (for state/nonce).
+// A rand failure must fail the login rather than proceed with a predictable value.
+func randState() (string, error) {
 	b := make([]byte, 24)
-	_, _ = rand.Read(b)
-	return base64.RawURLEncoding.EncodeToString(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
 // safeReturnTo returns p if it is a safe same-origin relative path, else "".
@@ -130,14 +134,22 @@ func resolveReturn(postLogin, rt string) string {
 }
 
 func (o *OIDC) Login(w http.ResponseWriter, r *http.Request) {
-	state := randState()
+	state, err := randState()
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name: "oauth_state", Value: state, Path: "/", HttpOnly: true,
 		Secure: o.secure, SameSite: http.SameSiteLaxMode, MaxAge: 300,
 	})
 	// nonce binds the id_token to this login (replay/injection defence). Stored in
 	// a short-lived HttpOnly cookie and verified against idToken.Nonce on callback.
-	nonce := randState()
+	nonce, err := randState()
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name: "oauth_nonce", Value: nonce, Path: "/", HttpOnly: true,
 		Secure: o.secure, SameSite: http.SameSiteLaxMode, MaxAge: 300,

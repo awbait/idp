@@ -27,7 +27,9 @@ COPY --from=web /web/dist ./internal/spa/dist
 ARG VERSION=dev
 ARG COMMIT=
 ARG DATE=
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath \
+# -tags prod excludes the test-only dev authenticator (internal/auth/dev.go) from
+# the shipped binary, so the X-Dev-Role header cannot grant roles in production.
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -tags prod \
 	-ldflags="-s -w -X console/internal/buildinfo.Version=${VERSION} -X console/internal/buildinfo.Commit=${COMMIT} -X console/internal/buildinfo.Date=${DATE}" \
 	-o /out/portal ./cmd/portal
 
