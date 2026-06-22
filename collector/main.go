@@ -55,7 +55,7 @@ func main() {
 		cctx, cancel := context.WithTimeout(ctx, cfg.pollInterval)
 		defer cancel()
 		now := time.Now().UTC().Format(time.RFC3339)
-		snapshot, err := collect(cctx, cs, cfg.nsLabel, now)
+		snapshot, err := collect(cctx, cs, cfg.nsLabel, now, log)
 		if err != nil {
 			log.Error("collect", "err", err)
 			return

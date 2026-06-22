@@ -192,7 +192,11 @@ func run(ctx context.Context, cfg *config.Config, log *slog.Logger) error {
 		}))
 	}
 	poller := status.NewPoller(cfg.StatusPollInterval, observability.Component(log, "poller"), reconcilers...)
-	go poller.Run(ctx)
+	pollerDone := make(chan struct{})
+	go func() {
+		defer close(pollerDone)
+		poller.Run(ctx)
+	}()
 
 	// --- HTTP ---
 	srv := &api.Server{
@@ -240,6 +244,14 @@ func run(ctx context.Context, cfg *config.Config, log *slog.Logger) error {
 
 	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
+	}
+	// Drain the poller: wait for its in-flight reconcile tick to unwind before
+	// exiting, so we do not abandon a half-applied reconcile (e.g. a dangling
+	// GitLab branch). Bounded so a stuck reconcile cannot hang shutdown.
+	select {
+	case <-pollerDone:
+	case <-time.After(15 * time.Second):
+		log.Warn("poller did not drain within shutdown grace")
 	}
 	return nil
 }

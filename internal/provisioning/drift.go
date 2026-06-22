@@ -46,7 +46,11 @@ func driftCheckable(st models.RequestStatus) bool {
 func (s *Service) checkDriftOne(ctx context.Context, r *models.Request) {
 	proj, err := s.gl.GetProject(ctx, s.gitops.RepoPath(r.Team, r.ChartName))
 	if err != nil {
-		return // can't resolve the repo (transient/absent) - skip this tick
+		// Can't resolve the repo (transient/absent) - skip this order this tick.
+		// Logged at Debug: it is expected and recovers on its own, but should not
+		// vanish silently.
+		s.logger().Debug("drift check skipped: repo unavailable", "order_id", r.ID, "err", err)
+		return
 	}
 	branch := proj.DefaultBranch
 	if branch == "" {
@@ -83,6 +87,7 @@ func (s *Service) checkDriftOne(ctx context.Context, r *models.Request) {
 		return // no change
 	}
 	if err := s.store.SetDrift(ctx, r.ID, drifted, detail); err != nil {
+		s.logger().Warn("drift flag not persisted", "order_id", r.ID, "err", err)
 		return
 	}
 	r.Drifted, r.DriftDetail = drifted, detail

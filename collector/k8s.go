@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +48,9 @@ func newClientset(kubeconfig string) (*kubernetes.Clientset, error) {
 
 // collect lists namespaces matching nsLabel and gathers their workloads.
 // Authorization is cluster-wide read-only; nsLabel filters at the query level.
-func collect(ctx context.Context, cs kubernetes.Interface, nsLabel, now string) (map[string][]Workload, error) {
+// A failure in one namespace is logged and skipped so a single bad namespace
+// does not drop the whole snapshot.
+func collect(ctx context.Context, cs kubernetes.Interface, nsLabel, now string, log *slog.Logger) (map[string][]Workload, error) {
 	nss, err := cs.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: nsLabel})
 	if err != nil {
 		return nil, fmt.Errorf("list namespaces: %w", err)
@@ -57,7 +60,8 @@ func collect(ctx context.Context, cs kubernetes.Interface, nsLabel, now string) 
 		ns := nss.Items[i].Name
 		ws, err := collectNamespace(ctx, cs, ns, now)
 		if err != nil {
-			return nil, err
+			log.Warn("skip namespace: collect failed", "namespace", ns, "err", err)
+			continue
 		}
 		out[ns] = ws
 	}
