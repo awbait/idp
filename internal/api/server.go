@@ -3,6 +3,7 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -20,6 +21,16 @@ import (
 	"console/internal/spa"
 	"console/internal/status"
 	"console/internal/store"
+)
+
+const (
+	// maxRequestBodyBytes caps a decoded request body to bound memory against a
+	// hostile client (Values/View JSON are otherwise unbounded). SSE requests
+	// carry no body, so this does not affect streams.
+	maxRequestBodyBytes = 4 << 20 // 4 MiB
+	// maxSSEStreams caps concurrent Server-Sent Events streams process-wide; each
+	// holds a goroutine, a bus subscription and a socket until the client leaves.
+	maxSSEStreams = 256
 )
 
 // Server holds dependencies for the HTTP API.
@@ -43,6 +54,10 @@ type Server struct {
 	GitLab gitlab.Port
 	ArgoCD argocd.Port
 	System SystemInfo
+
+	// sseStreams counts live SSE streams to enforce maxSSEStreams (zero value is
+	// ready to use; no constructor needed).
+	sseStreams atomic.Int64
 }
 
 // Router builds the HTTP handler tree.
@@ -60,6 +75,8 @@ func (s *Server) Router() http.Handler {
 	r.Handle("/metrics", promhttp.Handler())
 
 	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(maxBytes(maxRequestBodyBytes)) // bound request-body memory (GET/SSE carry none)
+
 		// auth endpoints (unauthenticated)
 		r.Get("/auth/login", s.Auth.Login)
 		r.Get("/auth/callback", s.Auth.Callback)
@@ -141,6 +158,20 @@ func (s *Server) Router() http.Handler {
 	return r
 }
 
+// maxBytes wraps each request body in http.MaxBytesReader so a handler cannot
+// read more than n bytes, bounding memory from a hostile client. Requests
+// without a body (GET, SSE) are unaffected.
+func maxBytes(n int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Body != nil {
+				r.Body = http.MaxBytesReader(w, r.Body, n)
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // logger returns the configured logger, or the default if none was wired (tests).
 func (s *Server) logger() *slog.Logger {
 	if s.Log != nil {
@@ -176,12 +207,18 @@ func (s *Server) requestLogger(next http.Handler) http.Handler {
 
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	// /ready is public (pre-auth); log the upstream detail but return a generic
+	// message so host/port/driver internals are not exposed to anonymous callers.
 	if err := s.Store.Ping(ctx); err != nil {
-		writeErr(w, http.StatusServiceUnavailable, "not_ready", "store: "+err.Error())
+		s.logger().LogAttrs(ctx, slog.LevelWarn, "readiness check failed",
+			slog.String("component", "store"), slog.String("err", err.Error()))
+		writeErr(w, http.StatusServiceUnavailable, "not_ready", "store unavailable")
 		return
 	}
 	if err := s.Cache.Ping(ctx); err != nil {
-		writeErr(w, http.StatusServiceUnavailable, "not_ready", "cache: "+err.Error())
+		s.logger().LogAttrs(ctx, slog.LevelWarn, "readiness check failed",
+			slog.String("component", "cache"), slog.String("err", err.Error()))
+		writeErr(w, http.StatusServiceUnavailable, "not_ready", "cache unavailable")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})

@@ -207,6 +207,11 @@ func run(ctx context.Context, cfg *config.Config, log *slog.Logger) error {
 		Addr:              ":" + cfg.HTTPPort,
 		Handler:           srv.Router(),
 		ReadHeaderTimeout: 10 * time.Second,
+		// Bound idle keep-alive connections and request header size. No global
+		// WriteTimeout/ReadTimeout: SSE responses are long-lived (WriteTimeout
+		// would cut them), and bodies are size-capped via MaxBytesReader instead.
+		IdleTimeout:    120 * time.Second,
+		MaxHeaderBytes: 1 << 20, // 1 MiB
 	}
 
 	go func() {

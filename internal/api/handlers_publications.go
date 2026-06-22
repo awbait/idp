@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -348,7 +349,11 @@ func (s *Server) handleCheckChart(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := s.Catalog.CheckChart(r.Context(), project, name)
 	if err != nil {
-		writeErr(w, http.StatusBadGateway, "upstream_unavailable", err.Error())
+		// Log the raw upstream error; return a generic message so Harbor
+		// host/transport details do not leak to the client.
+		s.logger().LogAttrs(r.Context(), slog.LevelWarn, "chart check failed",
+			slog.String("chart", project+"/"+name), slog.String("err", err.Error()))
+		writeErr(w, http.StatusBadGateway, "upstream_unavailable", "upstream unavailable")
 		return
 	}
 	writeJSON(w, http.StatusOK, res)

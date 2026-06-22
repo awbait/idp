@@ -13,6 +13,16 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request, topic string) {
 		writeErr(w, http.StatusInternalServerError, "internal", "streaming unsupported")
 		return
 	}
+
+	// Cap concurrent streams: each holds a goroutine, a bus subscription and a
+	// socket until the client disconnects, so an unbounded count is a DoS vector.
+	if s.sseStreams.Add(1) > maxSSEStreams {
+		s.sseStreams.Add(-1)
+		writeErr(w, http.StatusServiceUnavailable, "too_many_streams", "too many concurrent event streams")
+		return
+	}
+	defer s.sseStreams.Add(-1)
+
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
