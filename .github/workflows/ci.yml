@@ -25,6 +25,7 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
       web: ${{ steps.filter.outputs.web }}
       docker: ${{ steps.filter.outputs.docker }}
+      migrations: ${{ steps.filter.outputs.migrations }}
     steps:
       - uses: actions/checkout@v5
       - uses: dorny/paths-filter@v4
@@ -41,6 +42,9 @@ jobs:
               - '.env.example'
             web:
               - 'web/**'
+            migrations:
+              - 'internal/store/migrations/**'
+              - 'atlas.hcl'
             docker:
               - 'Dockerfile'
               - 'collector/Dockerfile'
@@ -99,6 +103,20 @@ jobs:
       - name: Build
         run: bun run build
 
+  migrations:
+    needs: changes
+    if: needs.changes.outputs.migrations == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # atlas migrate lint --git-base needs history
+      - uses: ariga/setup-atlas@v0
+      - name: Lint migrations (integrity + destructive changes)
+        # Ephemeral dev database via docker:// (Docker is preinstalled on the
+        # runner). Compares new migrations against origin/main.
+        run: atlas migrate lint --env local --git-base origin/main
+
   docker:
     needs: changes
     if: needs.changes.outputs.docker == 'true'
@@ -126,7 +144,7 @@ jobs:
   # Single required status check. Stays green when upstream jobs are skipped
   # (path filters), fails if any of them failed or was cancelled.
   ci:
-    needs: [backend, web, docker]
+    needs: [backend, web, migrations, docker]
     if: always()
     runs-on: ubuntu-latest
     steps:

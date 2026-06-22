@@ -1,2 +1,0 @@
-ALTER TABLE requests DROP COLUMN IF EXISTS drift_detail;
-ALTER TABLE requests DROP COLUMN IF EXISTS drifted;

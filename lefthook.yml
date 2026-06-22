@@ -30,3 +30,9 @@ pre-push:
       root: "web/"
       glob: "*.{ts,tsx,css,json}"
       run: bunx biome lint ./src --diagnostic-level=error
+    # Atlas migration gate: integrity (atlas.sum) + destructive-change lint
+    # against origin/main. Only runs when migration files change. Needs the
+    # Atlas CLI (https://atlasgo.io) and Docker for the ephemeral dev database.
+    migrate-lint:
+      glob: "internal/store/migrations/*.sql"
+      run: atlas migrate lint --env local --git-base origin/main
