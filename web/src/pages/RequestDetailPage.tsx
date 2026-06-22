@@ -2,33 +2,35 @@
 // the Info-tab actions and the product tabs are derived from the chart's view
 // document (genericView/GenericProductTabs), so it is chart-agnostic - no per-chart
 // code. Presentational pieces live in ./requestDetailParts.
-import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+
 import {
+  IconAlertTriangle,
   IconArrowUpCircle,
   IconCheck,
-  IconAlertTriangle,
   IconGitFork,
   IconPencil,
   IconRefresh,
   IconTrash,
   IconX,
 } from "@tabler/icons-react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
-import { api, HttpError } from "../api/client";
-import { useAsync } from "../hooks/useAsync";
-import { canModify, canEditOrder, useUser } from "../auth/UserContext";
-import { Button, Card, Select, Spinner } from "../components/ui";
-import { NotFound } from "../components/NotFound";
-import { ConfirmDialog } from "../components/ConfirmDialog";
-import { StatusBadge } from "../components/StatusBadge";
-import { Breadcrumbs } from "../components/Breadcrumbs";
-import { ProductIcon } from "../components/icons";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { api, errorMessage, HttpError } from "../api/client";
+import type { ViewDocument } from "../api/types";
 import { chartLabel, findCatalogChart, useCatalog } from "../app/CatalogContext";
 import { useTeam } from "../app/TeamContext";
+import { useToast } from "../app/ToastContext";
+import { canEditOrder, canModify, useUser } from "../auth/UserContext";
+import { Breadcrumbs } from "../components/Breadcrumbs";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { ProductIcon } from "../components/icons";
+import { NotFound } from "../components/NotFound";
+import { StatusBadge } from "../components/StatusBadge";
+import { Button, Card, Select, Spinner } from "../components/ui";
+import { useAsync } from "../hooks/useAsync";
 import { upgradeTargets } from "../lib/semver";
 import { DetailActions, fmtDateTime, Meta, ProductView } from "./requestDetailParts";
-import type { ViewDocument } from "../api/types";
 
 export function RequestDetailPage() {
   const { id = "" } = useParams();
@@ -37,6 +39,7 @@ export function RequestDetailPage() {
   const { user } = useUser();
   const { team } = useTeam();
   const { charts } = useCatalog();
+  const toast = useToast();
   const { data, error, loading, reload } = useAsync(() => api.getRequest(id), [id]);
   // The chart's approved view document drives the product tabs/actions. Loaded
   // here (was inside the tabs) so ProductView stays presentational.
@@ -178,7 +181,7 @@ export function RequestDetailPage() {
       setEditingName(false);
       reload();
     } catch (e) {
-      alert(e instanceof HttpError ? e.message : (e as Error).message);
+      toast.error(errorMessage(e));
     } finally {
       setSavingName(false);
     }
@@ -188,15 +191,15 @@ export function RequestDetailPage() {
       await api.submitRequest(id);
       reload();
     } catch (e) {
-      alert(e instanceof HttpError ? e.message : (e as Error).message);
+      toast.error(errorMessage(e));
     }
   }
   async function onSync() {
     try {
       await api.syncRequest(id);
-      alert("Sync requested");
+      toast.success("Синхронизация запрошена");
     } catch (e) {
-      alert(e instanceof HttpError ? e.message : (e as Error).message);
+      toast.error(errorMessage(e));
     }
   }
   async function onPull() {
@@ -205,7 +208,7 @@ export function RequestDetailPage() {
       await api.pullRequest(id);
       reload();
     } catch (e) {
-      alert(e instanceof HttpError ? e.message : (e as Error).message);
+      toast.error(errorMessage(e));
     } finally {
       setPulling(false);
     }

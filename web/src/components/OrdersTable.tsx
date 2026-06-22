@@ -1,5 +1,5 @@
+import { IconAlertTriangle, IconArrowRight, IconArrowsSort, IconArrowUpCircle, IconCheck, IconChevronDown, IconDots, IconGitFork, IconPackages, IconPlus, IconX } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
 import {
   Button,
   Cell,
@@ -13,18 +13,19 @@ import {
   TableBody,
   TableHeader,
 } from "react-aria-components";
-import { IconAlertTriangle, IconArrowRight, IconArrowsSort, IconArrowUpCircle, IconCheck, IconChevronDown, IconDots, IconGitFork, IconPackages, IconPlus, IconX } from "@tabler/icons-react";
-import { api, HttpError } from "../api/client";
-import { useAsync } from "../hooks/useAsync";
-import { canModify, useUser } from "../auth/UserContext";
-import { useTeam } from "../app/TeamContext";
-import { ErrorBox, Spinner } from "./ui";
-import { ConfirmDialog } from "./ConfirmDialog";
-import { StatusBadge, StatusDot } from "./StatusBadge";
-import { ProductIcon } from "./icons";
-import { useCatalog } from "../app/CatalogContext";
-import { isNewer } from "../lib/semver";
+import { Link, useNavigate } from "react-router-dom";
+import { api, errorMessage } from "../api/client";
 import type { OrderRequest, RequestStatus } from "../api/types";
+import { useCatalog } from "../app/CatalogContext";
+import { useTeam } from "../app/TeamContext";
+import { useToast } from "../app/ToastContext";
+import { canModify, useUser } from "../auth/UserContext";
+import { useAsync } from "../hooks/useAsync";
+import { isNewer } from "../lib/semver";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { ProductIcon } from "./icons";
+import { StatusBadge, StatusDot } from "./StatusBadge";
+import { ErrorBox, Spinner } from "./ui";
 
 // Live order statuses (create-MR merged): only these can be upgraded to a new version.
 const LIVE_STATUSES: RequestStatus[] = ["MR_MERGED", "DEPLOYING", "HEALTHY", "DEGRADED", "ARGO_MISSING"];
@@ -78,6 +79,7 @@ export function OrdersTable({ title, filter, orderTo, orderDisabledReason, empty
   const { team } = useTeam();
   const { user } = useUser();
   const navigate = useNavigate();
+  const toast = useToast();
 
   // Order's category label from its chart's publication (for the "Category" column).
   const { categories, charts } = useCatalog();
@@ -122,9 +124,9 @@ export function OrdersTable({ title, filter, orderTo, orderDisabledReason, empty
   async function onSync(r: OrderRequest) {
     try {
       await api.syncRequest(r.id);
-      alert("Sync requested");
+      toast.success("Синхронизация запрошена");
     } catch (e) {
-      alert(e instanceof HttpError ? e.message : (e as Error).message);
+      toast.error(errorMessage(e));
     }
   }
   async function onConfirmDelete() {
