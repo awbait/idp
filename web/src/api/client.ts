@@ -1,29 +1,33 @@
 import type {
-  Application,
+  AboutInfo,
   ApiError,
+  Application,
   CatalogResponse,
   Category,
+  ChangelogEntry,
+  ChangelogRelease,
   Chart,
   ChartCheckResult,
   ChartPublication,
-  FieldError,
   ChartVersion,
-  ChangelogEntry,
   CreateOrderBody,
+  FieldError,
   JSONSchema,
   OrderRequest,
   PublicationDetail,
   RequestDetail,
+  SystemStatus,
   UpdateOrderBody,
   User,
-  SystemStatus,
-  AboutInfo,
-  ChangelogRelease,
   ViewDocument,
   ViewIssue,
 } from "./types";
 
 const BASE = "/api/v1";
+
+// Default network timeout. A hung backend/proxy must not leave a request (and its
+// spinner) pending forever; after this the fetch is aborted and surfaced as an error.
+const REQUEST_TIMEOUT_MS = 30_000;
 
 // In dev (AUTH_MODE=dev backend) we impersonate a user via headers. In OIDC
 // mode these are ignored and the session cookie is used.
@@ -47,6 +51,13 @@ export class HttpError extends Error {
   }
 }
 
+// Friendly message for any thrown value: HttpError/Error carry their own message,
+// anything else is stringified. Used by callers to surface failures (e.g. toasts).
+export function errorMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  return String(e);
+}
+
 // Central 401 handler, registered by the auth layer. Lets a mid-session
 // expiry trigger a re-login flow (return-to current page) instead of surfacing
 // a raw "unauthorized" error in every caller. Kept out of React so the plain
@@ -62,16 +73,31 @@ async function req<T>(
   body?: unknown,
   signal?: AbortSignal,
 ): Promise<T> {
-  const res = await fetch(BASE + path, {
-    method,
-    credentials: "include",
-    headers: {
-      ...devHeaders(),
-      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-    signal,
-  });
+  // Combine the default timeout with the caller's signal (useAsync aborts on
+  // unmount/deps change), so either source can cancel the in-flight fetch.
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  let res: Response;
+  try {
+    res = await fetch(BASE + path, {
+      method,
+      credentials: "include",
+      headers: {
+        ...devHeaders(),
+        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: combined,
+    });
+  } catch (e) {
+    // The timeout aborts with a TimeoutError; surface it as a clear message
+    // instead of a bare DOMException. A caller-initiated abort keeps its
+    // AbortError name so useAsync recognises and ignores it.
+    if (e instanceof DOMException && e.name === "TimeoutError") {
+      throw new Error("Превышено время ожидания ответа сервера");
+    }
+    throw e;
+  }
   if (!res.ok) {
     let parsed: ApiError | null = null;
     try {
