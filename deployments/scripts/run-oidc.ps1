@@ -31,6 +31,15 @@ try {
 }
 
 $env:AUTH_MODE = "oidc"
+# Non-default session-encryption key: the portal refuses to start in oidc mode
+# while SESSION_SECRET equals the built-in default. Fixed local-dev value (NOT a
+# real secret) so sessions survive restarts on the stand.
+$env:SESSION_SECRET = "dev-local-session-key-not-for-production"
+# The stand is served over plain HTTP (and often a LAN IP, not localhost), where
+# browsers drop Secure cookies - the oauth_state cookie would be lost and the
+# callback would fail with "invalid state". COOKIE_SECURE defaults to true (prod
+# is HTTPS); turn it off for this HTTP dev runner.
+$env:COOKIE_SECURE = "false"
 $env:OIDC_ISSUER = "http://${BindHost}:8081/realms/internal"
 $env:OIDC_CLIENT_ID = "portal"
 $env:OIDC_CLIENT_SECRET = "portal-secret"
