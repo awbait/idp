@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { IconExternalLink } from "@tabler/icons-react";
 import { api } from "../api/client";
+import { safeHref } from "../lib/href";
 import { useAsync } from "../hooks/useAsync";
 import { useUser } from "../auth/UserContext";
 import { Button, ErrorBox, Spinner } from "../components/ui";
@@ -107,11 +108,11 @@ function Row({ c }: { c: ComponentStatus }) {
             {c.kind === "storage" ? (BACKEND_LABELS[c.mode] ?? c.mode) : (LABELS[c.name] ?? c.name)}
           </span>
         </div>
-        {c.url && (
+        {safeHref(c.url) && (
           <a
-            href={c.url}
+            href={safeHref(c.url)}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             className="mt-0.5 inline-flex items-center gap-1 pl-5 text-xs text-brand-600 hover:text-brand-700 hover:underline"
           >
             {c.url}

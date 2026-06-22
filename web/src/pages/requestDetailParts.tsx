@@ -42,6 +42,7 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { Card } from "../components/ui";
+import { safeHref } from "../lib/href";
 import { StatusBadge, statusMeta } from "../components/StatusBadge";
 import { useTheme } from "../app/ThemeContext";
 import { productTabs } from "../components/products/genericView";
@@ -82,14 +83,15 @@ export function DetailTab({ id, children }: { id: string; children: React.ReactN
 }
 
 export function Field({ label, value, href }: { label: string; value: string; href?: string }) {
+  const safe = safeHref(href);
   return (
     <div>
       <div className="text-xs uppercase text-gray-400">{label}</div>
-      {href && value ? (
+      {safe && value ? (
         <a
-          href={href}
+          href={safe}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="group inline-flex items-center gap-1 text-brand-600 hover:text-brand-700 hover:underline"
         >
           {value}
@@ -715,9 +717,9 @@ function MrRow({ m }: { m: RequestMR }) {
   return (
     <li>
       <a
-        href={m.mr_url}
+        href={safeHref(m.mr_url)}
         target="_blank"
-        rel="noreferrer"
+        rel="noopener noreferrer"
         className="group flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2.5 outline-none transition-colors hover:border-brand-300 hover:bg-brand-50/50 focus-visible:ring-2 focus-visible:ring-brand-500"
       >
         <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${tints[a.tint]}`}>

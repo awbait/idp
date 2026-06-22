@@ -10,6 +10,7 @@ import {
   IconPackages,
 } from "@tabler/icons-react";
 import { api } from "../api/client";
+import { safeHref } from "../lib/href";
 import { useAsync } from "../hooks/useAsync";
 import { useUser } from "../auth/UserContext";
 import { Card, ErrorBox, Spinner } from "../components/ui";
@@ -25,7 +26,7 @@ const MD: Components = {
   li: ({ children }) => <li className="text-sm text-slate-700 marker:text-slate-300">{children}</li>,
   p: ({ children }) => <p className="text-sm text-slate-700">{children}</p>,
   a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">
+    <a href={safeHref(href)} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline">
       {children}
     </a>
   ),

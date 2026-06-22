@@ -11,7 +11,7 @@ function components(inline: boolean): Components {
     h3: (p) => <h3 className="mt-3 mb-1 text-sm font-semibold text-gray-800 first:mt-0" {...p} />,
     h4: (p) => <h4 className="mt-3 mb-1 text-sm font-semibold text-gray-700 first:mt-0" {...p} />,
     p: (p) => (inline ? <span {...p} /> : <p className="my-2 text-sm leading-relaxed text-gray-700" {...p} />),
-    a: (p) => <a className="text-brand-600 underline hover:text-brand-700" target="_blank" rel="noreferrer" {...p} />,
+    a: (p) => <a className="text-brand-600 underline hover:text-brand-700" target="_blank" rel="noopener noreferrer" {...p} />,
     ul: (p) => <ul className="my-2 ml-5 list-disc space-y-1 text-sm text-gray-700" {...p} />,
     ol: (p) => <ol className="my-2 ml-5 list-decimal space-y-1 text-sm text-gray-700" {...p} />,
     li: (p) => <li className="leading-relaxed" {...p} />,

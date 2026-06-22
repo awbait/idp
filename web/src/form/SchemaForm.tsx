@@ -44,13 +44,26 @@ function emptyVal(v: unknown): boolean {
   return v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
 }
 
+// matchesPattern safely tests v against a schema-provided regex. The pattern is
+// semi-trusted (chart view/schema), so guard against an invalid pattern (throws)
+// and cap input length to blunt catastrophic backtracking (ReDoS); backend
+// validation stays authoritative, so the safe fallback is "no client error".
+function matchesPattern(pattern: string, v: string): boolean {
+  if (v.length > 4096) return true;
+  try {
+    return new RegExp(pattern).test(v);
+  } catch {
+    return true;
+  }
+}
+
 function leafErrors(s: Schema, v: unknown, path: string, out: Map<string, string>) {
   if (emptyVal(v) || typeof v !== "string") return;
   if (typeof s.minLength === "number" && v.length < s.minLength)
     out.set(path, `Минимум ${s.minLength} символов`);
   else if (typeof s.maxLength === "number" && v.length > s.maxLength)
     out.set(path, `Максимум ${s.maxLength} символов`);
-  else if (typeof s.pattern === "string" && !new RegExp(s.pattern).test(v))
+  else if (typeof s.pattern === "string" && !matchesPattern(s.pattern, v))
     out.set(path, "Недопустимый формат");
 }
 

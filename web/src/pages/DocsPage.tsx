@@ -227,7 +227,7 @@ function makeComponents(headings: Heading[]): Components {
     a: ({ node, href, ...p }) => {
       const cls = "font-semibold text-brand-600 transition-colors hover:text-brand-700";
       const ext = /^https?:/.test(href || "");
-      if (ext) return <a href={href} target="_blank" rel="noreferrer" className={cls} {...p} />;
+      if (ext) return <a href={href} target="_blank" rel="noopener noreferrer" className={cls} {...p} />;
       const to = `/docs/${(href || "").replace(/^#?\/?/, "")}`;
       return <Link to={to} className={cls} {...p} />;
     },
