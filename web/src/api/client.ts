@@ -56,7 +56,12 @@ export function setUnauthorizedHandler(h: (() => void) | null) {
   unauthorizedHandler = h;
 }
 
-async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function req<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T> {
   const res = await fetch(BASE + path, {
     method,
     credentials: "include",
@@ -65,6 +70,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal,
   });
   if (!res.ok) {
     let parsed: ApiError | null = null;
@@ -99,25 +105,27 @@ export const api = {
   getCatalog: () => req<CatalogResponse>("GET", "/catalog"),
   // Check a chart by arbitrary Harbor path (project/name) before publishing.
   checkChart: (path: string) => req<ChartCheckResult>("POST", "/charts/check", { path }),
-  getChart: (project: string, name: string) =>
-    req<Chart>("GET", `/charts/${enc(project)}/${enc(name)}`),
-  getVersion: (project: string, name: string, version: string) =>
-    req<ChartVersion>("GET", `/charts/${enc(project)}/${enc(name)}/${enc(version)}`),
-  getValues: (project: string, name: string, version: string) =>
-    req<string>("GET", `/charts/${enc(project)}/${enc(name)}/${enc(version)}/values`),
-  getReadme: (project: string, name: string, version: string) =>
-    req<string>("GET", `/charts/${enc(project)}/${enc(name)}/${enc(version)}/readme`),
-  getSchema: (project: string, name: string, version: string) =>
-    req<JSONSchema>("GET", `/charts/${enc(project)}/${enc(name)}/${enc(version)}/schema`),
-  getAggregatedChangelog: (project: string, name: string, limit = 20) =>
+  getChart: (project: string, name: string, signal?: AbortSignal) =>
+    req<Chart>("GET", `/charts/${enc(project)}/${enc(name)}`, undefined, signal),
+  getVersion: (project: string, name: string, version: string, signal?: AbortSignal) =>
+    req<ChartVersion>("GET", `/charts/${enc(project)}/${enc(name)}/${enc(version)}`, undefined, signal),
+  getValues: (project: string, name: string, version: string, signal?: AbortSignal) =>
+    req<string>("GET", `/charts/${enc(project)}/${enc(name)}/${enc(version)}/values`, undefined, signal),
+  getReadme: (project: string, name: string, version: string, signal?: AbortSignal) =>
+    req<string>("GET", `/charts/${enc(project)}/${enc(name)}/${enc(version)}/readme`, undefined, signal),
+  getSchema: (project: string, name: string, version: string, signal?: AbortSignal) =>
+    req<JSONSchema>("GET", `/charts/${enc(project)}/${enc(name)}/${enc(version)}/schema`, undefined, signal),
+  getAggregatedChangelog: (project: string, name: string, limit = 20, signal?: AbortSignal) =>
     req<ChangelogEntry[]>(
       "GET",
       `/charts/${enc(project)}/${enc(name)}/changelog/aggregated?limit=${limit}`,
+      undefined,
+      signal,
     ),
   // Active approved chart view (view document from the publication). null -
   // the chart has no approved view (form-based ordering is unavailable).
-  getChartView: (project: string, name: string) =>
-    req<ViewDocument>("GET", `/charts/${enc(project)}/${enc(name)}/view`).catch((e) => {
+  getChartView: (project: string, name: string, signal?: AbortSignal) =>
+    req<ViewDocument>("GET", `/charts/${enc(project)}/${enc(name)}/view`, undefined, signal).catch((e) => {
       if (e instanceof HttpError && e.status === 404) return null;
       throw e;
     }),
@@ -152,7 +160,8 @@ export const api = {
   // requests
   listRequests: (params?: Record<string, string>) =>
     req<OrderRequest[]>("GET", "/requests" + qs(params)),
-  getRequest: (id: string) => req<RequestDetail>("GET", `/requests/${enc(id)}`),
+  getRequest: (id: string, signal?: AbortSignal) =>
+    req<RequestDetail>("GET", `/requests/${enc(id)}`, undefined, signal),
   createRequest: (body: CreateOrderBody) => req<OrderRequest>("POST", "/requests", body),
   updateRequest: (id: string, body: UpdateOrderBody) =>
     req<OrderRequest>("PATCH", `/requests/${enc(id)}`, body),

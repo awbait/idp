@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { TabList, TabPanel, Tabs } from "react-aria-components";
 import yaml from "js-yaml";
 import { api, HttpError } from "../api/client";
@@ -58,7 +58,7 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
   // In edit mode, load the draft we're continuing. Its chart coordinates and
   // pinned version drive the rest of the page.
   const { data: existing, error: existingErr, loading: existingLoading } = useAsync(
-    () => (id ? api.getRequest(id) : Promise.resolve(null)),
+    (signal) => (id ? api.getRequest(id, signal) : Promise.resolve(null)),
     [id],
   );
   const draft = existing?.request ?? null;
@@ -70,7 +70,7 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
   const label = name ? chartLabel(name) : "";
 
   const { data: chart, error: chartErr, loading: chartLoading } = useAsync(
-    () => (project && name ? api.getChart(project, name) : Promise.resolve(null)),
+    (signal) => (project && name ? api.getChart(project, name, signal) : Promise.resolve(null)),
     [project, name],
   );
 
@@ -111,9 +111,11 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
   // Upgrade: the chart's CHANGELOG between the order's current version and the
   // target, so the changes are visible.
   const { data: changelog } = useAsync(
-    async () => {
+    async (signal) => {
       if (!upgrade || !project || !name) return [] as ChangelogEntry[];
-      const all = await api.getAggregatedChangelog(project, name).catch(() => [] as ChangelogEntry[]);
+      const all = await api
+        .getAggregatedChangelog(project, name, 20, signal)
+        .catch(() => [] as ChangelogEntry[]);
       const from = draft?.chart_version ?? "";
       return all.filter((e) => isNewer(e.version, from) && !isNewer(e.version, targetVersion));
     },
@@ -125,10 +127,10 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
   // (e.g. one Gateway, hide xroutes); the schema stays the single source of
   // truth for validation.
   const { data: form } = useAsync(
-    async () => {
+    async (signal) => {
       if (!project || !name || !effectiveVersion) return null;
-      const schema = await api.getSchema(project, name, effectiveVersion);
-      const ui = await api.getChartView(project, name).catch(() => null);
+      const schema = await api.getSchema(project, name, effectiveVersion, signal);
+      const ui = await api.getChartView(project, name, signal).catch(() => null);
       return { schema, doc: ui, view: ui?.views?.order };
     },
     [project, name, effectiveVersion],
@@ -171,8 +173,9 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
   if (editing && !upgrade && draft && draft.status !== "DRAFT") {
     // Only drafts are editable here; live orders bounce to the read-only detail
     // page (the upgrade flow is the one exception - it edits a live order).
-    navigate(`/requests/${draft.id}`, { replace: true });
-    return null;
+    // Use <Navigate> rather than calling navigate() during render (which warns in
+    // React 19/StrictMode and can double-navigate).
+    return <Navigate to={`/requests/${draft.id}`} replace />;
   }
   if (chartLoading) return <Spinner />;
   if (chartErr) return <ErrorBox error={chartErr} />;
