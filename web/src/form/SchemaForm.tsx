@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   Button as AriaButton,
   Disclosure,
@@ -706,14 +706,15 @@ function SingleField({
   const label = schema.title ?? name;
   const desc = schema.description as string | undefined;
 
-  // Seed the item's schema defaults once when empty (e.g. default Gateway
-  // resources). Unfilled fields are pruned on submit and a provided list
-  // replaces the chart's values, so seeding is what makes a default effective.
-  // Guarded to skip when a value already exists (e.g. editing a draft).
-  const seeded = useRef(false);
+  // Seed the item's schema defaults whenever it is empty (e.g. default Gateway
+  // resources). Unfilled fields are pruned on submit and a provided list replaces
+  // the chart's values, so seeding is what makes a default effective. Keyed on
+  // `item === undefined` rather than a one-shot ref so the defaults are re-seeded
+  // when the form is reset/recreated (mode or version switch on upgrade), not
+  // only on first mount (FE-M3). SingleField has no remove control, so editing
+  // never drives item back to undefined - this won't fight the user.
   useEffect(() => {
-    if (seeded.current || item !== undefined) return;
-    seeded.current = true;
+    if (item !== undefined) return;
     const def = seedDefaults(itemSchema, root) as Values | undefined;
     if (!def || typeof def !== "object") return;
     // Don't seed values for fields hidden by the view (e.g. hpa) - only visible defaults.
@@ -739,6 +740,32 @@ function SingleField({
   return <Field name={name} schema={itemSchema} root={root} required value={item} onChange={setItem} path={`${path}/0`} />;
 }
 
+// mapRow carries a stable client-side id so React keys survive add/remove/reorder
+// (FE-M2): keying by array index made disclosure/focus state shift to a sibling
+// when a middle row was removed.
+type mapRow = { k: string; v: string; id: string };
+let mapRowSeq = 0;
+const nextMapRowID = () => `mr${++mapRowSeq}`;
+
+function valueToMapRows(value: unknown): mapRow[] {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? Object.entries(value as Values).map(([k, v]) => ({ k, v: String(v), id: nextMapRowID() }))
+    : [];
+}
+
+// rowsToObject is the object the current rows represent (skipping blank keys).
+function rowsToObject(rows: mapRow[]): Values {
+  const obj: Values = {};
+  for (const r of rows) if (r.k) obj[r.k] = r.v;
+  return obj;
+}
+
+function sameStringMap(a: Values, b: Values): boolean {
+  const ka = Object.keys(a);
+  if (ka.length !== Object.keys(b).length) return false;
+  return ka.every((k) => String(b[k]) === String(a[k]));
+}
+
 function MapField({
   label,
   desc,
@@ -752,16 +779,24 @@ function MapField({
   onChange: (v: unknown) => void;
 }) {
   const locked = useContext(LockedCtx);
-  const init =
-    value && typeof value === "object" && !Array.isArray(value)
-      ? Object.entries(value as Values).map(([k, v]) => ({ k, v: String(v) }))
-      : [];
-  const [rows, setRows] = useState<{ k: string; v: string }[]>(init);
+  const [rows, setRows] = useState<mapRow[]>(() => valueToMapRows(value));
 
-  const push = (next: { k: string; v: string }[]) => {
+  // FE-M1: resync local rows when value changes externally (form<->raw toggle,
+  // draft hydration, upgrade prefill). Our own edits go through push, which keeps
+  // value in sync with rows, so this only fires on a genuine outside change and
+  // does not clobber in-progress typing.
+  useEffect(() => {
+    const incoming: Values = {};
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      for (const [k, v] of Object.entries(value as Values)) incoming[k] = String(v);
+    }
+    if (!sameStringMap(rowsToObject(rows), incoming)) setRows(valueToMapRows(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const push = (next: mapRow[]) => {
     setRows(next);
-    const obj: Values = {};
-    for (const r of next) if (r.k) obj[r.k] = r.v;
+    const obj = rowsToObject(next);
     onChange(Object.keys(obj).length ? obj : undefined);
   };
 
@@ -769,27 +804,27 @@ function MapField({
     <Section label={label} desc={desc}>
       <div className="flex flex-col gap-2">
         {rows.length === 0 && <p className="text-xs text-gray-400">Нет записей.</p>}
-        {rows.map((r, i) => (
-          <div key={i} className="flex items-center gap-2">
+        {rows.map((r) => (
+          <div key={r.id} className="flex items-center gap-2">
             <input
               disabled={locked}
               className="w-1/3 rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
               placeholder="ключ"
               value={r.k}
-              onChange={(e) => push(rows.map((x, idx) => (idx === i ? { ...x, k: e.target.value } : x)))}
+              onChange={(e) => push(rows.map((x) => (x.id === r.id ? { ...x, k: e.target.value } : x)))}
             />
             <input
               disabled={locked}
               className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
               placeholder="значение"
               value={r.v}
-              onChange={(e) => push(rows.map((x, idx) => (idx === i ? { ...x, v: e.target.value } : x)))}
+              onChange={(e) => push(rows.map((x) => (x.id === r.id ? { ...x, v: e.target.value } : x)))}
             />
             <Button
               variant="danger"
               aria-label="Удалить"
               isDisabled={locked}
-              onPress={() => push(rows.filter((_, idx) => idx !== i))}
+              onPress={() => push(rows.filter((x) => x.id !== r.id))}
             >
               <IconX size={16} stroke={2} />
             </Button>
@@ -797,7 +832,7 @@ function MapField({
         ))}
         {!locked && (
           <div>
-            <Button variant="secondary" onPress={() => push([...rows, { k: "", v: "" }])}>
+            <Button variant="secondary" onPress={() => push([...rows, { k: "", v: "", id: nextMapRowID() }])}>
               + Добавить
             </Button>
           </div>
