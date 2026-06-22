@@ -26,6 +26,10 @@ pre-push:
       root: "web/"
       glob: "*.{ts,tsx}"
       run: bun run typecheck
+    web-test:
+      root: "web/"
+      glob: "*.{ts,tsx}"
+      run: bun test
     web-lint:
       root: "web/"
       glob: "*.{ts,tsx,css,json}"

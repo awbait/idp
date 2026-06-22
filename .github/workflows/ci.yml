@@ -104,6 +104,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Typecheck
         run: bun run typecheck
+      - name: Test
+        run: bun test
       - name: Lint
         run: bunx biome lint ./src --diagnostic-level=error
       - name: Build
