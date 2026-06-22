@@ -191,6 +191,11 @@ func (o *OIDC) Callback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad claims", http.StatusBadGateway)
 		return
 	}
+	// Re-login from a browser that still holds a session cookie: drop the old
+	// server-side session so stale sessions do not accumulate until their TTL.
+	if old, oerr := r.Cookie(o.cookieName); oerr == nil && old.Value != "" {
+		_ = o.sessions.Delete(ctx, old.Value)
+	}
 	user := o.rbac.BuildUser(idToken.Subject, cl.Email, cl.Username, cl.Name, cl.Groups)
 	sess := &Session{
 		User:         user,
