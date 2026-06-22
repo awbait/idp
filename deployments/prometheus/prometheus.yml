@@ -1,6 +1,7 @@
 # Prometheus scrape config for the IDP portal.
-# The portal exposes /metrics (promhttp) on its HTTP port. It runs from source on
-# the host (`make run-oidc`), reached from this container at host.docker.internal.
+# The portal exposes /metrics (promhttp) on a dedicated METRICS_PORT (default
+# 2112), separate from the API port. It runs from source on the host
+# (`make run-oidc`), reached from this container at host.docker.internal.
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -10,7 +11,7 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
-          - host.docker.internal:8080
+          - host.docker.internal:2112
 
   - job_name: prometheus
     static_configs:

@@ -27,6 +27,9 @@ type Config struct {
 	// Server
 	HTTPPort  string `env:"HTTP_PORT" envDefault:"8080"`
 	PublicURL string `env:"PUBLIC_URL" envDefault:"http://localhost:8080"`
+	// MetricsPort serves Prometheus /metrics on its own listener, separate from
+	// the API port, so scraping is not exposed through the public app ingress.
+	MetricsPort string `env:"METRICS_PORT" envDefault:"2112"`
 	// CookieSecure sets the Secure flag on the session cookie. Defaults to true
 	// (production runs over HTTPS, and localhost is a secure context even on
 	// http). Set to false only for a non-localhost plain-HTTP setup.

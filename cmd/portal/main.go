@@ -217,7 +217,7 @@ func run(ctx context.Context, cfg *config.Config, log *slog.Logger) error {
 		},
 	}
 	// Refresh platform-status and order gauges in-process (single replica),
-	// reusing the poller interval. promhttp at /metrics exposes the result.
+	// reusing the poller interval. The metrics server below exposes the result.
 	go srv.RunMetricsRefresher(ctx, cfg.StatusPollInterval)
 
 	httpServer := &http.Server{
@@ -231,15 +231,32 @@ func run(ctx context.Context, cfg *config.Config, log *slog.Logger) error {
 		MaxHeaderBytes: 1 << 20, // 1 MiB
 	}
 
+	// Prometheus /metrics on a dedicated listener, separate from the public API
+	// port, so scraping stays internal-only (not exposed through the app ingress).
+	metricsMux := http.NewServeMux()
+	metricsMux.Handle("/metrics", api.MetricsHandler())
+	metricsServer := &http.Server{
+		Addr:              ":" + cfg.MetricsPort,
+		Handler:           metricsMux,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	go func() {
+		if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error("metrics server failed", "err", err)
+		}
+	}()
+
 	go func() {
 		<-ctx.Done()
 		shutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		_ = httpServer.Shutdown(shutCtx)
+		_ = metricsServer.Shutdown(shutCtx)
 	}()
 
 	log.Info("portal starting",
-		"port", cfg.HTTPPort, "auth", cfg.AuthMode, "store", cfg.Store, "cache", cfg.Cache,
+		"port", cfg.HTTPPort, "metrics_port", cfg.MetricsPort, "auth", cfg.AuthMode,
+		"store", cfg.Store, "cache", cfg.Cache,
 		"harbor", cfg.HarborMode, "gitlab", cfg.GitLabMode, "argocd", cfg.ArgoCDMode)
 
 	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
