@@ -150,6 +150,13 @@ func run(ctx context.Context, cfg *config.Config, log *slog.Logger) error {
 	gitops.ChartRegistry = cfg.ChartRegistry // OCI base for the chart source in application.yaml
 	bus := events.New()
 	catalogSvc := catalog.New(hb, c)
+	if cfg.GitLabAutoMerge {
+		// The poller merges the portal's own MRs with no human review. Fine for
+		// demos; dangerous against a real GitLab. Log loudly so it cannot enable
+		// itself in production unnoticed.
+		log.Warn("GITLAB_AUTO_MERGE enabled: portal MRs are merged without review",
+			"gitlab_mode", string(cfg.GitLabMode))
+	}
 	provSvc := provisioning.New(st, gl, argo, catalogSvc, gitops, bus, cfg.ArgoCDCluster, cfg.GitLabDefaultBranch, cfg.GitLabAutoMerge)
 	provSvc.Log = observability.Component(log, "provisioning")
 	pubsSvc := publications.New(st, catalogSvc)

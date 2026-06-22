@@ -2,12 +2,31 @@ package provisioning
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"text/template"
 
 	"console/pkg/models"
 )
+
+// plainYAMLScalar matches values safe to emit as a bare YAML scalar (no quoting
+// needed). Anything else is JSON-encoded by yamlScalar, which is a valid YAML
+// double-quoted scalar - this keeps normal output byte-identical (no spurious
+// drift) while neutralising values with YAML-significant characters or newlines.
+var plainYAMLScalar = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/@-]*$`)
+
+// yamlScalar returns s ready to substitute as a standalone YAML scalar: bare when
+// safe, otherwise JSON-quoted (a JSON string is a valid YAML scalar). Prevents
+// YAML injection from a field carrying ":" lines, newlines, etc.
+func yamlScalar(s string) string {
+	if plainYAMLScalar.MatchString(s) {
+		return s
+	}
+	b, _ := json.Marshal(s)
+	return string(b)
+}
 
 // GitOps encapsulates the GitOps repo convention:
 //
@@ -171,19 +190,23 @@ func (g *GitOps) RenderApplication(r *models.Request, repoURL string) (string, e
 		namespace = r.ServiceName // back-compat: pre-namespace records
 	}
 	var b bytes.Buffer
+	// Quote every standalone scalar (yamlScalar) so a field with YAML-significant
+	// characters cannot break or inject structure. Path is exempt: it is embedded
+	// inside a larger string ($values/<path>/values.yaml) and its segments are
+	// nameRe-validated.
 	err := applicationYAML.Execute(&b, map[string]string{
-		"AppName":      r.ArgoCDAppName,
-		"Team":         r.Team,
-		"Chart":        r.ChartName,
-		"Service":      r.ServiceName,
-		"Namespace":    namespace,
-		"Project":      g.ArgoProject,
-		"Cluster":      r.Cluster,
-		"RepoURL":      gitRepo,
+		"AppName":      yamlScalar(r.ArgoCDAppName),
+		"Team":         yamlScalar(r.Team),
+		"Chart":        yamlScalar(r.ChartName),
+		"Service":      yamlScalar(r.ServiceName),
+		"Namespace":    yamlScalar(namespace),
+		"Project":      yamlScalar(g.ArgoProject),
+		"Cluster":      yamlScalar(r.Cluster),
+		"RepoURL":      yamlScalar(gitRepo),
 		"Path":         g.InstanceDir(r.Cluster, r.ServiceName),
-		"Branch":       g.DefaultBranch,
-		"ChartRepo":    chartRepo,
-		"ChartVersion": r.ChartVersion,
+		"Branch":       yamlScalar(g.DefaultBranch),
+		"ChartRepo":    yamlScalar(chartRepo),
+		"ChartVersion": yamlScalar(r.ChartVersion),
 	})
 	return b.String(), err
 }
