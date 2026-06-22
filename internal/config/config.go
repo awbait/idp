@@ -15,6 +15,11 @@ const (
 	ModeFake Mode = "fake"
 )
 
+// DefaultSessionSecret is the insecure development default for SESSION_SECRET.
+// Keep it in sync with the envDefault tag below; buildAuth refuses to start in
+// AUTH_MODE=oidc while the secret still equals this value.
+const DefaultSessionSecret = "dev-insecure-session-secret-change-me"
+
 // Config is the full portal configuration. Defaults favour a local
 // fakes-only run so the whole portal boots with just Postgres+Redis
 // (or fully in-memory in tests).

@@ -275,7 +275,12 @@ func buildAuth(ctx context.Context, cfg *config.Config, c cache.Cache) (auth.Aut
 	if cfg.AuthMode != "oidc" {
 		return nil, fmt.Errorf("AUTH_MODE must be \"oidc\" (dev auth is test-only); got %q", cfg.AuthMode)
 	}
-	sessions := auth.NewSessionStore(c, cfg.SessionTTL)
+	// Session values are encrypted with a key derived from SESSION_SECRET; the
+	// insecure default would make that encryption pointless, so refuse to start.
+	if cfg.SessionSecret == config.DefaultSessionSecret {
+		return nil, fmt.Errorf("SESSION_SECRET must be set to a non-default value in AUTH_MODE=oidc")
+	}
+	sessions := auth.NewSessionStore(c, cfg.SessionTTL, cfg.SessionSecret)
 	rbac := auth.RBAC{
 		AdminGroups:    cfg.AdminGroups,
 		SupportGroups:  cfg.SupportGroups,
