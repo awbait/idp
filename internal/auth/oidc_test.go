@@ -6,7 +6,39 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"golang.org/x/oauth2"
 )
+
+func TestOIDCLoginSetsNonce(t *testing.T) {
+	o := &OIDC{
+		oauth: oauth2.Config{
+			ClientID:    "portal",
+			Endpoint:    oauth2.Endpoint{AuthURL: "http://kc:8081/auth"},
+			RedirectURL: "http://host/api/v1/auth/callback",
+		},
+		secure: true,
+	}
+	rec := httptest.NewRecorder()
+	o.Login(rec, httptest.NewRequest(http.MethodGet, "/api/v1/auth/login", nil))
+
+	var nonceCookie string
+	for _, ck := range rec.Result().Cookies() {
+		if ck.Name == "oauth_nonce" {
+			nonceCookie = ck.Value
+		}
+	}
+	if nonceCookie == "" {
+		t.Fatal("oauth_nonce cookie not set")
+	}
+	loc, err := url.Parse(rec.Header().Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := loc.Query().Get("nonce"); got != nonceCookie {
+		t.Fatalf("nonce param = %q, want cookie value %q", got, nonceCookie)
+	}
+}
 
 func TestSafeReturnTo(t *testing.T) {
 	cases := []struct {

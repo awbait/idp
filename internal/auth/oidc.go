@@ -129,6 +129,13 @@ func (o *OIDC) Login(w http.ResponseWriter, r *http.Request) {
 		Name: "oauth_state", Value: state, Path: "/", HttpOnly: true,
 		Secure: o.secure, SameSite: http.SameSiteLaxMode, MaxAge: 300,
 	})
+	// nonce binds the id_token to this login (replay/injection defence). Stored in
+	// a short-lived HttpOnly cookie and verified against idToken.Nonce on callback.
+	nonce := randState()
+	http.SetCookie(w, &http.Cookie{
+		Name: "oauth_nonce", Value: nonce, Path: "/", HttpOnly: true,
+		Secure: o.secure, SameSite: http.SameSiteLaxMode, MaxAge: 300,
+	})
 	// Remember where to return after callback. Base64-encoded so arbitrary path
 	// characters survive cookie sanitization; validated again on the way back.
 	if rt := safeReturnTo(r.URL.Query().Get("return_to")); rt != "" {
@@ -137,7 +144,7 @@ func (o *OIDC) Login(w http.ResponseWriter, r *http.Request) {
 			Path: "/", HttpOnly: true, Secure: o.secure, SameSite: http.SameSiteLaxMode, MaxAge: 300,
 		})
 	}
-	http.Redirect(w, r, o.oauth.AuthCodeURL(state), http.StatusFound)
+	http.Redirect(w, r, o.oauth.AuthCodeURL(state, oidc.Nonce(nonce)), http.StatusFound)
 }
 
 func (o *OIDC) Callback(w http.ResponseWriter, r *http.Request) {
@@ -162,6 +169,17 @@ func (o *OIDC) Callback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid id_token", http.StatusUnauthorized)
 		return
 	}
+	// Bind the id_token to this browser's login: its nonce must match the cookie
+	// set in Login. Defeats id_token replay/injection.
+	nonceCookie, nerr := r.Cookie("oauth_nonce")
+	if nerr != nil || nonceCookie.Value == "" || idToken.Nonce != nonceCookie.Value {
+		http.Error(w, "invalid nonce", http.StatusBadRequest)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name: "oauth_nonce", Value: "", Path: "/", HttpOnly: true,
+		Secure: o.secure, SameSite: http.SameSiteLaxMode, MaxAge: -1,
+	})
 	var cl claims
 	if err := idToken.Claims(&cl); err != nil {
 		http.Error(w, "bad claims", http.StatusBadGateway)
@@ -224,6 +242,23 @@ func (o *OIDC) Authenticate(r *http.Request) (*models.User, error) {
 			// Persist the rotated refresh token; the IdP invalidates the old one
 			// after first use, so dropping it here would break the next refresh.
 			sess.RefreshToken = newTok.RefreshToken
+		}
+		// Re-derive identity and roles from the refreshed id_token so a revoked
+		// group or a disabled account takes effect at refresh time, not only at the
+		// next full login (otherwise stale privileges linger for the whole session).
+		if rawID, ok := newTok.Extra("id_token").(string); ok && rawID != "" {
+			idToken, verr := o.verifier.Verify(r.Context(), rawID)
+			if verr != nil {
+				// The IdP no longer vouches for this identity - force re-login
+				// rather than serving the stale user.
+				_ = o.sessions.Delete(r.Context(), c.Value)
+				return nil, ErrUnauthenticated
+			}
+			var cl claims
+			if idToken.Claims(&cl) == nil {
+				sess.User = o.rbac.BuildUser(idToken.Subject, cl.Email, cl.Username, cl.Name, cl.Groups)
+				sess.IDToken = rawID
+			}
 		}
 		// Persist the rotated tokens and extend the session TTL. Best-effort: a
 		// store error must not fail an otherwise-authenticated request.
