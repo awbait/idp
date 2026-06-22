@@ -9,7 +9,7 @@
 
 | ID | Серьёзность | Подсистема | Суть |
 |----|-------------|------------|------|
-| C1 | Critical | auth | `SESSION_SECRET` объявлен, но не используется: токены лежат в Redis в plaintext |
+| C1 | Critical | auth | `SESSION_SECRET` объявлен, но не используется: токены лежат в Redis в plaintext - RESOLVED |
 | C2 | Critical | api/catalog | Обход allowlist чартов (BOLA) по прямому URL |
 | H1 | High | api | Паника при старте / небезопасный `Secure`-флаг cookie из `PublicURL[:5]` |
 | H2 | High | auth | Не проверяется OIDC `nonce` |
@@ -37,12 +37,14 @@
 
 ## Critical
 
-### C1. `SESSION_SECRET` объявлен, но не используется - токены в Redis в plaintext
+### C1. `SESSION_SECRET` объявлен, но не используется - токены в Redis в plaintext [RESOLVED]
 Файлы: `internal/config/config.go:47`, `internal/auth/session.go:13-22,38-48`, `cmd/portal/main.go:278`
 
 `SESSION_SECRET` (дефолт `dev-insecure-session-secret-change-me`) объявлен в конфиге, но grep по всему репозиторию (`SessionSecret`) находит только эту строку-объявление - значение нигде не читается. Комментарий в `session.go` это признаёт: «the skeleton stores plain JSON (TODO: wrap with secretbox/AES-GCM)». В Redis в открытом виде лежат `access_token`, `refresh_token`, `id_token` и профиль каждого пользователя. Любой, кто читает Redis (дамп, реплика, бэкап, общая сеть), получает все OIDC-токены активных пользователей и может выдавать себя за них во внешних системах. Небезопасный дефолт секрета создаёт ложное ощущение настроенного шифрования.
 
 Рекомендация: либо реально шифровать значение сессии (AES-GCM/secretbox на ключе из `SESSION_SECRET`) перед `cache.Set` и расшифровывать в `Get`, либо убрать вводящую в заблуждение переменную и зафиксировать в доке требование к изоляции/TLS Redis. Не оставлять небезопасный дефолт, который ни на что не влияет.
+
+Исправлено: значение сессии шифруется AES-256-GCM (ключ = SHA-256(`SESSION_SECRET`), случайный nonce; `internal/auth/seal.go`) перед `cache.Set` и расшифровывается в `Get`. Не расшифровавшееся значение (битое, под другим ключом или legacy-plaintext) трактуется как отсутствующая сессия -> релогин. Небезопасный дефолт обезврежен fail-fast: в `AUTH_MODE=oidc` портал отказывается стартовать, пока `SESSION_SECRET` равен дефолту (`config.DefaultSessionSecret`). Тесты: шифрование at-rest, реджект чужого ключа и plaintext.
 
 ### C2. Обход allowlist чартов (BOLA) по прямому URL
 Файлы: `internal/api/handlers_catalog.go:21-91` -> `internal/catalog/service.go:62-109`
