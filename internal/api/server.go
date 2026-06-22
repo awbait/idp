@@ -60,6 +60,13 @@ type Server struct {
 	sseStreams atomic.Int64
 }
 
+// MetricsHandler returns the Prometheus /metrics handler. It is served on a
+// dedicated listener (see cmd/portal), separate from the API, so scraping is not
+// reachable through the public app ingress.
+func MetricsHandler() http.Handler {
+	return promhttp.Handler()
+}
+
 // Router builds the HTTP handler tree.
 func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
@@ -72,7 +79,7 @@ func (s *Server) Router() http.Handler {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 	r.Get("/ready", s.handleReady)
-	r.Handle("/metrics", promhttp.Handler())
+	// /metrics is served on a separate listener (see MetricsHandler), not here.
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(maxBytes(maxRequestBodyBytes)) // bound request-body memory (GET/SSE carry none)
@@ -191,7 +198,7 @@ func (s *Server) requestLogger(next http.Handler) http.Handler {
 
 		level := slog.LevelInfo
 		switch r.URL.Path {
-		case "/health", "/ready", "/metrics":
+		case "/health", "/ready":
 			level = slog.LevelDebug
 		}
 		s.logger().LogAttrs(r.Context(), level, "http request",
