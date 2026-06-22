@@ -58,6 +58,27 @@ func (s *Service) ListCharts(ctx context.Context, u *models.User) ([]models.Char
 	return out, nil
 }
 
+// Authorize loads a chart and enforces the visibility allowlist for the user,
+// returning the chart so callers can reuse it. A chart hidden from the user is
+// reported as ErrNotFound (a 404), not ErrForbidden, so the endpoint does not
+// disclose that a restricted chart exists.
+//
+// The per-chart read methods below (GetChart/GetVersion/GetValues/...) do NOT
+// check visibility themselves - they are also used by system flows (provisioning
+// render, the global publication catalog). HTTP handlers that expose a chart by
+// its path must call Authorize first; otherwise a user could read a chart hidden
+// from the listing by guessing its URL (allowlist bypass).
+func (s *Service) Authorize(ctx context.Context, u *models.User, project, name string) (*models.Chart, error) {
+	chart, err := s.hb.GetChart(ctx, project, name)
+	if err != nil {
+		return nil, err
+	}
+	if !VisibleTo(chart, u) {
+		return nil, models.ErrNotFound
+	}
+	return chart, nil
+}
+
 // GetChart returns a chart's details (with version list).
 func (s *Service) GetChart(ctx context.Context, project, name string) (*models.Chart, error) {
 	return s.hb.GetChart(ctx, project, name)

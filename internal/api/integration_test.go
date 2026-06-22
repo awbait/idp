@@ -89,6 +89,49 @@ func TestHTTPUnauthorizedNothing(t *testing.T) {
 	}
 }
 
+func TestHTTPChartAllowlistBypass(t *testing.T) {
+	srv, _, _ := newServer(t)
+	h := srv.Router()
+
+	// platform/redis is restricted to team "core" in the fake Harbor fixture.
+	// A member of another team must not reach it by direct URL (allowlist bypass,
+	// C2): every per-chart endpoint returns 404, not just the listing hiding it.
+	outsider := []string{
+		"/api/v1/charts/platform/redis",
+		"/api/v1/charts/platform/redis/7.2.0",
+		"/api/v1/charts/platform/redis/7.2.0/values",
+		"/api/v1/charts/platform/redis/7.2.0/readme",
+		"/api/v1/charts/platform/redis/7.2.0/schema",
+		"/api/v1/charts/platform/redis/7.2.0/changelog",
+		"/api/v1/charts/platform/redis/changelog/aggregated",
+	}
+	for _, p := range outsider {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, devReq("GET", p, "payments", nil))
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("outsider GET %s: want 404, got %d", p, rec.Code)
+		}
+	}
+
+	// A member of the allowed team still reaches the chart.
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, devReq("GET", "/api/v1/charts/platform/redis", "core", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("core GET redis: want 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	// And the restricted chart never appears in the outsider's listing.
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, devReq("GET", "/api/v1/charts", "payments", nil))
+	var charts []models.Chart
+	_ = json.Unmarshal(rec.Body.Bytes(), &charts)
+	for _, c := range charts {
+		if c.Project == "platform" && c.Name == "redis" {
+			t.Fatalf("listing leaked restricted chart to outsider")
+		}
+	}
+}
+
 func TestHTTPCreateAndReconcile(t *testing.T) {
 	srv, argo, prov := newServer(t)
 	h := srv.Router()
