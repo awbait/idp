@@ -37,3 +37,6 @@ internal/spa/dist/*
 
 # Docs: work in progress, not tracked for now
 /docs/
+
+# Separate charts repo dropped in here, tracked on its own
+/charts/
