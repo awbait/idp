@@ -288,7 +288,7 @@ export function RequestDetailPage() {
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-            <ProductIcon name={r.chart_name} size={22} />
+            <ProductIcon project={r.chart_project} name={r.chart_name} size={22} />
           </span>
           {editingName ? (
             <div className="flex items-center gap-1.5">

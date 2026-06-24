@@ -1149,7 +1149,7 @@ function ProductPagePreview({
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-          <ProductIcon name={request.chart_name} size={22} />
+          <ProductIcon project={request.chart_project} name={request.chart_name} size={22} />
         </span>
         <h1 className="truncate text-xl font-semibold">
           {request.display_name || request.service_name}

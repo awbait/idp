@@ -1,13 +1,14 @@
-import { Link, useParams } from "react-router-dom";
+import { IconCategory, IconTag, IconUser, IconUsersGroup } from "@tabler/icons-react";
 import { Tab, TabList, TabPanel, Tabs } from "react-aria-components";
-import { IconTag, IconCategory, IconUser, IconUsersGroup } from "@tabler/icons-react";
+import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import { useAsync } from "../hooks/useAsync";
-import { Button, Card, Chip, ErrorBox, Spinner } from "../components/ui";
-import { Breadcrumbs } from "../components/Breadcrumbs";
-import { Markdown } from "../components/Markdown";
 import { findCatalogChart, useCatalog } from "../app/CatalogContext";
-import { useUser, canModify } from "../auth/UserContext";
+import { canModify, useUser } from "../auth/UserContext";
+import { Breadcrumbs } from "../components/Breadcrumbs";
+import { ProductIcon } from "../components/icons";
+import { Markdown } from "../components/Markdown";
+import { Button, Card, Chip, ErrorBox, Spinner } from "../components/ui";
+import { useAsync } from "../hooks/useAsync";
 import { isNewer } from "../lib/semver";
 
 export function ChartDetailPage() {
@@ -33,7 +34,6 @@ export function ChartDetailPage() {
   const published = !!pub?.published;
   const version = (published && pub?.approved_view_version) || liveVersion;
   const description = (published && pub?.approved_description) || chart.description;
-  const iconUrl = published ? pub?.approved_icon_url : undefined;
   // Ordering is open only for publications with an approved order-view; it leads
   // to the product page (its order list).
   const orderable = !!pub?.published && !!pub?.has_order_view;
@@ -54,9 +54,7 @@ export function ChartDetailPage() {
             ]}
           />
           <h1 className="mt-1 flex items-center gap-2 text-xl font-semibold">
-            {iconUrl && (
-              <img src={iconUrl} alt="" className="h-6 w-6 shrink-0 rounded object-contain" />
-            )}
+            <ProductIcon project={chart.project} name={chart.name} size={24} />
             {chart.project}/{chart.name}
           </h1>
           <p className="text-sm text-gray-600">{description}</p>

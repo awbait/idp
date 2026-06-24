@@ -3,8 +3,6 @@
 import {
   IconApps,
   IconBox,
-  IconBrandMongodb,
-  IconBrandMysql,
   IconBucket,
   IconChartLine,
   IconCloud,
@@ -16,10 +14,10 @@ import {
   IconNetwork,
   IconServer,
   IconShieldLock,
-  IconStack2,
   IconStack3,
 } from "@tabler/icons-react";
 import type { ComponentType } from "react";
+import { findCatalogChart, useCatalog } from "../app/CatalogContext";
 
 // Common shape of a Tabler icon component (size/stroke/className props).
 export type TablerIcon = ComponentType<{ size?: number | string; stroke?: number; className?: string }>;
@@ -73,42 +71,40 @@ export function categoryIcon(name: string): TablerIcon {
   return CATEGORY_ICON_BY_NAME[name] ?? IconBox;
 }
 
-// Map a chart/product name to a Tabler icon (brand where available, else by kind).
-const PRODUCT_ICON: Record<string, TablerIcon> = {
-  postgres: IconDatabase,
-  postgresql: IconDatabase,
-  redis: IconDatabase,
-  clickhouse: IconDatabase,
-  elasticsearch: IconDatabase,
-  mongo: IconBrandMongodb,
-  mongodb: IconBrandMongodb,
-  mysql: IconBrandMysql,
-  mariadb: IconBrandMysql,
-  kafka: IconStack2,
-  rabbitmq: IconStack2,
-  nginx: IconServer,
-  grafana: IconChartLine,
-  prometheus: IconChartLine,
-  minio: IconBucket,
-};
-
-function iconFor(name: string): TablerIcon {
-  const n = name.toLowerCase();
-  for (const key of Object.keys(PRODUCT_ICON)) {
-    if (n.includes(key)) return PRODUCT_ICON[key];
-  }
-  return IconBox;
-}
-
+// ProductIcon renders a chart's own icon (Chart.yaml `icon` -> icon_url). When the
+// chart has no icon it falls back to the admin-chosen icon of the chart's category,
+// then to a neutral box. The chart is resolved from the shared catalog by its
+// coordinates, so callers pass only project/name (an order knows both).
 export function ProductIcon({
+  project,
   name,
   size = 18,
   className = "",
 }: {
+  project: string;
   name: string;
   size?: number;
   className?: string;
 }) {
-  const Icon = iconFor(name);
+  const { charts, categories } = useCatalog();
+  const chart = findCatalogChart(charts, project, name);
+  const pub = chart?.publication;
+  // Approved charts show the icon snapshot from approve time (like the catalog);
+  // others show the live Chart.yaml icon. An empty snapshot deliberately falls
+  // through to the category icon rather than leaking a newer version's icon.
+  const approved = !!pub?.published && !!pub?.has_order_view;
+  const iconUrl = approved ? pub?.approved_icon_url : chart?.icon_url;
+  if (iconUrl) {
+    return (
+      <img
+        src={iconUrl}
+        alt=""
+        width={size}
+        height={size}
+        className={`shrink-0 rounded object-contain ${className}`}
+      />
+    );
+  }
+  const Icon = categoryIcon(categories.find((c) => c.id === pub?.category_id)?.icon ?? "");
   return <Icon size={size} stroke={1.7} className={`shrink-0 ${className}`} />;
 }

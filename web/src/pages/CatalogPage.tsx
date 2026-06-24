@@ -1,12 +1,13 @@
-import { Link } from "react-router-dom";
 import { IconArrowUpCircle, IconCircleCheckFilled } from "@tabler/icons-react";
-import { useTeam } from "../app/TeamContext";
+import { Link } from "react-router-dom";
+import type { CatalogChart } from "../api/types";
 import { useCatalog } from "../app/CatalogContext";
-import { useUser, canModify } from "../auth/UserContext";
+import { useTeam } from "../app/TeamContext";
+import { canModify, useUser } from "../auth/UserContext";
 import { AddChartDialog } from "../components/AddChartDialog";
+import { ProductIcon } from "../components/icons";
 import { Card, ErrorBox, Spinner } from "../components/ui";
 import { isNewer } from "../lib/semver";
-import type { CatalogChart } from "../api/types";
 
 type CatLabel = (id?: string) => string | undefined;
 
@@ -124,17 +125,13 @@ function ChartCard({ chart: c, categoryLabel }: { chart: CatalogChart; categoryL
   // icon strictly from the snapshot (even if empty), else a new version's icon leaks.
   const version = (approved && pub?.approved_view_version) || c.latest_version;
   const description = (approved && pub?.approved_description) || c.description;
-  const iconUrl = approved ? pub?.approved_icon_url : c.icon_url;
   const category = categoryLabel(pub?.category_id);
   return (
     <Link to={`/catalog/${c.project}/${c.name}`}>
       <Card className="h-full transition hover:border-brand-400 hover:shadow">
         <div className="flex items-baseline justify-between gap-2">
           <h2 className="flex min-w-0 items-center gap-1.5 font-medium text-gray-900">
-            {/* Approved version icon (data:image/...;base64,...). If absent, hide it. */}
-            {iconUrl && (
-              <img src={iconUrl} alt="" className="h-5 w-5 shrink-0 rounded object-contain" />
-            )}
+            <ProductIcon project={c.project} name={c.name} size={20} />
             <span className="truncate">{c.name}</span>
             {/* Published and approved: a plain green check. */}
             {approved && (

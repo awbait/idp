@@ -240,7 +240,7 @@ export function OrdersTable({ title, filter, orderTo, orderDisabledReason, empty
                   </Cell>
                   <Cell className="px-4 py-3 text-left">
                     <span className="flex items-center gap-2 font-medium text-slate-800">
-                      <ProductIcon name={r.chart_name} />
+                      <ProductIcon project={r.chart_project} name={r.chart_name} />
                       {r.chart_name}
                     </span>
                   </Cell>
