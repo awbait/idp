@@ -1,5 +1,6 @@
 import {
   IconActivity,
+  IconAlertTriangle,
   IconArrowLeft,
   IconArrowRight,
   IconChecklist,
@@ -562,7 +563,15 @@ export function AdminCategoriesPage() {
               onDragOver={() => setOverId(c.id)}
               onDrop={() => onDropOn(c.id)}
               onRename={(label) => run(() => api.updateCategory({ ...c, label }))}
-              onIcon={(icon) => run(() => api.updateCategory({ ...c, icon }))}
+              onIcon={(icon) =>
+                run(async () => {
+                  // Optimistic: the resync effect only fires when the id set
+                  // changes, so push the new icon into local order ourselves -
+                  // otherwise the row keeps rendering the stale icon until reload.
+                  setOrder((prev) => prev.map((o) => (o.id === c.id ? { ...o, icon } : o)));
+                  await api.updateCategory({ ...c, icon });
+                })
+              }
               onDelete={() => run(() => api.deleteCategory(c.id))}
             />
           ))
@@ -810,6 +819,22 @@ function slugify(s: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+// A slug must be a url-safe id: lowercase latin/digits in single-dash groups,
+// and carry at least SLUG_MIN_LETTERS letters so it stays readable (digits alone
+// are not a meaningful id).
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SLUG_MIN_LETTERS = 2;
+
+// slugError returns a human message for an invalid slug, or null when it is valid
+// (or empty - emptiness is handled by disabling the button, not by an error).
+function slugError(id: string): string | null {
+  if (!id) return null;
+  if (!SLUG_RE.test(id)) return "Только строчные латинские буквы, цифры и дефис, без пробелов.";
+  if ((id.match(/[a-z]/g)?.length ?? 0) < SLUG_MIN_LETTERS)
+    return `Минимум ${SLUG_MIN_LETTERS} латинские буквы.`;
+  return null;
+}
+
 // AddCategory: a single inline row matching the list style. The slug is
 // auto-suggested from the name until the admin edits it; new categories land at
 // the end with the chosen icon, then are editable inline above.
@@ -819,10 +844,11 @@ function AddCategory({ busy, run }: { busy: boolean; run: (fn: () => Promise<unk
   const [slugTouched, setSlugTouched] = useState(false);
   const [icon, setIcon] = useState("box");
   const id = (slugTouched ? slug : slugify(label)).trim();
-  // Slug must be a url-safe id: lowercase latin, digits, single dashes.
-  const slugValid = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id);
-  const slugBad = slugTouched && !!slug.trim() && !slugValid;
-  const canAdd = !busy && !!label.trim() && slugValid;
+  const slugErr = slugError(id);
+  // Only surface the message once the admin has typed into the slug field; while
+  // it is still auto-derived from the name we just disable the button.
+  const showSlugErr = slugTouched && !!slug.trim() && !!slugErr;
+  const canAdd = !busy && !!label.trim() && !slugErr && !!id;
 
   function reset() {
     setLabel("");
@@ -836,21 +862,21 @@ function AddCategory({ busy, run }: { busy: boolean; run: (fn: () => Promise<unk
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-surface px-3 py-2.5">
-        <span className="h-7 w-7 shrink-0" aria-hidden />
-        <IconPicker value={icon} disabled={busy} onPick={setIcon} />
-        <input
-          value={label}
-          disabled={busy}
-          onChange={(e) => setLabel(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") add();
-          }}
-          placeholder="Название новой категории"
-          aria-label="Название новой категории"
-          className="h-[30px] min-w-0 flex-1 rounded-md border border-slate-200 bg-transparent px-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
-        />
+    <div className="flex items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-surface px-3 py-2.5">
+      <span className="h-7 w-7 shrink-0" aria-hidden />
+      <IconPicker value={icon} disabled={busy} onPick={setIcon} />
+      <input
+        value={label}
+        disabled={busy}
+        onChange={(e) => setLabel(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") add();
+        }}
+        placeholder="Название новой категории"
+        aria-label="Название новой категории"
+        className="h-[30px] min-w-0 flex-1 rounded-md border border-slate-200 bg-transparent px-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
+      />
+      <div className="relative shrink-0">
         <input
           value={slugTouched ? slug : id}
           disabled={busy}
@@ -863,26 +889,34 @@ function AddCategory({ busy, run }: { busy: boolean; run: (fn: () => Promise<unk
           }}
           placeholder="slug"
           aria-label="Идентификатор (slug)"
-          className={`h-[30px] w-32 shrink-0 rounded-md border bg-transparent px-2.5 font-mono text-[11px] text-slate-600 outline-none placeholder:text-slate-400 focus:ring-1 disabled:opacity-50 ${
-            slugBad
+          aria-invalid={showSlugErr}
+          className={`h-[30px] w-32 rounded-md border bg-transparent px-2.5 font-mono text-[11px] text-slate-600 outline-none placeholder:text-slate-400 focus:ring-1 disabled:opacity-50 ${
+            showSlugErr
               ? "border-red-400 focus:border-red-500 focus:ring-red-500"
               : "border-slate-200 focus:border-brand-500 focus:ring-brand-500"
           }`}
         />
-        <AriaButton
-          isDisabled={!canAdd}
-          onPress={add}
-          aria-label="Добавить категорию"
-          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-md bg-brand-600 text-on-accent outline-none hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-40"
-        >
-          <IconPlus size={16} stroke={2} />
-        </AriaButton>
+        {showSlugErr && (
+          <div
+            role="alert"
+            className="absolute bottom-full right-0 z-20 mb-2 w-56 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs leading-snug text-red-700 shadow-md"
+          >
+            <div className="flex items-start gap-1.5">
+              <IconAlertTriangle size={14} stroke={2} className="mt-px shrink-0" />
+              <span>{slugErr}</span>
+            </div>
+            <span className="absolute right-6 top-full h-2 w-2 -translate-y-1/2 rotate-45 border-b border-r border-red-200 bg-red-50" />
+          </div>
+        )}
       </div>
-      {slugBad && (
-        <p className="pl-[4.75rem] text-xs text-red-600">
-          Slug: только строчные латинские буквы, цифры и дефис.
-        </p>
-      )}
+      <AriaButton
+        isDisabled={!canAdd}
+        onPress={add}
+        aria-label="Добавить категорию"
+        className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-md bg-brand-600 text-on-accent outline-none hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-40"
+      >
+        <IconPlus size={16} stroke={2} />
+      </AriaButton>
     </div>
   );
 }
