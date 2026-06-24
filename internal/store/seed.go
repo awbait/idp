@@ -18,11 +18,11 @@ var seedIngressView []byte
 // seedCategories is the initial catalog category list; afterwards managed
 // by the admin via API.
 var seedCategories = []models.Category{
-	{ID: "databases", Label: "Базы данных", Sort: 10},
-	{ID: "network", Label: "Сеть", Sort: 20},
+	{ID: "databases", Label: "Базы данных", Sort: 10, Icon: "database"},
+	{ID: "network", Label: "Сеть", Sort: 20, Icon: "network"},
 	// Default category for auto-discovered charts (CATALOG_AUTODISCOVER);
 	// the admin moves them to the right one during moderation.
-	{ID: "uncategorized", Label: "Без категории", Sort: 99},
+	{ID: "uncategorized", Label: "Без категории", Sort: 99, Icon: "box"},
 }
 
 // SeedPublications populates the base categories and the approved

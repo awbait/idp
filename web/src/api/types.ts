@@ -163,6 +163,8 @@ export interface Category {
   id: string; // slug
   label: string;
   sort: number;
+  icon?: string; // chosen icon slug (palette in icons.tsx); empty -> default
+  system?: boolean; // built-in category that cannot be deleted (read-only)
 }
 
 // Lightweight publication projection in the /catalog response (without view-document bodies).

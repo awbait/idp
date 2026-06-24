@@ -326,7 +326,7 @@ export function Layout() {
         {collapsed ? (
           <nav className="flex flex-col gap-0.5 px-2 py-3">
             {menu.map((g) => {
-              const Icon = categoryIcon(g.id);
+              const Icon = categoryIcon(g.icon || g.id);
               const first = g.charts[0];
               return (
                 <Link
@@ -349,7 +349,7 @@ export function Layout() {
             className="px-2 py-3"
           >
             {menu.map((g) => {
-              const Icon = categoryIcon(g.id);
+              const Icon = categoryIcon(g.icon || g.id);
               return (
                 <Disclosure key={g.id} id={g.id} className="group">
                   <Heading>

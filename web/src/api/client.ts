@@ -160,7 +160,7 @@ export const api = {
   listCategories: () => req<Category[]>("GET", "/categories"),
   createCategory: (c: Category) => req<Category>("POST", "/categories", c),
   updateCategory: (c: Category) =>
-    req<Category>("PATCH", `/categories/${enc(c.id)}`, { label: c.label, sort: c.sort }),
+    req<Category>("PATCH", `/categories/${enc(c.id)}`, { label: c.label, sort: c.sort, icon: c.icon }),
   deleteCategory: (id: string) => req<void>("DELETE", `/categories/${enc(id)}`),
 
   // chart publications (metadata + view builder + approval)

@@ -14,8 +14,8 @@ import (
 // --- categories ---
 
 func (p *Postgres) CreateCategory(ctx context.Context, c *models.Category) error {
-	_, err := p.db.Exec(ctx, `INSERT INTO categories (id, label, sort) VALUES ($1,$2,$3)`,
-		c.ID, c.Label, c.Sort)
+	_, err := p.db.Exec(ctx, `INSERT INTO categories (id, label, sort, icon) VALUES ($1,$2,$3,$4)`,
+		c.ID, c.Label, c.Sort, c.Icon)
 	if isUniqueViolation(err) {
 		return models.ErrConflict
 	}
@@ -23,8 +23,8 @@ func (p *Postgres) CreateCategory(ctx context.Context, c *models.Category) error
 }
 
 func (p *Postgres) UpdateCategory(ctx context.Context, c *models.Category) error {
-	tag, err := p.db.Exec(ctx, `UPDATE categories SET label=$1, sort=$2 WHERE id=$3`,
-		c.Label, c.Sort, c.ID)
+	tag, err := p.db.Exec(ctx, `UPDATE categories SET label=$1, sort=$2, icon=$3 WHERE id=$4`,
+		c.Label, c.Sort, c.Icon, c.ID)
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func (p *Postgres) DeleteCategory(ctx context.Context, id string) error {
 }
 
 func (p *Postgres) ListCategories(ctx context.Context) ([]*models.Category, error) {
-	rows, err := p.db.Query(ctx, `SELECT id, label, sort FROM categories ORDER BY sort, id`)
+	rows, err := p.db.Query(ctx, `SELECT id, label, sort, icon FROM categories ORDER BY sort, id`)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (p *Postgres) ListCategories(ctx context.Context) ([]*models.Category, erro
 	var out []*models.Category
 	for rows.Next() {
 		var c models.Category
-		if err := rows.Scan(&c.ID, &c.Label, &c.Sort); err != nil {
+		if err := rows.Scan(&c.ID, &c.Label, &c.Sort, &c.Icon); err != nil {
 			return nil, err
 		}
 		out = append(out, &c)

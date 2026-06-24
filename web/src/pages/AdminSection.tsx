@@ -6,22 +6,35 @@ import {
   IconCircleCheck,
   IconClock,
   IconFileText,
+  IconGripVertical,
+  IconLock,
   IconPackage,
   IconPencil,
   IconPlus,
   IconSettings,
   IconStack,
   IconTags,
+  IconTrash,
 } from "@tabler/icons-react";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Button as AriaButton,
+  Dialog,
+  DialogTrigger,
+  Heading,
+  Modal,
+  ModalOverlay,
+  Popover,
+} from "react-aria-components";
 import { Link, Outlet, useParams } from "react-router-dom";
 import { api, HttpError } from "../api/client";
 import type { Category, ChartPublication, PublicationStatus } from "../api/types";
 import { chartLabel, useCatalog } from "../app/CatalogContext";
 import { useUser } from "../auth/UserContext";
+import { CATEGORY_ICON_CHOICES, categoryIcon } from "../components/icons";
 import { PublicationReview } from "../components/PublicationReview";
-import { Button, ErrorBox, Spinner, TextField } from "../components/ui";
+import { Button, ErrorBox, Spinner } from "../components/ui";
 import { useAsync } from "../hooks/useAsync";
 
 // ---------------------------------------------------------------------------
@@ -450,11 +463,39 @@ export function AdminApprovalDetailPage() {
 // Categories
 // ---------------------------------------------------------------------------
 
+// Russian plural for "чарт".
+function chartsWord(n: number): string {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return "чарт";
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return "чарта";
+  return "чартов";
+}
+
 export function AdminCategoriesPage() {
-  const { categories, reload } = useCatalog();
-  const [draft, setDraft] = useState<Category>({ id: "", label: "", sort: 0 });
+  const { categories, charts, reload } = useCatalog();
+  const [order, setOrder] = useState<Category[]>(categories);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const dragId = useRef<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+
+  // Re-sync local order when the catalog's category set changes (add/remove),
+  // keyed by the id list so an in-flight reorder/edit is not clobbered on every
+  // render.
+  const sig = categories.map((c) => c.id).join(",");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resync on set change only
+  useEffect(() => setOrder(categories), [sig]);
+
+  // Charts per category: drives the "can't delete a non-empty category" guard.
+  const counts = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const c of charts) {
+      const id = c.publication?.category_id;
+      if (id) m[id] = (m[id] ?? 0) + 1;
+    }
+    return m;
+  }, [charts]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -469,113 +510,379 @@ export function AdminCategoriesPage() {
     }
   }
 
+  // Drop the dragged row before the target: renumber sort (10,20,...) and
+  // persist only the rows whose position actually changed.
+  function onDropOn(targetId: string) {
+    const fromId = dragId.current;
+    dragId.current = null;
+    setOverId(null);
+    if (!fromId || fromId === targetId) return;
+    const cur = [...order];
+    const from = cur.findIndex((c) => c.id === fromId);
+    const to = cur.findIndex((c) => c.id === targetId);
+    if (from < 0 || to < 0) return;
+    const [moved] = cur.splice(from, 1);
+    cur.splice(to, 0, moved);
+    const renum = cur.map((c, i) => ({ ...c, sort: (i + 1) * 10 }));
+    const prev = order;
+    setOrder(renum); // optimistic
+    run(async () => {
+      for (const c of renum) {
+        if (prev.find((o) => o.id === c.id)?.sort !== c.sort) await api.updateCategory(c);
+      }
+    });
+  }
+
   return (
     <div className="flex flex-col gap-5">
-      <PageTitle
-        title="Категории каталога"
-        badge={<Badge tone="slate">{categories.length}</Badge>}
-      />
+      <div>
+        <h1 className="text-xl font-semibold">Категории каталога</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Перетаскивайте за ручку для порядка, кликните иконку чтобы сменить. Название и порядок
+          сохраняются автоматически.
+        </p>
+      </div>
 
       {err && <ErrorBox error={new Error(err)} />}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-surface shadow-sm">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-400">
-              <th className="px-4 py-2.5 font-medium">ID (slug)</th>
-              <th className="px-4 py-2.5 font-medium">Название</th>
-              <th className="w-28 px-4 py-2.5 font-medium">Порядок</th>
-              <th className="px-4 py-2.5 text-right font-medium">Действия</th>
-            </tr>
-          </thead>
-          <tbody>
-            {categories.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-500">
-                  Категорий нет. Добавьте первую ниже.
-                </td>
-              </tr>
-            ) : (
-              categories.map((c) => <CategoryRow key={c.id} category={c} busy={busy} run={run} />)
-            )}
-          </tbody>
-        </table>
+      <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-surface shadow-sm">
+        {order.length === 0 ? (
+          <p className="px-4 py-10 text-center text-sm text-slate-500">Категорий нет. Добавьте первую ниже.</p>
+        ) : (
+          order.map((c) => (
+            <CategoryRow
+              key={c.id}
+              category={c}
+              count={counts[c.id] ?? 0}
+              busy={busy}
+              over={overId === c.id}
+              onDragStart={() => {
+                dragId.current = c.id;
+              }}
+              onDragOver={() => setOverId(c.id)}
+              onDrop={() => onDropOn(c.id)}
+              onRename={(label) => run(() => api.updateCategory({ ...c, label }))}
+              onIcon={(icon) => run(() => api.updateCategory({ ...c, icon }))}
+              onDelete={() => run(() => api.deleteCategory(c.id))}
+            />
+          ))
+        )}
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-surface p-4 shadow-sm">
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
-          <IconPlus size={16} stroke={1.8} className="text-slate-400" />
-          Добавить категорию
-        </h2>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="w-40">
-            <TextField label="ID (slug)" value={draft.id} onChange={(v) => setDraft({ ...draft, id: v })} />
-          </div>
-          <div className="min-w-48 flex-1">
-            <TextField label="Название" value={draft.label} onChange={(v) => setDraft({ ...draft, label: v })} />
-          </div>
-          <div className="w-28">
-            <TextField
-              label="Порядок"
-              value={String(draft.sort)}
-              onChange={(v) => setDraft({ ...draft, sort: Number(v) || 0 })}
-            />
-          </div>
-          <Button
-            variant="primary"
-            isDisabled={busy || !draft.id.trim() || !draft.label.trim()}
-            onPress={() =>
-              run(() => api.createCategory({ ...draft, id: draft.id.trim(), label: draft.label.trim() })).then(() =>
-                setDraft({ id: "", label: "", sort: 0 }),
-              )
-            }
-          >
-            <IconPlus size={16} stroke={1.8} /> Добавить
-          </Button>
-        </div>
-      </div>
+      <AddCategory busy={busy} run={run} />
     </div>
   );
 }
 
 function CategoryRow({
   category,
+  count,
   busy,
-  run,
+  over,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onRename,
+  onIcon,
+  onDelete,
 }: {
   category: Category;
+  count: number;
   busy: boolean;
-  run: (fn: () => Promise<unknown>) => Promise<void>;
+  over: boolean;
+  onDragStart: () => void;
+  onDragOver: () => void;
+  onDrop: () => void;
+  onRename: (label: string) => void;
+  onIcon: (icon: string) => void;
+  onDelete: () => void;
 }) {
   const [label, setLabel] = useState(category.label);
-  const [sort, setSort] = useState(String(category.sort));
-  const dirty = label !== category.label || Number(sort) !== category.sort;
+  useEffect(() => setLabel(category.label), [category.label]);
+
+  function saveLabel() {
+    const v = label.trim();
+    if (v && v !== category.label) onRename(v);
+    else if (!v) setLabel(category.label); // revert empty edit
+  }
+
   return (
-    <tr className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-      <td className="px-4 py-3">
-        <span className="font-mono text-xs text-slate-500">{category.id}</span>
-      </td>
-      <td className="px-4 py-3">
-        <TextField label="Название" hideLabel value={label} onChange={setLabel} />
-      </td>
-      <td className="px-4 py-3">
-        <TextField label="Порядок" hideLabel value={sort} onChange={setSort} />
-      </td>
-      <td className="px-4 py-3">
-        <div className="flex justify-end gap-2">
-          <Button
-            isDisabled={busy || !dirty || !label.trim()}
-            onPress={() =>
-              run(() => api.updateCategory({ id: category.id, label: label.trim(), sort: Number(sort) || 0 }))
-            }
+    // biome-ignore lint/a11y/noStaticElementInteractions: native HTML5 drag-and-drop reorder (admin-only)
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        onDragOver();
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop();
+      }}
+      className={`flex items-center gap-3 px-3 py-2.5 ${over ? "bg-brand-50/60" : "hover:bg-slate-50"}`}
+    >
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: native drag handle */}
+      <span
+        draggable
+        onDragStart={onDragStart}
+        title="Перетащить для изменения порядка"
+        className="flex h-7 w-7 shrink-0 cursor-grab items-center justify-center rounded text-slate-300 hover:text-slate-500 active:cursor-grabbing"
+      >
+        <IconGripVertical size={18} stroke={1.7} />
+      </span>
+
+      <IconPicker value={category.icon} disabled={busy} onPick={onIcon} />
+
+      <div className="flex min-w-0 flex-1 items-baseline gap-2">
+        <input
+          value={label}
+          disabled={busy}
+          onChange={(e) => setLabel(e.target.value)}
+          onBlur={saveLabel}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          }}
+          aria-label="Название категории"
+          className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 text-sm font-medium text-slate-800 outline-none hover:border-slate-200 focus:border-brand-500 focus:bg-surface focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
+        />
+        <span className="shrink-0 font-mono text-[11px] text-slate-400">{category.id}</span>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2">
+        {category.system && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-400">
+            <IconLock size={11} stroke={2} />
+            системная
+          </span>
+        )}
+        {count > 0 && (
+          <span
+            title={`${count} ${chartsWord(count)} в категории`}
+            className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500"
           >
-            Сохранить
-          </Button>
-          <Button variant="danger" isDisabled={busy} onPress={() => run(() => api.deleteCategory(category.id))}>
-            Удалить
-          </Button>
-        </div>
-      </td>
-    </tr>
+            <IconPackage size={11} stroke={2} />
+            {count}
+          </span>
+        )}
+      </div>
+
+      <DeleteCategoryButton
+        deletable={!category.system && count === 0}
+        system={!!category.system}
+        count={count}
+        label={category.label}
+        onConfirm={onDelete}
+      />
+    </div>
+  );
+}
+
+// IconPicker: a tile showing the current icon; clicking opens a palette popover.
+function IconPicker({
+  value,
+  disabled,
+  onPick,
+}: {
+  value?: string;
+  disabled?: boolean;
+  onPick: (icon: string) => void;
+}) {
+  const Current = categoryIcon(value ?? "");
+  return (
+    <DialogTrigger>
+      <AriaButton
+        isDisabled={disabled}
+        aria-label="Сменить иконку"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600 outline-none hover:border-brand-300 hover:bg-brand-50 focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50"
+      >
+        <Current size={18} stroke={1.8} />
+      </AriaButton>
+      <Popover className="rounded-md border border-slate-200 bg-surface p-2 shadow-lg outline-none entering:animate-in entering:fade-in">
+        <Dialog className="outline-none" aria-label="Выбор иконки">
+          {({ close }) => (
+            <div className="grid grid-cols-5 gap-1">
+              {CATEGORY_ICON_CHOICES.map(({ id, Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => {
+                    onPick(id);
+                    close();
+                  }}
+                  aria-label={id}
+                  className={`flex h-9 w-9 items-center justify-center rounded-md outline-none hover:bg-brand-50 focus-visible:ring-2 focus-visible:ring-brand-500 ${
+                    value === id ? "bg-brand-50 text-brand-700 ring-1 ring-brand-200" : "text-slate-600"
+                  }`}
+                >
+                  <Icon size={18} stroke={1.8} />
+                </button>
+              ))}
+            </div>
+          )}
+        </Dialog>
+      </Popover>
+    </DialogTrigger>
+  );
+}
+
+// DeleteCategoryButton: a trash control that asks for confirmation in a modal.
+// Disabled (with a reason) for the system category or one that still has charts.
+function DeleteCategoryButton({
+  deletable,
+  system,
+  count,
+  label,
+  onConfirm,
+}: {
+  deletable: boolean;
+  system: boolean;
+  count: number;
+  label: string;
+  onConfirm: () => void;
+}) {
+  if (!deletable) {
+    const title = system
+      ? "Системную категорию нельзя удалить"
+      : `Нельзя удалить: в категории ${count} ${chartsWord(count)}`;
+    return (
+      <span
+        title={title}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-200"
+      >
+        <IconTrash size={16} stroke={1.8} />
+      </span>
+    );
+  }
+  return (
+    <DialogTrigger>
+      <AriaButton
+        aria-label="Удалить категорию"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 outline-none hover:bg-red-50 hover:text-red-600 focus-visible:ring-2 focus-visible:ring-red-500"
+      >
+        <IconTrash size={16} stroke={1.8} />
+      </AriaButton>
+      <ModalOverlay
+        isDismissable
+        className="fixed inset-0 z-10 flex items-start justify-center bg-black/20 p-4 pt-24 entering:animate-in entering:fade-in"
+      >
+        <Modal className="w-full max-w-md rounded-lg border border-slate-200 bg-surface shadow-xl">
+          <Dialog className="outline-none">
+            {({ close }) => (
+              <div className="flex flex-col gap-4 p-5">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-500">
+                    <IconTrash size={20} stroke={1.8} />
+                  </span>
+                  <div>
+                    <Heading slot="title" className="text-base font-semibold text-slate-800">
+                      Удалить категорию?
+                    </Heading>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Категория «{label}» будет удалена без возможности восстановления.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button onPress={close}>Отмена</Button>
+                  <Button
+                    variant="danger"
+                    onPress={() => {
+                      onConfirm();
+                      close();
+                    }}
+                  >
+                    Удалить
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Dialog>
+        </Modal>
+      </ModalOverlay>
+    </DialogTrigger>
+  );
+}
+
+// slugify derives a url-safe id from a label (latin letters/digits only). For a
+// non-latin label it yields "", so the admin types the slug explicitly.
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+// AddCategory: a single inline row matching the list style. The slug is
+// auto-suggested from the name until the admin edits it; new categories land at
+// the end with the chosen icon, then are editable inline above.
+function AddCategory({ busy, run }: { busy: boolean; run: (fn: () => Promise<unknown>) => Promise<void> }) {
+  const [label, setLabel] = useState("");
+  const [slug, setSlug] = useState("");
+  const [slugTouched, setSlugTouched] = useState(false);
+  const [icon, setIcon] = useState("box");
+  const id = (slugTouched ? slug : slugify(label)).trim();
+  // Slug must be a url-safe id: lowercase latin, digits, single dashes.
+  const slugValid = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id);
+  const slugBad = slugTouched && !!slug.trim() && !slugValid;
+  const canAdd = !busy && !!label.trim() && slugValid;
+
+  function reset() {
+    setLabel("");
+    setSlug("");
+    setSlugTouched(false);
+    setIcon("box");
+  }
+  function add() {
+    if (!canAdd) return;
+    run(() => api.createCategory({ id, label: label.trim(), sort: 999, icon })).then(reset);
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-surface px-3 py-2.5">
+        <span className="h-7 w-7 shrink-0" aria-hidden />
+        <IconPicker value={icon} disabled={busy} onPick={setIcon} />
+        <input
+          value={label}
+          disabled={busy}
+          onChange={(e) => setLabel(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") add();
+          }}
+          placeholder="Название новой категории"
+          aria-label="Название новой категории"
+          className="h-[30px] min-w-0 flex-1 rounded-md border border-slate-200 bg-transparent px-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
+        />
+        <input
+          value={slugTouched ? slug : id}
+          disabled={busy}
+          onChange={(e) => {
+            setSlug(e.target.value);
+            setSlugTouched(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") add();
+          }}
+          placeholder="slug"
+          aria-label="Идентификатор (slug)"
+          className={`h-[30px] w-32 shrink-0 rounded-md border bg-transparent px-2.5 font-mono text-[11px] text-slate-600 outline-none placeholder:text-slate-400 focus:ring-1 disabled:opacity-50 ${
+            slugBad
+              ? "border-red-400 focus:border-red-500 focus:ring-red-500"
+              : "border-slate-200 focus:border-brand-500 focus:ring-brand-500"
+          }`}
+        />
+        <AriaButton
+          isDisabled={!canAdd}
+          onPress={add}
+          aria-label="Добавить категорию"
+          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-md bg-brand-600 text-on-accent outline-none hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-40"
+        >
+          <IconPlus size={16} stroke={2} />
+        </AriaButton>
+      </div>
+      {slugBad && (
+        <p className="pl-[4.75rem] text-xs text-red-600">
+          Slug: только строчные латинские буквы, цифры и дефис.
+        </p>
+      )}
+    </div>
   );
 }

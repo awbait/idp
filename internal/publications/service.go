@@ -92,7 +92,14 @@ func canManage(u *models.User, ownerTeam string) bool {
 // --- categories (admin-managed) ---
 
 func (s *Service) ListCategories(ctx context.Context) ([]*models.Category, error) {
-	return s.store.ListCategories(ctx)
+	cats, err := s.store.ListCategories(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range cats {
+		c.System = c.ID == DefaultDiscoveryCategory // built-in bucket, undeletable
+	}
+	return cats, nil
 }
 
 func (s *Service) CreateCategory(ctx context.Context, u *models.User, c *models.Category) error {
@@ -126,6 +133,9 @@ func (s *Service) UpdateCategory(ctx context.Context, u *models.User, c *models.
 func (s *Service) DeleteCategory(ctx context.Context, u *models.User, id string) error {
 	if !u.IsAdmin() {
 		return ErrForbidden
+	}
+	if id == DefaultDiscoveryCategory {
+		return conflict("системную категорию %q нельзя удалить", id)
 	}
 	if err := s.store.DeleteCategory(ctx, id); err != nil {
 		if errors.Is(err, models.ErrConflict) {

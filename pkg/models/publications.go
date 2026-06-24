@@ -23,6 +23,12 @@ type Category struct {
 	ID    string `json:"id"` // slug
 	Label string `json:"label"`
 	Sort  int    `json:"sort"`
+	// Icon is the chosen icon slug (client-side palette in icons.tsx); empty
+	// falls back to a default. Cosmetic only.
+	Icon string `json:"icon"`
+	// System marks a built-in category that must not be deleted (e.g. the
+	// auto-discovery bucket). Computed on read, never persisted.
+	System bool `json:"system,omitempty"`
 }
 
 // ChartPublication is portal metadata on top of a Harbor chart: category,
