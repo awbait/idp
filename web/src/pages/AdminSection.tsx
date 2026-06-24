@@ -7,6 +7,7 @@ import {
   IconClock,
   IconFileText,
   IconGripVertical,
+  IconLock,
   IconPackage,
   IconPencil,
   IconPlus,
@@ -645,10 +646,23 @@ function CategoryRow({
         <span className="shrink-0 font-mono text-[11px] text-slate-400">{category.id}</span>
       </div>
 
-      {category.system && <Badge tone="slate">системная</Badge>}
-      <span className="shrink-0 text-xs text-slate-400">
-        {count > 0 ? `${count} ${chartsWord(count)}` : "пусто"}
-      </span>
+      <div className="flex shrink-0 items-center gap-2">
+        {category.system && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-400">
+            <IconLock size={11} stroke={2} />
+            системная
+          </span>
+        )}
+        {count > 0 && (
+          <span
+            title={`${count} ${chartsWord(count)} в категории`}
+            className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500"
+          >
+            <IconPackage size={11} stroke={2} />
+            {count}
+          </span>
+        )}
+      </div>
 
       <DeleteCategoryButton
         deletable={!category.system && count === 0}
