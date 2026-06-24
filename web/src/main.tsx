@@ -17,7 +17,6 @@ import {
   AdminOverviewPage,
   AdminSection,
 } from "./pages/AdminSection";
-import { ApplicationsPage } from "./pages/ApplicationsPage";
 import { CatalogPage } from "./pages/CatalogPage";
 import { ChartDetailPage } from "./pages/ChartDetailPage";
 import { ChartManagePage } from "./pages/ChartManagePage";
@@ -97,7 +96,6 @@ const router = createBrowserRouter([
           { path: "requests/:id/upgrade", element: <OrderPage upgrade /> },
           { path: "products/:project/:name", element: <ProductPage /> },
           { path: "requests/:id", element: <RequestDetailPage /> },
-          { path: "applications", element: <ApplicationsPage /> },
         ],
       },
       { path: "*", element: <NotFound /> },

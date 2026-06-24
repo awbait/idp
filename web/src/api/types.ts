@@ -106,15 +106,6 @@ export interface RequestDetail {
   argocd_url?: string;
 }
 
-export interface Application {
-  name: string;
-  project: string;
-  cluster: string;
-  sync_status: string;
-  health_status: string;
-  labels?: Record<string, string>;
-}
-
 // System status page (GET /api/v1/status).
 export interface ComponentStatus {
   name: string; // harbor|gitlab|argocd|store|cache

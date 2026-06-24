@@ -95,17 +95,3 @@ export function StatusDot({ status, size = 22 }: { status: RequestStatus | strin
     </span>
   );
 }
-
-export function HealthBadge({ health }: { health: string }) {
-  const map: Record<string, string> = {
-    Healthy: "bg-green-100 text-green-800",
-    Progressing: "bg-blue-100 text-blue-800",
-    Degraded: "bg-red-100 text-red-800",
-    Missing: "bg-red-100 text-red-800",
-  };
-  return (
-    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${map[health] ?? "bg-gray-100 text-gray-700"}`}>
-      {health}
-    </span>
-  );
-}

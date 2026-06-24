@@ -1,7 +1,6 @@
 import type {
   AboutInfo,
   ApiError,
-  Application,
   CatalogResponse,
   Category,
   ChangelogEntry,
@@ -198,9 +197,6 @@ export const api = {
   syncRequest: (id: string) => req<unknown>("POST", `/requests/${enc(id)}/sync`),
   // Adopt the order's current Git state (values + version) into the portal.
   pullRequest: (id: string) => req<OrderRequest>("POST", `/requests/${enc(id)}/pull`),
-
-  // applications
-  listApplications: () => req<Application[]>("GET", "/applications"),
 
   // system status (integrations + storage health)
   getSystemStatus: () => req<SystemStatus>("GET", "/status"),

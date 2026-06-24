@@ -248,7 +248,9 @@ ApplicationSet (`deployments/kind/applicationset.yaml`) **хардкодит**
 - [ ] Поиск / фильтр в каталоге чартов.
 - [ ] Дифф values при апдейте заказа.
 - [ ] Ленивая загрузка Monaco (бандл ~544 КБ).
-- [ ] «Applications» (`/applications`) - роут жив, решить, нужен ли пункт в меню. - удалить
+- [x] «Applications» (`/applications`) - роут удалён вместе со страницей, мёртвым
+  `listApplications`/`Application` и осиротевшим `HealthBadge`. Бэкенд-эндпоинты
+  `/applications*` остались (используются тестами), чистить отдельным PR.
 - [ ] Persist свёрнутого меню и адаптив под узкие экраны.
 
 ## 8. Документация
