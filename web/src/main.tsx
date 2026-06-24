@@ -11,6 +11,7 @@ import { Layout } from "./components/Layout";
 import { NotFound } from "./components/NotFound";
 import { AboutPage } from "./pages/AboutPage";
 import {
+  AdminApprovalDetailPage,
   AdminApprovalsPage,
   AdminCategoriesPage,
   AdminOverviewPage,
@@ -76,6 +77,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <AdminOverviewPage /> },
           { path: "approvals", element: <AdminApprovalsPage /> },
+          { path: "approvals/:project/:name", element: <AdminApprovalDetailPage /> },
           { path: "categories", element: <AdminCategoriesPage /> },
           { path: "status", element: <StatusPage /> },
           { path: "publications", element: <Navigate to="/admin/approvals" replace /> },

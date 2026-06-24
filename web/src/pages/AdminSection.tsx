@@ -1,11 +1,13 @@
 import {
   IconActivity,
+  IconArrowLeft,
   IconArrowRight,
   IconChecklist,
   IconCircleCheck,
   IconClock,
   IconFileText,
   IconPackage,
+  IconPencil,
   IconPlus,
   IconSettings,
   IconStack,
@@ -13,11 +15,12 @@ import {
 } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useParams } from "react-router-dom";
 import { api, HttpError } from "../api/client";
 import type { Category, ChartPublication, PublicationStatus } from "../api/types";
 import { chartLabel, useCatalog } from "../app/CatalogContext";
 import { useUser } from "../auth/UserContext";
+import { PublicationReview } from "../components/PublicationReview";
 import { Button, ErrorBox, Spinner, TextField } from "../components/ui";
 import { useAsync } from "../hooks/useAsync";
 
@@ -84,6 +87,8 @@ function PageTitle({ title, badge }: { title: string; badge?: ReactNode }) {
 
 const managePath = (p: Pick<ChartPublication, "chart_project" | "chart_name">) =>
   `/catalog/${p.chart_project}/${p.chart_name}/manage`;
+const reviewPath = (p: Pick<ChartPublication, "chart_project" | "chart_name">) =>
+  `/admin/approvals/${p.chart_project}/${p.chart_name}`;
 
 // ---------------------------------------------------------------------------
 // section guard
@@ -159,7 +164,7 @@ export function AdminOverviewPage() {
               {pending.map((p) => (
                 <li key={p.id}>
                   <Link
-                    to={managePath(p)}
+                    to={reviewPath(p)}
                     className="group flex items-center justify-between gap-3 rounded-md px-2 py-2.5 hover:bg-slate-50"
                   >
                     <span className="flex min-w-0 items-center gap-3">
@@ -340,7 +345,7 @@ export function AdminApprovalsPage() {
                     <td className="px-4 py-3">
                       <div className="flex justify-end">
                         <Link
-                          to={managePath(p)}
+                          to={isPending ? reviewPath(p) : managePath(p)}
                           className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium outline-none focus-visible:ring-2 ${
                             isPending
                               ? "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 focus-visible:ring-brand-500"
@@ -357,6 +362,84 @@ export function AdminApprovalsPage() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Approval detail (one publication)
+// ---------------------------------------------------------------------------
+
+// AdminApprovalDetailPage is the dedicated review screen for a single pending
+// publication: header + the PublicationReview decision surface. Non-pending
+// publications have nothing to decide, so it points to the manage page instead.
+export function AdminApprovalDetailPage() {
+  const { project = "", name = "" } = useParams();
+  const {
+    data: pub,
+    loading,
+    error,
+    reload,
+  } = useAsync(
+    () => api.listPublications({ chart: name }).then((l) => l.find((p) => p.chart_project === project) ?? null),
+    [project, name],
+  );
+
+  const back = (
+    <Link
+      to="/admin/approvals"
+      className="inline-flex w-fit items-center gap-1 text-sm text-slate-500 outline-none hover:text-slate-700 focus-visible:text-brand-600"
+    >
+      <IconArrowLeft size={16} stroke={1.8} /> Согласование публикаций
+    </Link>
+  );
+
+  if (loading && !pub) return <Spinner />;
+  if (error && !pub) return <ErrorBox error={error} />;
+  if (!pub) {
+    return (
+      <div className="flex flex-col gap-5">
+        {back}
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          Публикация {project}/{name} не найдена.
+        </div>
+      </div>
+    );
+  }
+
+  const st = STATUS_META[pub.status];
+  return (
+    <div className="flex flex-col gap-5">
+      {back}
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+          <IconPackage size={20} stroke={1.8} />
+        </span>
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-semibold text-slate-900">{chartLabel(pub.chart_name)}</h1>
+          <p className="truncate text-xs text-slate-400">
+            {pub.chart_project}/{pub.chart_name}
+          </p>
+        </div>
+        <Badge tone={st.tone}>{st.label}</Badge>
+        <Badge tone="brand">{pub.owner_team}</Badge>
+      </div>
+
+      {pub.status === "PENDING" ? (
+        <PublicationReview pub={pub} onReviewed={reload} />
+      ) : (
+        <div className="flex flex-col items-start gap-3 rounded-lg border border-slate-200 bg-surface p-4 shadow-sm">
+          <p className="text-sm text-slate-600">
+            Эта публикация не находится на согласовании, решать нечего. Открыть редактор публикации:
+          </p>
+          <Link
+            to={managePath(pub)}
+            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-surface px-2.5 py-1 text-xs font-medium text-slate-600 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-brand-500"
+          >
+            <IconPencil size={14} stroke={1.8} /> Открыть управление
+          </Link>
         </div>
       )}
     </div>

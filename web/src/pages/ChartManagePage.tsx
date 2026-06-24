@@ -1,26 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
-import Editor, { DiffEditor } from "@monaco-editor/react";
-import yaml from "js-yaml";
-import {
-  Button as AriaButton,
-  Dialog,
-  DialogTrigger,
-  Heading,
-  ListBox,
-  ListBoxItem,
-  Modal,
-  ModalOverlay,
-  Popover,
-  Select as AriaSelect,
-  SelectValue,
-  Tab,
-  TabList,
-  TabPanel,
-  Tabs,
-  Tooltip,
-  TooltipTrigger,
-} from "react-aria-components";
+import Editor from "@monaco-editor/react";
 import {
   IconAlertCircle,
   IconArrowNarrowRight,
@@ -36,20 +14,29 @@ import {
   IconUsersGroup,
   IconX,
 } from "@tabler/icons-react";
+import yaml from "js-yaml";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Button as AriaButton,
+  Select as AriaSelect,
+  Dialog,
+  DialogTrigger,
+  Heading,
+  ListBox,
+  ListBoxItem,
+  Modal,
+  ModalOverlay,
+  Popover,
+  SelectValue,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
+  Tooltip,
+  TooltipTrigger,
+} from "react-aria-components";
+import { useParams } from "react-router-dom";
 import { api, HttpError } from "../api/client";
-import { useAsync } from "../hooks/useAsync";
-import { useUser, canModify } from "../auth/UserContext";
-import { chartLabel, useCatalog } from "../app/CatalogContext";
-import { useTheme } from "../app/ThemeContext";
-import { useToast } from "../app/ToastContext";
-import { Breadcrumbs } from "../components/Breadcrumbs";
-import { Button, Card, Chip, ErrorBox, Select, Spinner, TextField } from "../components/ui";
-import { StatusBadge } from "../components/StatusBadge";
-import { ProductIcon } from "../components/icons";
-import { pruneEmpty, type View } from "../form/SchemaForm";
-import { OrderMetaCard, OrderValuesCard } from "../components/OrderFormParts";
-import { Meta, ProductView } from "./requestDetailParts";
-import type { PersistValues } from "../components/products/GenericProductTabs";
 import type {
   ChartPublication,
   OrderRequest,
@@ -57,6 +44,19 @@ import type {
   ViewDocument,
   ViewIssue,
 } from "../api/types";
+import { chartLabel, useCatalog } from "../app/CatalogContext";
+import { useTheme } from "../app/ThemeContext";
+import { useToast } from "../app/ToastContext";
+import { canModify, useUser } from "../auth/UserContext";
+import { Breadcrumbs } from "../components/Breadcrumbs";
+import { ProductIcon } from "../components/icons";
+import { OrderMetaCard, OrderValuesCard } from "../components/OrderFormParts";
+import type { PersistValues } from "../components/products/GenericProductTabs";
+import { StatusBadge } from "../components/StatusBadge";
+import { Button, Card, Chip, ErrorBox, Select, Spinner, TextField } from "../components/ui";
+import { pruneEmpty, type View } from "../form/SchemaForm";
+import { useAsync } from "../hooks/useAsync";
+import { Meta, ProductView } from "./requestDetailParts";
 
 type Values = Record<string, unknown>;
 
@@ -79,7 +79,8 @@ const STATUS_LABELS: Record<PublicationStatus, { label: string; cls: string; Ico
 };
 
 // Chart publication management: metadata (category, owner) + view-document
-// builder (Monaco + live validation + form preview) + review.
+// builder (Monaco + live validation + form preview). Approval is a separate
+// admin screen (/admin/approvals/:project/:name).
 export function ChartManagePage() {
   const { project = "", name = "" } = useParams();
   const { user } = useUser();
@@ -227,7 +228,6 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
   );
 
   const pending = pub.status === "PENDING";
-  const isAdmin = user?.role === "admin";
   const isOwner = canModify(user, pub.owner_team);
   const editable = isOwner && !pending;
 
@@ -236,8 +236,7 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
     pub.view_json ? JSON.stringify(pub.view_json, null, 2) : VIEW_TEMPLATE,
   );
   const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState<null | "save" | "submit" | "approve" | "reject" | "withdraw">(null);
-  const [rejectComment, setRejectComment] = useState("");
+  const [busy, setBusy] = useState<null | "save" | "submit" | "withdraw">(null);
   // The "new version is out" modal shows once per new version from Harbor: in
   // localStorage we remember (per-user, per-chart) the version at which the user
   // dismissed the modal; on the next version we show it again.
@@ -383,33 +382,6 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
     }
   }
 
-  async function onApprove() {
-    setBusy("approve");
-    setErr(null);
-    try {
-      await api.approvePublication(pub.id);
-      reload();
-      reloadCatalog();
-    } catch (e) {
-      setErr(e instanceof HttpError ? e.message : (e as Error).message);
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function onReject() {
-    setBusy("reject");
-    setErr(null);
-    try {
-      await api.rejectPublication(pub.id, rejectComment.trim());
-      reload();
-    } catch (e) {
-      setErr(e instanceof HttpError ? e.message : (e as Error).message);
-    } finally {
-      setBusy(null);
-    }
-  }
-
   const st = STATUS_LABELS[pub.status];
   const viewNames = Object.keys(parsed?.views ?? {});
   const catLabel = (id: string) => categories.find((c) => c.id === id)?.label ?? id;
@@ -417,14 +389,6 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
   const ownerOptions = [
     ...new Set([...(user?.teams ?? []), pub.owner_team, pub.draft_owner_team].filter(Boolean) as string[]),
   ];
-  // Unapproved metadata change: proposals awaiting approve (shown to the admin
-  // in the review card).
-  const proposals: { label: string; from: string; to: string }[] = [];
-  if (pub.draft_category_id)
-    proposals.push({ label: "Категория", from: categoryLabel, to: catLabel(pub.draft_category_id) });
-  if (pub.draft_owner_team)
-    proposals.push({ label: "Владелец", from: pub.owner_team, to: pub.draft_owner_team });
-
   // A version newer than the one the active view was approved for is out in
   // Harbor: time for the author to update the view for the new schema.
   const viewOutdated =
@@ -626,53 +590,8 @@ function ManagePublication({ pub, reload }: { pub: ChartPublication; reload: () 
       )}
       {err && <p className="text-sm text-red-600">{err}</p>}
 
-      {/* Review (admin, pending): metadata change + diff view. */}
-      {pending && isAdmin && (
-        <Card className="flex flex-col gap-3 border-amber-200">
-          <h2 className="text-sm font-semibold text-slate-800">Согласование</h2>
-          {proposals.length > 0 && (
-            <div className="flex flex-col gap-1.5 rounded-md border border-amber-200 bg-amber-50/60 p-3">
-              <p className="text-xs font-medium text-amber-800">Смена метаданных</p>
-              <div className="flex flex-wrap gap-1.5">
-                {proposals.map((p) => (
-                  <ProposalChip key={p.label} label={p.label} from={p.from} to={p.to} />
-                ))}
-              </div>
-            </div>
-          )}
-          {pub.approved_view_json ? (
-            <div className="overflow-hidden rounded-md border border-slate-200">
-              <DiffEditor
-                height="280px"
-                language="json"
-                theme={monacoTheme}
-                original={JSON.stringify(pub.approved_view_json, null, 2)}
-                modified={JSON.stringify(pub.view_json ?? {}, null, 2)}
-                options={{ readOnly: true, renderSideBySide: true, minimap: { enabled: false }, fontSize: 12 }}
-              />
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">
-              Первая публикация view: действующей версии для сравнения нет.
-            </p>
-          )}
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
-              <TextField
-                label="Комментарий (для отклонения)"
-                value={rejectComment}
-                onChange={(v: string) => setRejectComment(v)}
-              />
-            </div>
-            <Button variant="primary" isDisabled={busy !== null} onPress={onApprove}>
-              Согласовать
-            </Button>
-            <Button variant="danger" isDisabled={busy !== null} onPress={onReject}>
-              Отклонить
-            </Button>
-          </div>
-        </Card>
-      )}
+      {/* Approval (admin decision) lives on its own screen now:
+          /admin/approvals/:project/:name. This page is the owner's editor. */}
 
       {/* Builder: the document on the left (+ chart schema alongside, read-only), preview on
           the right. Stretches to all the page's free height (no outer scroll): the editor
