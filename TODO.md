@@ -218,23 +218,17 @@ README для `policies`; учтены новые чарты `egress-gateway` и
 - [x] **`creator` не хардкодить.** Чарт: `namespace.creator` (default `lk`,
   `ui:widget: hidden`) - console-charts#3. Консоль: подставляет `console` при
   заказе через chart-agnostic блок `defaults` во view-документе (console#77).
-
-Осталось (чартовое, репо console-charts):
-
-- [ ] **Роли namespace (глянуть).** Пересмотреть/доработать RBAC в namespace
-  (Role/RoleBinding) - сейчас чарт их не создаёт. Развилки: привязки к встроенным
-  ClusterRole (admin/edit/view) vs кастомная Role; субъекты из values vs из
-  `projectName`.
-- [ ] **Istio-лейблы.** Проставлять лейблы Istio на namespace при включённом
-  Service Mesh. Решено: режим ambient (`istio.io/dataplane-mode: ambient`), гейт -
-  единый флаг `serviceMesh.enabled` (отдельного netpol-флага нет).
-- [ ] **Deny-default политики только при включённом Service Mesh.** Сейчас
-  NetworkPolicy-шаблона в чарте нет вовсе. Добавить deny-default политику и
-  включать её, а также лейбл и аннотацию `networking.k8s.io/enable-netpol: "true"`
-  - **только когда включён Service Mesh**. Для DEV-контура это по флагу (отдельного
-  «netpol enabled» сейчас нет - вешать на флаг Service Mesh); на остальных
-  контурах Service Mesh всегда включён, значит политики ставятся всегда.
-  Развилка: объём deny-default - ingress+egress vs только ingress.
+- [x] **Istio-лейблы** (console-charts#5). По флагу `serviceMesh.enabled` на
+  namespace ставятся labels `istio-discovery: enabled`,
+  `istio.io/dataplane-mode: ambient` и аннотация
+  `networking.k8s.io/enable-netpol: "true"`. Режим - ambient.
+- [x] **Роль namespace** (console-charts#5). Поле `namespace.role`
+  (`ingress`/`egress`/`other`, enum в схеме) -> лейбл `namespace-role`.
+- [x] **Deny-default NetworkPolicy.** Достаточно аннотации
+  `networking.k8s.io/enable-netpol` (ставится по `serviceMesh.enabled`,
+  console-charts#5): в Alauda она включает enforcement сетевых политик. Отдельный
+  `NetworkPolicy`-шаблон в чарте решено не добавлять.
+- [x] **RBAC namespace.** Решено: пока не требуется (чарт RBAC не создаёт).
 
 ## 6. Код-ревью (остаток)
 
