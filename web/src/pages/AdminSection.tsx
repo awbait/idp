@@ -849,7 +849,7 @@ function AddCategory({ busy, run }: { busy: boolean; run: (fn: () => Promise<unk
           }}
           placeholder="Название новой категории"
           aria-label="Название новой категории"
-          className="min-w-0 flex-1 rounded-md border border-slate-200 bg-transparent px-2.5 py-1 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
+          className="h-[30px] min-w-0 flex-1 rounded-md border border-slate-200 bg-transparent px-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
         />
         <input
           value={slugTouched ? slug : id}
@@ -863,7 +863,7 @@ function AddCategory({ busy, run }: { busy: boolean; run: (fn: () => Promise<unk
           }}
           placeholder="slug"
           aria-label="Идентификатор (slug)"
-          className={`w-32 shrink-0 rounded-md border bg-transparent px-2.5 py-1 font-mono text-[11px] text-slate-600 outline-none placeholder:text-slate-400 focus:ring-1 disabled:opacity-50 ${
+          className={`h-[30px] w-32 shrink-0 rounded-md border bg-transparent px-2.5 font-mono text-[11px] text-slate-600 outline-none placeholder:text-slate-400 focus:ring-1 disabled:opacity-50 ${
             slugBad
               ? "border-red-400 focus:border-red-500 focus:ring-red-500"
               : "border-slate-200 focus:border-brand-500 focus:ring-brand-500"
@@ -873,7 +873,7 @@ function AddCategory({ busy, run }: { busy: boolean; run: (fn: () => Promise<unk
           isDisabled={!canAdd}
           onPress={add}
           aria-label="Добавить категорию"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand-600 text-on-accent outline-none hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-40"
+          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-md bg-brand-600 text-on-accent outline-none hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-40"
         >
           <IconPlus size={16} stroke={2} />
         </AriaButton>
