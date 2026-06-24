@@ -55,6 +55,10 @@ type Server struct {
 	ArgoCD argocd.Port
 	System SystemInfo
 
+	// Reconcilers exposes the background poller's per-loop health to the status
+	// page (GET /api/v1/status). Optional: nil omits the reconcilers section.
+	Reconcilers reconcilerSnapshotter
+
 	// sseStreams counts live SSE streams to enforce maxSSEStreams (zero value is
 	// ready to use; no constructor needed).
 	sseStreams atomic.Int64

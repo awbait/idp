@@ -124,9 +124,18 @@ export interface ComponentStatus {
   detail?: string;
   url?: string; // external UI link (integrations only)
 }
+export interface ReconcilerStatus {
+  name: string; // provisioning|drift|import|catalog-discovery|argocd-fake
+  status: "ok" | "failing";
+  last_success?: string; // RFC3339; absent if never succeeded
+  last_error?: string;
+  last_run_ms?: number;
+}
 export interface SystemStatus {
   healthy: boolean;
   components: ComponentStatus[];
+  reconcilers?: ReconcilerStatus[];
+  grafana_url?: string;
 }
 
 // About page (GET /api/v1/info): portal build metadata.

@@ -3,6 +3,7 @@ package status
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"time"
 
 	"console/internal/observability"
@@ -62,14 +63,21 @@ type Poller struct {
 	interval    time.Duration
 	reconcilers []Reconciler
 	log         *slog.Logger
+	// mu guards the per-reconciler state maps below: tick() writes them from the
+	// Run goroutine, Snapshot() reads them from an HTTP handler goroutine.
+	mu sync.Mutex
 	// failing tracks which reconcilers were failing on the previous tick, keyed
-	// by name, so we log on the ok<->fail edge instead of every tick. Accessed
-	// only from the single Run goroutine, so it needs no lock.
+	// by name, so we log on the ok<->fail edge instead of every tick.
 	failing map[string]bool
 	// fails counts consecutive failures per reconciler; nextAttempt is the time
 	// before which a failing reconciler is skipped (exponential backoff).
 	fails       map[string]int
 	nextAttempt map[string]time.Time
+	// lastSuccess/lastErr/lastDuration record the most recent outcome per
+	// reconciler for the status page (Snapshot).
+	lastSuccess  map[string]time.Time
+	lastErr      map[string]string
+	lastDuration map[string]time.Duration
 	// now is the clock, injectable in tests; defaults to time.Now.
 	now func() time.Time
 }
@@ -79,8 +87,40 @@ func NewPoller(interval time.Duration, log *slog.Logger, reconcilers ...Reconcil
 	return &Poller{
 		interval: interval, reconcilers: reconcilers, log: log,
 		failing: map[string]bool{}, fails: map[string]int{}, nextAttempt: map[string]time.Time{},
+		lastSuccess: map[string]time.Time{}, lastErr: map[string]string{}, lastDuration: map[string]time.Duration{},
 		now: time.Now,
 	}
+}
+
+// ReconcilerState is a point-in-time view of one reconciler's health, for the
+// status page. LastSuccess is zero if it has never succeeded.
+type ReconcilerState struct {
+	Name        string
+	Failing     bool
+	Fails       int
+	LastSuccess time.Time
+	LastErr     string
+	LastRunMs   int64
+}
+
+// Snapshot returns the current health of every reconciler, in run order. Safe to
+// call concurrently with the poller loop.
+func (p *Poller) Snapshot() []ReconcilerState {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	out := make([]ReconcilerState, 0, len(p.reconcilers))
+	for _, r := range p.reconcilers {
+		name := nameOf(r)
+		out = append(out, ReconcilerState{
+			Name:        name,
+			Failing:     p.failing[name],
+			Fails:       p.fails[name],
+			LastSuccess: p.lastSuccess[name],
+			LastErr:     p.lastErr[name],
+			LastRunMs:   p.lastDuration[name].Milliseconds(),
+		})
+	}
+	return out
 }
 
 // Run blocks, ticking until the context is cancelled. It also reconciles once
@@ -104,7 +144,10 @@ func (p *Poller) tick(ctx context.Context) {
 		name := nameOf(r)
 		// Skip reconcilers in backoff after consecutive failures, so a broken
 		// upstream is retried with exponential delay instead of every tick.
-		if t, ok := p.nextAttempt[name]; ok && p.now().Before(t) {
+		p.mu.Lock()
+		next, inBackoff := p.nextAttempt[name]
+		p.mu.Unlock()
+		if inBackoff && p.now().Before(next) {
 			continue
 		}
 		start := time.Now()
@@ -114,25 +157,33 @@ func (p *Poller) tick(ctx context.Context) {
 		dur := time.Since(start)
 		observability.ObserveReconcile(name, dur, err)
 
+		p.mu.Lock()
+		p.lastDuration[name] = dur
+		wasFailing := p.failing[name]
 		if err != nil {
 			p.fails[name]++
 			p.nextAttempt[name] = p.now().Add(backoffFor(p.interval, p.fails[name]))
+			p.lastErr[name] = err.Error()
+			p.failing[name] = true
 		} else {
 			delete(p.fails, name)
 			delete(p.nextAttempt, name)
+			p.lastErr[name] = ""
+			p.lastSuccess[name] = p.now()
+			p.failing[name] = false
 		}
+		fails := p.fails[name]
+		p.mu.Unlock()
 
 		// Log on the ok<->fail edge only: a flapping upstream (e.g. GitLab still
 		// booting) would otherwise spam one WARN per tick. Steady-state lines stay
 		// at debug. Metrics above still record every tick for rate/alerting.
 		switch {
-		case err != nil && !p.failing[name]:
-			p.failing[name] = true
+		case err != nil && !wasFailing:
 			p.log.Warn("reconcile failing", "reconciler", name, "err", err)
 		case err != nil:
-			p.log.Debug("reconcile still failing", "reconciler", name, "err", err, "backoff_ms", backoffFor(p.interval, p.fails[name]).Milliseconds())
-		case p.failing[name]:
-			p.failing[name] = false
+			p.log.Debug("reconcile still failing", "reconciler", name, "err", err, "backoff_ms", backoffFor(p.interval, fails).Milliseconds())
+		case wasFailing:
 			p.log.Info("reconcile recovered", "reconciler", name, "duration_ms", dur.Milliseconds())
 		default:
 			p.log.Debug("reconcile ok", "reconciler", name, "duration_ms", dur.Milliseconds())

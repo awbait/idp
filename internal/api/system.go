@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"console/internal/auth"
+	"console/internal/status"
 )
 
 // SystemInfo carries the configured backend modes + external UI URLs for the
@@ -24,6 +25,7 @@ type SystemInfo struct {
 	ArgoCDURL    string
 	AuthMode     string // oidc|dev
 	OIDCIssuer   string // Keycloak issuer (empty in dev mode)
+	GrafanaURL   string // external Grafana base for the "view in Grafana" link (optional)
 }
 
 // ComponentStatus is one row on the system status page.
@@ -36,10 +38,28 @@ type ComponentStatus struct {
 	URL    string `json:"url,omitempty"`    // external UI link (integrations only)
 }
 
+// ReconcilerStatus is one background-loop row on the status page. Deep metrics
+// (durations, history) live in Grafana; this is just a liveness traffic light.
+type ReconcilerStatus struct {
+	Name        string `json:"name"`                   // provisioning|drift|import|...
+	Status      string `json:"status"`                 // "ok" | "failing"
+	LastSuccess string `json:"last_success,omitempty"` // RFC3339; empty if never succeeded
+	LastError   string `json:"last_error,omitempty"`   // last error message when failing
+	LastRunMs   int64  `json:"last_run_ms,omitempty"`  // duration of the last run
+}
+
+// reconcilerSnapshotter is the slice of the poller the status page needs: the
+// current health of each background reconciler.
+type reconcilerSnapshotter interface {
+	Snapshot() []status.ReconcilerState
+}
+
 // SystemStatus is the aggregate health payload returned by GET /api/v1/status.
 type SystemStatus struct {
-	Healthy    bool              `json:"healthy"`
-	Components []ComponentStatus `json:"components"`
+	Healthy     bool               `json:"healthy"`
+	Components   []ComponentStatus  `json:"components"`
+	Reconcilers []ReconcilerStatus `json:"reconcilers,omitempty"`
+	GrafanaURL  string             `json:"grafana_url,omitempty"`
 }
 
 // checkTimeout bounds each individual probe so one stuck upstream can't hang the
@@ -126,7 +146,36 @@ func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	writeJSON(w, http.StatusOK, SystemStatus{Healthy: healthy, Components: comps})
+	writeJSON(w, http.StatusOK, SystemStatus{
+		Healthy:     healthy,
+		Components:   comps,
+		Reconcilers: s.reconcilerStatuses(),
+		GrafanaURL:  s.System.GrafanaURL,
+	})
+}
+
+// reconcilerStatuses maps the poller snapshot into the status-page shape. Returns
+// nil when no poller is wired (e.g. in tests), so the field is omitted.
+func (s *Server) reconcilerStatuses() []ReconcilerStatus {
+	if s.Reconcilers == nil {
+		return nil
+	}
+	states := s.Reconcilers.Snapshot()
+	out := make([]ReconcilerStatus, 0, len(states))
+	for _, st := range states {
+		rs := ReconcilerStatus{Name: st.Name, LastRunMs: st.LastRunMs}
+		if st.Failing {
+			rs.Status = "failing"
+			rs.LastError = st.LastErr
+		} else {
+			rs.Status = "ok"
+		}
+		if !st.LastSuccess.IsZero() {
+			rs.LastSuccess = st.LastSuccess.Format(time.RFC3339)
+		}
+		out = append(out, rs)
+	}
+	return out
 }
 
 // issuerBase strips the Keycloak realm suffix ("…/realms/<name>") from the OIDC

@@ -1,11 +1,11 @@
-import { useEffect } from "react";
 import { IconExternalLink } from "@tabler/icons-react";
+import { useEffect } from "react";
 import { api } from "../api/client";
-import { safeHref } from "../lib/href";
-import { useAsync } from "../hooks/useAsync";
+import type { ComponentStatus, ReconcilerStatus } from "../api/types";
 import { useUser } from "../auth/UserContext";
 import { Button, ErrorBox, Spinner } from "../components/ui";
-import type { ComponentStatus } from "../api/types";
+import { useAsync } from "../hooks/useAsync";
+import { safeHref } from "../lib/href";
 
 // Status auto-refresh interval, seconds.
 const REFRESH_SECONDS = 30;
@@ -20,6 +20,29 @@ const LABELS: Record<string, string> = {
 
 // Storage rows are titled by their backend name directly.
 const BACKEND_LABELS: Record<string, string> = { postgres: "PostgreSQL", redis: "Redis" };
+
+// Friendly labels for background reconcilers (the poller's loops).
+const RECONCILER_LABELS: Record<string, string> = {
+  provisioning: "Провижининг заказов",
+  drift: "Детект дрейфа (Git)",
+  import: "Импорт из Git",
+  "catalog-discovery": "Автоскан каталога",
+  "argocd-fake": "ArgoCD (fake)",
+};
+
+// ago renders a coarse "N units назад" from an RFC3339 timestamp.
+function ago(iso?: string): string {
+  if (!iso) return "ещё не выполнялся";
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "";
+  const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (s < 60) return `${s} сек назад`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} мин назад`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} ч назад`;
+  return `${Math.round(h / 24)} дн назад`;
+}
 
 export function StatusPage() {
   const { user } = useUser();
@@ -63,6 +86,17 @@ export function StatusPage() {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-400">автообновление каждые {REFRESH_SECONDS} сек</span>
+          {safeHref(data?.grafana_url) && (
+            <a
+              href={safeHref(data?.grafana_url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-surface px-3 py-1.5 text-sm font-medium text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-brand-500"
+            >
+              Grafana
+              <IconExternalLink size={14} stroke={1.8} />
+            </a>
+          )}
           <Button variant="secondary" onPress={reload} isDisabled={loading}>
             {loading ? "Обновление…" : "Обновить"}
           </Button>
@@ -77,8 +111,43 @@ export function StatusPage() {
         <>
           <Section title="Интеграции" items={integrations} />
           <Section title="Хранилища" items={storage} />
+          <ReconcilerSection items={data?.reconcilers ?? []} />
         </>
       )}
+    </div>
+  );
+}
+
+function ReconcilerSection({ items }: { items: ReconcilerStatus[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <div className="mb-2 flex items-baseline justify-between">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Фоновые циклы</h2>
+        <span className="text-xs text-slate-400">подробности и графики - в Grafana</span>
+      </div>
+      <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-surface shadow-sm">
+        {items.map((r) => {
+          const ok = r.status === "ok";
+          return (
+            <div key={r.name} className="flex items-start justify-between gap-4 px-4 py-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <Dot ok={ok} />
+                  <span className="font-medium text-slate-800">{RECONCILER_LABELS[r.name] ?? r.name}</span>
+                </div>
+                <p className="mt-0.5 pl-5 text-xs text-slate-500">последний успех: {ago(r.last_success)}</p>
+                {!ok && r.last_error && (
+                  <p className="mt-1 break-words pl-5 text-xs text-red-600">{r.last_error}</p>
+                )}
+              </div>
+              <span className={`shrink-0 text-sm font-medium ${ok ? "text-emerald-600" : "text-red-600"}`}>
+                {ok ? "OK" : "Сбой"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

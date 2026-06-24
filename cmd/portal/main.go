@@ -202,7 +202,7 @@ func run(ctx context.Context, cfg *config.Config, log *slog.Logger) error {
 	srv := &api.Server{
 		Auth: authn, Catalog: catalogSvc, Prov: provSvc, Pubs: pubsSvc, Status: statusSvc,
 		Store: st, Cache: c, Bus: bus, Log: observability.Component(log, "api"), ArgoCDURL: cfg.ArgoCDURL,
-		Harbor: hb, GitLab: gl, ArgoCD: argo,
+		Harbor: hb, GitLab: gl, ArgoCD: argo, Reconcilers: poller,
 		System: api.SystemInfo{
 			HarborMode:   string(cfg.HarborMode),
 			GitLabMode:   string(cfg.GitLabMode),
@@ -214,6 +214,7 @@ func run(ctx context.Context, cfg *config.Config, log *slog.Logger) error {
 			ArgoCDURL:    cfg.ArgoCDURL,
 			AuthMode:     cfg.AuthMode,
 			OIDCIssuer:   cfg.OIDCIssuer,
+			GrafanaURL:   cfg.GrafanaURL,
 		},
 	}
 	// Refresh platform-status and order gauges in-process (single replica),
