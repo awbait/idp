@@ -198,30 +198,43 @@ ApplicationSet (`deployments/kind/applicationset.yaml`) **хардкодит**
 Доработки чартов из `console-charts` (живут в `charts/`, отдельный git). Сюда -
 задачи по конкретным чартам.
 
-### Конвенции и документация чартов (написать)
+### Конвенции и документация чартов
 
-- [ ] Вынести и записать все конвенции наименований `Kind`.
-- [ ] Правила написания README и CHANGELOG.
-- [ ] Правила создания `values.schema.json`.
-- [ ] Описание `NOTES.txt` и `_helpers.tpl`.
-- [ ] Общие параметры управляемых сервисов.
+Сделано в `charts/CONVENTIONS.md` (console-charts#2, вмержен). Плюс backfill
+README для `policies`; учтены новые чарты `egress-gateway` и `policies`.
+
+- [x] Вынести и записать все конвенции наименований `Kind` (реестр kindShort).
+- [x] Правила написания README и CHANGELOG.
+- [x] Правила создания `values.schema.json`.
+- [x] Описание `NOTES.txt` и `_helpers.tpl`.
+- [x] Общие параметры управляемых сервисов (`naming`/`generic`/`enabled`).
+- [x] Обязательный `values.yaml` + раскладка `values.yaml`/`values.minimal.yaml`/`values.full.yaml`.
 
 ### Чарт `managed-namespace`
 
+- [x] **Приведён к стандарту репо** (console-charts#2): README, CHANGELOG,
+  `NOTES.txt`, `.helmignore`; раскладка `values.yaml`/`values.minimal.yaml`/
+  `values.full.yaml`; убрана утечка кириллических комментариев из `subnet.yaml`.
+- [x] **`creator` не хардкодить.** Чарт: `namespace.creator` (default `lk`,
+  `ui:widget: hidden`) - console-charts#3. Консоль: подставляет `console` при
+  заказе через chart-agnostic блок `defaults` во view-документе (console#77).
+
+Осталось (чартовое, репо console-charts):
+
 - [ ] **Роли namespace (глянуть).** Пересмотреть/доработать RBAC в namespace
-  (Role/RoleBinding) - сейчас чарт их не создаёт.
-- [ ] **Istio-лейблы.** Проставлять лейблы Istio на namespace (инъекция /
-  ambient dataplane-mode) при включённом Service Mesh.
+  (Role/RoleBinding) - сейчас чарт их не создаёт. Развилки: привязки к встроенным
+  ClusterRole (admin/edit/view) vs кастомная Role; субъекты из values vs из
+  `projectName`.
+- [ ] **Istio-лейблы.** Проставлять лейблы Istio на namespace при включённом
+  Service Mesh. Решено: режим ambient (`istio.io/dataplane-mode: ambient`), гейт -
+  единый флаг `serviceMesh.enabled` (отдельного netpol-флага нет).
 - [ ] **Deny-default политики только при включённом Service Mesh.** Сейчас
   NetworkPolicy-шаблона в чарте нет вовсе. Добавить deny-default политику и
   включать её, а также лейбл и аннотацию `networking.k8s.io/enable-netpol: "true"`
   - **только когда включён Service Mesh**. Для DEV-контура это по флагу (отдельного
   «netpol enabled» сейчас нет - вешать на флаг Service Mesh); на остальных
   контурах Service Mesh всегда включён, значит политики ставятся всегда.
-- [ ] **`creator` не хардкодить.** Сейчас `cpaas.io/creator: lk` зашит в
-  `templates/namespace.yaml`. Сделать значением с дефолтом `lk`; при заказе из
-  консоли подставлять `console`. Поле скрыть от пользователя в форме
-  (`ui:widget: hidden` в схеме / перезапись дефолта на стороне консоли).
+  Развилка: объём deny-default - ingress+egress vs только ingress.
 
 ## 6. Код-ревью (остаток)
 
