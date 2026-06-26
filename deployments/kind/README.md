@@ -235,3 +235,22 @@ MetalLB (LoadBalancer-IP), без них Gateway не станет `Programmed`,
    `127.0.0.1 host.docker.internal` в `C:\Windows\System32\drivers\etc\hosts` (от
    админа). Рантайм портала (контейнер) резолвит `host.docker.internal` сам через
    Docker, hosts-файл хоста ему не нужен.
+7. **Вебхуки апстримов в портал на стенде** (`STATUS_UPDATE_MODE=hybrid|webhook`).
+   Проверено на стенде:
+   - **GitLab -> портал работает.** GitLab - compose-контейнер с
+     `extra_hosts: host.docker.internal:host-gateway`, поэтому достукивается до
+     портала варианта B (host-run) на `host.docker.internal:8080`. Подписанный MR
+     `merge`-вебхук из контейнера GitLab -> `202` + `reconcile triggered`.
+   - **Harbor -> портал НЕ работает в варианте B.** Harbor живёт подом в KinD; его
+     `host.docker.internal` резолвится (CoreDNS-патч) в gateway сети kind
+     (`172.21.0.1`), который маршрутизирует только на **docker-published** порты
+     (Harbor NodePort `8084`, GitLab `8929`), но не на **нативный** процесс
+     Windows-хоста на `:8080` - из пода это `connection refused`.
+
+   Это артефакт стенда, не проблема прода: в проде портал сам крутится в кластере
+   (чарт `console`, Pod+Service), и Harbor шлёт вебхук на in-cluster Service URL.
+   На стенде, чтобы прогнать Harbor-вебхуки e2e, гоняй портал контейнером
+   (docker-published порт - тогда поды KinD достукиваются через
+   `host.docker.internal:<port>`), либо положись на каталог-поллинг: в `hybrid`
+   поллинг остаётся подстраховкой, так что discovery всё равно отработает, просто
+   не мгновенно. GitLab-вебхуки работают в обоих вариантах стенда.
