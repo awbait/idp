@@ -1,6 +1,7 @@
 .PHONY: build run-oidc web infra obs test vet lint tidy cover hooks down docker \
 	up-upstreams-infra down-upstreams gitlab-seed \
-	stand-up stand-down stand-charts stand-appset stand-token stand-reset seed-import
+	stand-up stand-down stand-charts stand-appset stand-token stand-reset \
+	stand-gitlab-webhooks seed-import
 
 # Version/commit/date stamped into the binary for the "About" page. `go run`
 # does not apply VCS stamping, so inject via ldflags (best-effort: empty when
@@ -136,6 +137,12 @@ stand-token:
 # are left intact. Destructive - pass -Yes (see deployments/scripts/reset-state.ps1).
 stand-reset:
 	powershell -ExecutionPolicy Bypass -File deployments/scripts/reset-state.ps1 -Yes
+
+# Register the GitLab -> portal merge-request webhook on every order repo (for
+# STATUS_UPDATE_MODE=hybrid/webhook). GitLab CE has no group webhooks, so rerun
+# this after ordering a new service. Idempotent. See deployments/kind/README.md.
+stand-gitlab-webhooks:
+	powershell -ExecutionPolicy Bypass -File deployments/scripts/gitlab-webhooks.ps1
 
 # Seed an ingress-gateway instance straight into Git (bypassing the portal) to
 # exercise import/discovery. Needs IMPORT_DISCOVERY_ENABLED=true on the portal.

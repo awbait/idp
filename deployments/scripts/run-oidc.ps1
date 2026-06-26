@@ -62,6 +62,17 @@ if ($RealGitlab) {
   $env:GITLAB_TOKEN        = "glpat-localdev0123456789abcd"
   $env:GITLAB_AUTO_MERGE   = "true"   # poller merges portal MRs itself (no human gate)
   $env:STATUS_POLL_INTERVAL = "5s"    # snappier status progression for the demo
+  # Status freshness on the stand: hybrid (poll + webhooks). Default is already
+  # hybrid; set explicit so it is obvious. Do NOT use "webhook" here - Harbor
+  # webhooks cannot reach the host-run portal from a KinD pod (see kind/README.md).
+  $env:STATUS_UPDATE_MODE = "hybrid"
+  # Webhook secrets (stand-fixed, NOT real) so STATUS_UPDATE_MODE=hybrid registers
+  # the GitLab/Harbor webhook endpoints and the WARNs go away. Register a matching
+  # GitLab group webhook to actually deliver events (see deployments/kind/README.md,
+  # "Вебхуки апстримов в портал"). NOTE: Harbor -> portal does NOT reach this
+  # host-run portal (KinD pod cannot connect to a native host port); GitLab does.
+  $env:GITLAB_WEBHOOK_TOKEN  = "stand-gl-webhook-secret"
+  $env:HARBOR_WEBHOOK_SECRET = "stand-hb-webhook-secret"
   # Reverse sync against real Git (only meaningful with GITLAB_MODE=real):
   #  - drift: flag orders edited directly in Git (read-only). Default true anyway;
   #    set explicit so it's easy to flip off here.
@@ -120,7 +131,8 @@ if ($RealGitlab) {
                  "GITLAB_URL", "GITLAB_TOKEN", "GITLAB_AUTO_MERGE",
                  "ARGOCD_MODE", "ARGOCD_URL", "ARGOCD_TOKEN", "ARGOCD_PROJECT",
                  "CHART_REGISTRY", "DATABASE_URL", "REDIS_URL",
-                 "DRIFT_DETECTION_ENABLED", "IMPORT_DISCOVERY_ENABLED") {
+                 "DRIFT_DETECTION_ENABLED", "IMPORT_DISCOVERY_ENABLED",
+                 "GITLAB_WEBHOOK_TOKEN", "HARBOR_WEBHOOK_SECRET") {
     Remove-Item "Env:$v" -ErrorAction SilentlyContinue
   }
   $env:HARBOR_MODE = "fake"; $env:GITLAB_MODE = "fake"; $env:ARGOCD_MODE = "fake"

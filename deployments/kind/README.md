@@ -118,6 +118,14 @@ make down-upstreams   # останавливает контейнеры стек
 - `make stand-reset` - сбросить демо-состояние (Postgres + Valkey + Argo CD
   Applications + GitLab-репо заказов), не пересобирая кластер; Harbor с чартами и
   сам KinD остаются. Деструктивно.
+- `make stand-gitlab-webhooks` - завести GitLab -> портал MR-вебхук на все репо
+  заказов (для `STATUS_UPDATE_MODE=hybrid`/`webhook`). Включает в GitLab
+  "allow local network requests" и ставит проектный вебхук на каждый репо группы
+  `managed-services`. GitLab CE не умеет групповые вебхуки, поэтому **перезапусти
+  таргет после заказа нового сервиса** (новый репо). Идемпотентно. Портал должен
+  быть запущен с `GITLAB_WEBHOOK_TOKEN` (его выставляет `run-oidc.ps1 -RealGitlab`,
+  значение `stand-gl-webhook-secret`). Harbor-вебхук на стенде не достукивается до
+  host-run портала (см. [риск 7](#известные-риски--тонкие-места)).
 
 ## Архитектура
 
