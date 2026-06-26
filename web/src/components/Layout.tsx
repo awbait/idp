@@ -13,6 +13,7 @@ import {
   IconLayoutGrid,
   IconLayoutSidebarLeftCollapse,
   IconLayoutSidebarLeftExpand,
+  IconLifebuoy,
   IconLogout,
   IconPackages,
   IconPalette,
@@ -59,10 +60,11 @@ const navItems = [
 // Top-level sidebar sections. The platform section is the default product
 // experience; the security (InfoSec) and admin sections swap the lower nav for
 // their own pages. The switcher only appears when a role can see more than one.
-type SectionId = "platform" | "admin" | "security";
+type SectionId = "platform" | "support" | "admin" | "security";
 
 const SECTIONS: { id: SectionId; label: string; home: string; Icon: typeof IconBox }[] = [
   { id: "platform", label: "Платформа", home: "/catalog", Icon: IconLayoutGrid },
+  { id: "support", label: "Поддержка", home: "/support", Icon: IconLifebuoy },
   { id: "admin", label: "Админ", home: "/admin", Icon: IconSettings },
   { id: "security", label: "ИБ", home: "/security", Icon: IconShieldLock },
 ];
@@ -75,6 +77,12 @@ const securitySectionNav: SectionNavItem[] = [
   { to: "/security", label: "Обзор", Icon: IconLayoutDashboard, exact: true },
   { to: "/security/policies", label: "Согласование политик", Icon: IconShieldCheck },
   { to: "/security/kyverno", label: "Kyverno UI", Icon: IconScan },
+];
+
+// Lower-nav items of the support section.
+const supportSectionNav: SectionNavItem[] = [
+  { to: "/support", label: "Обзор", Icon: IconLayoutDashboard, exact: true },
+  { to: "/support/requests", label: "Заказы всех команд", Icon: IconBox },
 ];
 
 // Lower-nav items of the platform-admin section.
@@ -179,20 +187,29 @@ export function Layout() {
   const availableSections = SECTIONS.filter((s) => {
     if (s.id === "security") return user.role === "security" || user.role === "admin";
     if (s.id === "admin") return user.role === "admin";
+    if (s.id === "support") return user.role === "support" || user.role === "admin";
     return user.role !== "security"; // platform
   });
   const pathSection: SectionId = pathname.startsWith("/security")
     ? "security"
     : pathname.startsWith("/admin")
       ? "admin"
-      : "platform";
+      : pathname.startsWith("/support")
+        ? "support"
+        : "platform";
   const activeSection: SectionId = availableSections.some((s) => s.id === pathSection)
     ? pathSection
     : (availableSections[0]?.id ?? "platform");
   // The active section's own flat nav (security/admin); platform renders the
   // dynamic product taxonomy instead.
   const sectionNav =
-    activeSection === "security" ? securitySectionNav : activeSection === "admin" ? adminSectionNav : null;
+    activeSection === "security"
+      ? securitySectionNav
+      : activeSection === "admin"
+        ? adminSectionNav
+        : activeSection === "support"
+          ? supportSectionNav
+          : null;
   const currentSection = SECTIONS.find((s) => s.id === activeSection) ?? SECTIONS[0];
 
   return (

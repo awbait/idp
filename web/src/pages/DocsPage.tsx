@@ -1,10 +1,11 @@
+import { IconArrowLeft, IconBook, IconChevronRight, IconSearch } from "@tabler/icons-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
 import ReactMarkdown, { type Components } from "react-markdown";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import remarkGfm from "remark-gfm";
-import { IconArrowLeft, IconBook, IconSearch } from "@tabler/icons-react";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { Spinner } from "../components/ui";
+import { DOCS_NAV, type DocNode, flattenNav, pathToActive } from "./docsNav";
 
 const BASE = `${import.meta.env.BASE_URL}docs-content/`;
 
@@ -13,10 +14,6 @@ interface NavItem {
   title: string;
   section: string;
   text?: string; // page plain text, filled for the search index
-}
-interface NavSection {
-  title: string;
-  items: { id: string; title: string }[];
 }
 interface Heading {
   level: number;
@@ -28,22 +25,6 @@ async function fetchText(url: string): Promise<string> {
   const r = await fetch(url, { cache: "no-cache" });
   if (!r.ok) throw new Error(`${url} -> ${r.status}`);
   return r.text();
-}
-
-function parseNav(md: string): NavSection[] {
-  const sections: NavSection[] = [];
-  let cur: NavSection | null = null;
-  for (const raw of md.split("\n")) {
-    const sec = raw.match(/^##\s+(.+)/);
-    const item = raw.match(/^\s*-\s*\[(.+?)\]\(([^)]+)\)/);
-    if (sec) {
-      cur = { title: sec[1].trim(), items: [] };
-      sections.push(cur);
-    } else if (item && cur) {
-      cur.items.push({ title: item[1].trim(), id: item[2].trim().replace(/^#?\/?/, "") });
-    }
-  }
-  return sections;
 }
 
 // Strip the inline markdown a heading may carry so the TOC shows plain text.
@@ -267,7 +248,12 @@ function makeComponents(headings: Heading[]): Components {
     td: ({ node, ...p }) => <td className="border border-slate-200 px-3 py-2 text-slate-700" {...p} />,
     hr: ({ node, ...p }) => <hr className="my-8 border-slate-200" {...p} />,
     strong: ({ node, ...p }) => <strong className="font-semibold text-slate-900" {...p} />,
-    img: ({ node, ...p }) => <img className="my-3 max-w-full rounded-lg border border-slate-200" {...p} />,
+    img: ({ node, src, ...p }) => {
+      // Markdown is fetched from /docs-content/ but rendered at /docs/<slug>, so
+      // resolve relative image paths (e.g. "images/x.png") against docs-content.
+      const resolved = src && /^(https?:|\/|data:)/.test(src) ? src : `${BASE}${src ?? ""}`;
+      return <img alt="" src={resolved} className="my-3 max-w-full rounded-lg border border-slate-200" {...p} />;
+    },
   };
 }
 
@@ -327,15 +313,79 @@ function DocToc({ toc, scrollRef }: { toc: Heading[]; scrollRef: React.RefObject
   );
 }
 
-function DocsNav({
-  nav,
+// Nodes inside a section: a leaf renders a link, a nested group renders a
+// collapse toggle (chevron, no icon) whose children indent one level deeper.
+// paddingLeft is computed from depth so nesting reads at a glance.
+function NavNodes({
+  nodes,
+  parentKey,
+  depth,
   activeId,
-  index,
+  open,
+  onToggle,
 }: {
-  nav: NavSection[];
+  nodes: DocNode[];
+  parentKey: string;
+  depth: number;
   activeId: string;
-  index: NavItem[];
+  open: Set<string>;
+  onToggle: (key: string) => void;
 }) {
+  return (
+    <ul className="flex flex-col gap-0.5">
+      {nodes.map((node) => {
+        const pad = { paddingLeft: `${8 + (depth - 1) * 14}px` };
+        if (node.kind === "link") {
+          return (
+            <li key={node.id}>
+              <Link
+                to={`/docs/${node.id}`}
+                style={pad}
+                aria-current={activeId === node.id ? "page" : undefined}
+                className="block rounded-md py-1.5 pr-2 text-sm text-slate-600 hover:bg-slate-50 aria-[current=page]:bg-brand-50 aria-[current=page]:font-medium aria-[current=page]:text-brand-700"
+              >
+                {node.title}
+              </Link>
+            </li>
+          );
+        }
+        const key = `${parentKey}>${node.title}`;
+        const isOpen = open.has(key);
+        const Icon = node.Icon;
+        return (
+          <li key={key}>
+            <button
+              type="button"
+              onClick={() => onToggle(key)}
+              aria-expanded={isOpen}
+              style={pad}
+              className="flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-sm font-medium text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-brand-500"
+            >
+              {Icon && <Icon size={17} stroke={1.7} className="shrink-0 text-slate-400" />}
+              <span className="flex-1 truncate text-left">{node.title}</span>
+              <IconChevronRight
+                size={15}
+                className={`shrink-0 text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
+              />
+            </button>
+            {isOpen && (
+              <NavNodes
+                nodes={node.children}
+                parentKey={key}
+                depth={depth + 1}
+                activeId={activeId}
+                open={open}
+                onToggle={onToggle}
+              />
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function DocsNav({ activeId, index }: { activeId: string; index: NavItem[] }) {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const results = useMemo(() => {
@@ -344,6 +394,27 @@ function DocsNav({
       .filter((p) => `${p.title} ${p.text ?? ""}`.toLowerCase().includes(q))
       .slice(0, 12);
   }, [q, index]);
+
+  // Only nested groups collapse (top-level sections are always shown). They
+  // start closed; the subgroup containing the active page auto-expands.
+  const activePath = useMemo(() => pathToActive(activeId), [activeId]);
+  const [open, setOpen] = useState<Set<string>>(() => new Set(activePath));
+  useEffect(() => {
+    if (activePath.length === 0) return;
+    setOpen((prev) => {
+      if (activePath.every((k) => prev.has(k))) return prev;
+      const next = new Set(prev);
+      for (const k of activePath) next.add(k);
+      return next;
+    });
+  }, [activePath]);
+  const toggle = (key: string) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   return (
     <nav className="flex w-60 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-surface px-3 py-5">
@@ -374,24 +445,23 @@ function DocsNav({
           ))}
         </ul>
       ) : (
-        nav.map((sec) => (
-          <div key={sec.title} className="mb-4">
-            <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{sec.title}</div>
-            <ul className="flex flex-col gap-0.5">
-              {sec.items.map((it) => (
-                <li key={it.id}>
-                  <Link
-                    to={`/docs/${it.id}`}
-                    aria-current={activeId === it.id ? "page" : undefined}
-                    className="block rounded-md px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-50 aria-[current=page]:bg-brand-50 aria-[current=page]:font-medium aria-[current=page]:text-brand-700"
-                  >
-                    {it.title}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))
+        <div className="flex flex-col gap-4">
+          {DOCS_NAV.map((sec) => (
+            <div key={sec.title}>
+              <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                {sec.title}
+              </div>
+              <NavNodes
+                nodes={sec.children}
+                parentKey={sec.title}
+                depth={1}
+                activeId={activeId}
+                open={open}
+                onToggle={toggle}
+              />
+            </div>
+          ))}
+        </div>
       )}
     </nav>
   );
@@ -400,29 +470,17 @@ function DocsNav({
 export function DocsPage() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const [nav, setNav] = useState<NavSection[]>([]);
-  const [navError, setNavError] = useState<string | null>(null);
   const [content, setContent] = useState<string | null>(null);
   const [searchIndex, setSearchIndex] = useState<NavItem[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const flat = useMemo<NavItem[]>(
-    () => nav.flatMap((s) => s.items.map((it) => ({ ...it, section: s.title }))),
-    [nav],
-  );
+  const flat = useMemo<NavItem[]>(() => flattenNav(), []);
   const activeId = slug || flat[0]?.id || "index";
   const entry = flat.find((p) => p.id === activeId);
   const headings = useMemo(() => (content ? parseHeadings(content) : []), [content]);
   const toc = useMemo(() => headings.filter((h) => h.level === 2 || h.level === 3), [headings]);
 
-  // Load the navigation manifest once.
-  useEffect(() => {
-    fetchText(`${BASE}_nav.md`)
-      .then((md) => setNav(parseNav(md)))
-      .catch((e) => setNavError(String(e)));
-  }, []);
-
-  // Build a lightweight search index from all pages (after nav is known).
+  // Build a lightweight search index from all pages.
   useEffect(() => {
     if (flat.length === 0) return;
     let cancelled = false;
@@ -484,13 +542,9 @@ export function DocsPage() {
       </header>
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        {navError ? (
-          <div className="p-6 text-sm text-red-600">Не удалось загрузить документацию: {navError}</div>
-        ) : (
-          <>
-            <DocsNav nav={nav} activeId={activeId} index={searchIndex} />
+        <DocsNav activeId={activeId} index={searchIndex} />
 
-            <div ref={scrollRef} className="min-w-0 flex-1 overflow-y-auto">
+        <div ref={scrollRef} className="min-w-0 flex-1 overflow-y-auto">
               <div className="mx-auto flex max-w-6xl gap-8 px-8 py-8">
                 <article className="min-w-0 flex-1">
                   <Breadcrumbs
@@ -536,8 +590,6 @@ export function DocsPage() {
                 <DocToc toc={toc} scrollRef={scrollRef} />
               </div>
             </div>
-          </>
-        )}
       </div>
     </div>
   );
