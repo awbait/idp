@@ -185,7 +185,23 @@ ApplicationSet (`deployments/kind/applicationset.yaml`) **хардкодит**
   есть в конфиге, но не подключены. Приём вебхуков GitLab (MR merged) и Harbor
   (push чарта) дал бы мгновенную реакцию вместо тика поллера. Сюда же относится
   пункт «GitLab webhook» из ручного прохода и, возможно, причина «MR не смержился»
-  (отсутствие моментальной реакции на merge).
+  (отсутствие моментальной реакции на merge). Это канал **GitLab -> портал**.
+
+- [ ] **Нативный вебхук GitLab -> Argo CD** (отдельный канал от портального выше).
+  Сейчас Argo узнаёт об изменениях в git только поллингом: в стенде
+  `timeout.reconciliation` занижен до 30s (`deployments/kind/20-argocd.ps1`), что
+  на каждом `Application` (directory-app на репо + child-app на экземпляр) даёт
+  частые `git ls-remote`. Подключить встроенный эндпоинт `argocd-server`
+  `/api/webhook`:
+  - положить `webhook.gitlab.secret` в `argocd-secret`;
+  - завести webhook в GitLab **на уровне группы** `managed-services` (push, с этим
+    секретом) на эндпоинт `argocd-server`;
+  - (опц.) то же на `argocd-applicationset-controller` для ускорения генератора.
+  Нюанс: вебхук **рефрешит существующие** `Application`, но новые репо/экземпляры
+  по-прежнему обнаруживает SCM-генератор (листинг API). После подключения вернуть
+  `timeout.reconciliation` к 180s+ и поднять `requeueAfterSeconds` (60s) -
+  поллинг остаётся редкой подстраховкой. Для KinD проверить, что контейнер GitLab
+  достукивается до `argocd-server` (CoreDNS `host.docker.internal`).
 
 ### Горизонтальное масштабирование (техдолг, см. `docs/idp-spec.md`)
 
@@ -198,30 +214,37 @@ ApplicationSet (`deployments/kind/applicationset.yaml`) **хардкодит**
 Доработки чартов из `console-charts` (живут в `charts/`, отдельный git). Сюда -
 задачи по конкретным чартам.
 
-### Конвенции и документация чартов (написать)
+### Конвенции и документация чартов
 
-- [ ] Вынести и записать все конвенции наименований `Kind`.
-- [ ] Правила написания README и CHANGELOG.
-- [ ] Правила создания `values.schema.json`.
-- [ ] Описание `NOTES.txt` и `_helpers.tpl`.
-- [ ] Общие параметры управляемых сервисов.
+Сделано в `charts/CONVENTIONS.md` (console-charts#2, вмержен). Плюс backfill
+README для `policies`; учтены новые чарты `egress-gateway` и `policies`.
+
+- [x] Вынести и записать все конвенции наименований `Kind` (реестр kindShort).
+- [x] Правила написания README и CHANGELOG.
+- [x] Правила создания `values.schema.json`.
+- [x] Описание `NOTES.txt` и `_helpers.tpl`.
+- [x] Общие параметры управляемых сервисов (`naming`/`generic`/`enabled`).
+- [x] Обязательный `values.yaml` + раскладка `values.yaml`/`values.minimal.yaml`/`values.full.yaml`.
 
 ### Чарт `managed-namespace`
 
-- [ ] **Роли namespace (глянуть).** Пересмотреть/доработать RBAC в namespace
-  (Role/RoleBinding) - сейчас чарт их не создаёт.
-- [ ] **Istio-лейблы.** Проставлять лейблы Istio на namespace (инъекция /
-  ambient dataplane-mode) при включённом Service Mesh.
-- [ ] **Deny-default политики только при включённом Service Mesh.** Сейчас
-  NetworkPolicy-шаблона в чарте нет вовсе. Добавить deny-default политику и
-  включать её, а также лейбл и аннотацию `networking.k8s.io/enable-netpol: "true"`
-  - **только когда включён Service Mesh**. Для DEV-контура это по флагу (отдельного
-  «netpol enabled» сейчас нет - вешать на флаг Service Mesh); на остальных
-  контурах Service Mesh всегда включён, значит политики ставятся всегда.
-- [ ] **`creator` не хардкодить.** Сейчас `cpaas.io/creator: lk` зашит в
-  `templates/namespace.yaml`. Сделать значением с дефолтом `lk`; при заказе из
-  консоли подставлять `console`. Поле скрыть от пользователя в форме
-  (`ui:widget: hidden` в схеме / перезапись дефолта на стороне консоли).
+- [x] **Приведён к стандарту репо** (console-charts#2): README, CHANGELOG,
+  `NOTES.txt`, `.helmignore`; раскладка `values.yaml`/`values.minimal.yaml`/
+  `values.full.yaml`; убрана утечка кириллических комментариев из `subnet.yaml`.
+- [x] **`creator` не хардкодить.** Чарт: `namespace.creator` (default `lk`,
+  `ui:widget: hidden`) - console-charts#3. Консоль: подставляет `console` при
+  заказе через chart-agnostic блок `defaults` во view-документе (console#77).
+- [x] **Istio-лейблы** (console-charts#5). По флагу `serviceMesh.enabled` на
+  namespace ставятся labels `istio-discovery: enabled`,
+  `istio.io/dataplane-mode: ambient` и аннотация
+  `networking.k8s.io/enable-netpol: "true"`. Режим - ambient.
+- [x] **Роль namespace** (console-charts#5). Поле `namespace.role`
+  (`ingress`/`egress`/`other`, enum в схеме) -> лейбл `namespace-role`.
+- [x] **Deny-default NetworkPolicy.** Достаточно аннотации
+  `networking.k8s.io/enable-netpol` (ставится по `serviceMesh.enabled`,
+  console-charts#5): в Alauda она включает enforcement сетевых политик. Отдельный
+  `NetworkPolicy`-шаблон в чарте решено не добавлять.
+- [x] **RBAC namespace.** Решено: пока не требуется (чарт RBAC не создаёт).
 
 ## 6. Код-ревью (остаток)
 
