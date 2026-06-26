@@ -2,6 +2,7 @@
 package config
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/caarlos0/env/v11"
@@ -13,6 +14,16 @@ type Mode string
 const (
 	ModeReal Mode = "real"
 	ModeFake Mode = "fake"
+)
+
+// Status update modes (STATUS_UPDATE_MODE) select how order and catalog state is
+// kept fresh. Polling only periodically reconciles; hybrid also accepts inbound
+// GitLab/Harbor webhooks that trigger an immediate reconcile, with the poll left
+// on as a safety net. There is deliberately no webhook-only mode: a missed
+// delivery must not strand an order.
+const (
+	StatusModePolling = "polling"
+	StatusModeHybrid  = "hybrid"
 )
 
 // DefaultSessionSecret is the insecure development default for SESSION_SECRET.
@@ -134,6 +145,12 @@ func Load() (*Config, error) {
 	cfg := &Config{}
 	if err := env.Parse(cfg); err != nil {
 		return nil, err
+	}
+	switch cfg.StatusUpdateMode {
+	case StatusModePolling, StatusModeHybrid:
+	default:
+		return nil, fmt.Errorf("STATUS_UPDATE_MODE must be %q or %q, got %q",
+			StatusModePolling, StatusModeHybrid, cfg.StatusUpdateMode)
 	}
 	return cfg, nil
 }

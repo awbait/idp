@@ -301,6 +301,60 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "type": "row",
+      "title": "Webhooks (hybrid status mode)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+      "id": 12
+    },
+    {
+      "type": "timeseries",
+      "title": "Webhook rate (by source / result)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 29 },
+      "id": 13,
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" },
+          "unit": "ops",
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (source, result) (rate(console_webhooks_received_total[5m]))",
+          "legendFormat": "{{source}} / {{result}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Rejected / bad webhooks",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 29 },
+      "id": 14,
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" },
+          "unit": "ops",
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (source, result) (rate(console_webhooks_received_total{result=~\"unauthorized|bad_request\"}[5m]))",
+          "legendFormat": "{{source}} / {{result}}",
+          "refId": "A"
+        }
+      ]
     }
   ]
 }

@@ -78,6 +78,11 @@ type Poller struct {
 	lastSuccess  map[string]time.Time
 	lastErr      map[string]string
 	lastDuration map[string]time.Duration
+	// trigger requests an out-of-band sweep now (e.g. an inbound webhook) instead
+	// of waiting for the next tick. Buffered to 1: concurrent triggers coalesce
+	// into a single pending sweep, so a burst of webhooks cannot stampede the
+	// reconcilers.
+	trigger chan string
 	// now is the clock, injectable in tests; defaults to time.Now.
 	now func() time.Time
 }
@@ -88,7 +93,8 @@ func NewPoller(interval time.Duration, log *slog.Logger, reconcilers ...Reconcil
 		interval: interval, reconcilers: reconcilers, log: log,
 		failing: map[string]bool{}, fails: map[string]int{}, nextAttempt: map[string]time.Time{},
 		lastSuccess: map[string]time.Time{}, lastErr: map[string]string{}, lastDuration: map[string]time.Duration{},
-		now: time.Now,
+		trigger: make(chan string, 1),
+		now:     time.Now,
 	}
 }
 
@@ -123,8 +129,24 @@ func (p *Poller) Snapshot() []ReconcilerState {
 	return out
 }
 
+// Trigger requests an immediate reconcile sweep instead of waiting for the next
+// tick, for the hybrid status mode where inbound webhooks (GitLab MR merged,
+// Harbor chart pushed) accelerate the otherwise periodic poll. Non-blocking and
+// safe to call concurrently: if a sweep is already pending, the trigger is
+// coalesced (the buffered channel holds at most one). reason is logged for
+// observability. A nil poller is a no-op so callers need not guard.
+func (p *Poller) Trigger(reason string) {
+	if p == nil {
+		return
+	}
+	select {
+	case p.trigger <- reason:
+	default: // a sweep is already queued; coalesce
+	}
+}
+
 // Run blocks, ticking until the context is cancelled. It also reconciles once
-// immediately on start.
+// immediately on start. Between ticks it also reacts to Trigger.
 func (p *Poller) Run(ctx context.Context) {
 	t := time.NewTicker(p.interval)
 	defer t.Stop()
@@ -134,6 +156,9 @@ func (p *Poller) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			p.tick(ctx)
+		case reason := <-p.trigger:
+			p.log.Debug("reconcile triggered", "reason", reason)
 			p.tick(ctx)
 		}
 	}

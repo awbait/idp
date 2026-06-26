@@ -181,11 +181,20 @@ ApplicationSet (`deployments/kind/applicationset.yaml`) **хардкодит**
 
 ### Вебхуки вместо поллинга
 
-- [ ] `STATUS_UPDATE_MODE`, `HARBOR_WEBHOOK_SECRET`, `GITLAB_WEBHOOK_TOKEN` уже
-  есть в конфиге, но не подключены. Приём вебхуков GitLab (MR merged) и Harbor
-  (push чарта) дал бы мгновенную реакцию вместо тика поллера. Сюда же относится
-  пункт «GitLab webhook» из ручного прохода и, возможно, причина «MR не смержился»
-  (отсутствие моментальной реакции на merge). Это канал **GitLab -> портал**.
+- [x] `STATUS_UPDATE_MODE`, `HARBOR_WEBHOOK_SECRET`, `GITLAB_WEBHOOK_TOKEN`
+  подключены. При `STATUS_UPDATE_MODE=hybrid` портал принимает вебхуки GitLab
+  (`POST /api/v1/webhooks/gitlab`, MR merged/closed) и Harbor
+  (`POST /api/v1/webhooks/harbor`, push/delete artifact) и триггерит немедленный
+  reconcile-sweep поллера (`Poller.Trigger`) вместо ожидания тика. Поллинг
+  остаётся подстраховкой; вебхуки только ускоряют. Аутентификация shared-secret
+  (`X-Gitlab-Token` / `Authorization`, constant-time), маршруты регистрируются
+  только при заданном секрете. Метрика `console_webhooks_received_total`,
+  компонент логов `webhooks`, панель на дашборде. Это канал **GitLab -> портал**.
+  - [ ] Опционально: точечный reconcile одного заказа по `(project, mr_iid)`
+    вместо полного sweep (нужен reverse-lookup MR в сторе). Сейчас sweep
+    идемпотентен и дёшев, поэтому отложено.
+  - [ ] Опционально: канал C **ArgoCD -> портал** через `argocd-notifications`
+    (health/sync changed), чтобы ускорить переходы `Deploying -> Healthy/Degraded`.
 
 - [ ] **Нативный вебхук GitLab -> Argo CD** (отдельный канал от портального выше).
   Сейчас Argo узнаёт об изменениях в git только поллингом: в стенде

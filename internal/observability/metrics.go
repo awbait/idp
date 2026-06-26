@@ -59,7 +59,20 @@ var (
 		Name: "console_reconcile_last_success_timestamp_seconds",
 		Help: "Unix timestamp of the last successful reconciler tick.",
 	}, []string{"reconciler"})
+
+	// webhooksReceived counts inbound upstream webhooks by source (gitlab|harbor)
+	// and result (accepted|ignored|unauthorized|bad_request). Lets us see whether
+	// webhooks actually arrive in hybrid mode (vs falling back to the poll).
+	webhooksReceived = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "console_webhooks_received_total",
+		Help: "Total inbound upstream webhooks, by source and result.",
+	}, []string{"source", "result"})
 )
+
+// ObserveWebhook records one inbound webhook delivery: its source and result.
+func ObserveWebhook(source, result string) {
+	webhooksReceived.WithLabelValues(source, result).Inc()
+}
 
 // SetComponentUp records the health of a platform component (up/down), its probe
 // latency and the time of the probe.

@@ -27,6 +27,7 @@ import (
 	"console/internal/publications"
 	"console/internal/status"
 	"console/internal/store"
+	"console/internal/webhooks"
 	"console/pkg/models"
 )
 
@@ -198,11 +199,27 @@ func run(ctx context.Context, cfg *config.Config, log *slog.Logger) error {
 		poller.Run(ctx)
 	}()
 
+	// --- webhooks (hybrid status mode) ---
+	// In hybrid mode inbound GitLab/Harbor webhooks trigger an immediate reconcile
+	// sweep; the poll above stays on as a safety net. Routes register only for
+	// sources whose secret is set, so warn on a missing one.
+	var webhookHandler *webhooks.Handler
+	if cfg.StatusUpdateMode == config.StatusModeHybrid {
+		webhookHandler = webhooks.New(poller, observability.Component(log, "webhooks"),
+			cfg.GitLabWebhookToken, cfg.HarborWebhookKey)
+		if !webhookHandler.GitLabEnabled() {
+			log.Warn("hybrid status mode: GitLab webhook disabled (GITLAB_WEBHOOK_TOKEN not set), polling only for GitLab")
+		}
+		if !webhookHandler.HarborEnabled() {
+			log.Warn("hybrid status mode: Harbor webhook disabled (HARBOR_WEBHOOK_SECRET not set), polling only for Harbor")
+		}
+	}
+
 	// --- HTTP ---
 	srv := &api.Server{
 		Auth: authn, Catalog: catalogSvc, Prov: provSvc, Pubs: pubsSvc, Status: statusSvc,
 		Store: st, Cache: c, Bus: bus, Log: observability.Component(log, "api"), ArgoCDURL: cfg.ArgoCDURL,
-		Harbor: hb, GitLab: gl, ArgoCD: argo, Reconcilers: poller,
+		Harbor: hb, GitLab: gl, ArgoCD: argo, Reconcilers: poller, Webhooks: webhookHandler,
 		System: api.SystemInfo{
 			HarborMode:   string(cfg.HarborMode),
 			GitLabMode:   string(cfg.GitLabMode),

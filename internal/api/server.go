@@ -6,9 +6,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"console/internal/argocd"
 	"console/internal/auth"
 	"console/internal/cache"
@@ -21,6 +18,10 @@ import (
 	"console/internal/spa"
 	"console/internal/status"
 	"console/internal/store"
+	"console/internal/webhooks"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
@@ -59,6 +60,10 @@ type Server struct {
 	// page (GET /api/v1/status). Optional: nil omits the reconcilers section.
 	Reconcilers reconcilerSnapshotter
 
+	// Webhooks handles inbound upstream webhooks (GitLab MR, Harbor push) in the
+	// hybrid status mode. Optional: nil (polling mode) omits the webhook routes.
+	Webhooks *webhooks.Handler
+
 	// sseStreams counts live SSE streams to enforce maxSSEStreams (zero value is
 	// ready to use; no constructor needed).
 	sseStreams atomic.Int64
@@ -92,6 +97,18 @@ func (s *Server) Router() http.Handler {
 		r.Get("/auth/login", s.Auth.Login)
 		r.Get("/auth/callback", s.Auth.Callback)
 		r.Get("/auth/logout", s.Auth.Logout)
+
+		// upstream webhooks (machine-to-machine, authenticated by a shared secret
+		// in-handler, not by session): registered only in hybrid mode and only for
+		// sources whose secret is configured.
+		if s.Webhooks != nil {
+			if s.Webhooks.GitLabEnabled() {
+				r.Post("/webhooks/gitlab", s.Webhooks.GitLab)
+			}
+			if s.Webhooks.HarborEnabled() {
+				r.Post("/webhooks/harbor", s.Webhooks.Harbor)
+			}
+		}
 
 		// authenticated
 		r.Group(func(r chi.Router) {

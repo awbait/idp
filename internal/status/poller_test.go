@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -108,4 +109,58 @@ type countingReconciler struct {
 func (c *countingReconciler) Reconcile(context.Context) error {
 	c.calls++
 	return c.err
+}
+
+// atomicReconciler counts calls atomically so the Run goroutine and the test
+// goroutine can read the count without a data race.
+type atomicReconciler struct{ calls atomic.Int64 }
+
+func (a *atomicReconciler) Reconcile(context.Context) error {
+	a.calls.Add(1)
+	return nil
+}
+
+// TestPollerTriggerRunsTick: with a long interval the only ticks come from the
+// initial start sweep and from Trigger, so a Trigger must advance the count.
+func TestPollerTriggerRunsTick(t *testing.T) {
+	rec := &atomicReconciler{}
+	log := slog.New(slog.NewJSONHandler(&bytes.Buffer{}, &slog.HandlerOptions{Level: slog.LevelError}))
+	p := NewPoller(time.Hour, log, Named("x", rec))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() { p.Run(ctx); close(done) }()
+
+	waitFor(t, func() bool { return rec.calls.Load() >= 1 }) // start sweep
+	p.Trigger("test")
+	waitFor(t, func() bool { return rec.calls.Load() >= 2 }) // triggered sweep
+
+	cancel()
+	<-done
+}
+
+// TestTriggerNonBlockingAndNilSafe: Trigger never blocks even with no consumer
+// (buffered, coalescing) and a nil poller is a no-op.
+func TestTriggerNonBlockingAndNilSafe(t *testing.T) {
+	var np *Poller
+	np.Trigger("nil is a no-op") // must not panic
+
+	p := NewPoller(time.Hour, slog.Default())
+	p.Trigger("a")
+	p.Trigger("b") // buffer full; must coalesce, not block
+	p.Trigger("c")
+}
+
+// waitFor polls cond up to ~2s, failing the test if it never holds.
+func waitFor(t *testing.T, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("condition not met within timeout")
 }
