@@ -33,13 +33,16 @@ import {
   SecuritySection,
 } from "./pages/SecuritySection";
 import { StatusPage } from "./pages/StatusPage";
+import { SupportOverviewPage, SupportRequestsPage, SupportSection } from "./pages/SupportSection";
 
 // Role-aware landing: security users open their section by default; everyone
 // else lands on the catalog. Rendered inside Layout, which already gates on
 // auth/loading, so the user is resolved by the time this runs.
 function RoleHome() {
   const { user } = useUser();
-  return <Navigate to={user?.role === "security" ? "/security" : "/catalog"} replace />;
+  const home =
+    user?.role === "security" ? "/security" : user?.role === "support" ? "/support" : "/catalog";
+  return <Navigate to={home} replace />;
 }
 
 // PlatformOnly guards the product (platform) routes. The security role lives in
@@ -84,6 +87,16 @@ const router = createBrowserRouter([
         ],
       },
       { path: "status", element: <Navigate to="/admin/status" replace /> },
+      // Support section: its own switcher section (like security/admin), gated to
+      // the support role (and admins). Cross-team view of all orders.
+      {
+        path: "support",
+        element: <SupportSection />,
+        children: [
+          { index: true, element: <SupportOverviewPage /> },
+          { path: "requests", element: <SupportRequestsPage /> },
+        ],
+      },
       // Platform (product) routes: blocked for the security role.
       {
         element: <PlatformOnly />,

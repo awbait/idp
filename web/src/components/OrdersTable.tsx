@@ -1,9 +1,11 @@
-import { IconAlertTriangle, IconArrowRight, IconArrowsSort, IconArrowUpCircle, IconCheck, IconChevronDown, IconDots, IconGitFork, IconPackages, IconPlus, IconX } from "@tabler/icons-react";
+import { IconAlertTriangle, IconArrowRight, IconArrowsSort, IconArrowUpCircle, IconCheck, IconChevronDown, IconDots, IconGitFork, IconPackages, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   Button,
   Cell,
   Column,
+  Dialog,
+  DialogTrigger,
   Menu,
   MenuItem,
   MenuTrigger,
@@ -42,6 +44,9 @@ interface Props {
   orderDisabledReason?: string;
   // Hint shown when the table is empty.
   emptyHint?: React.ReactNode;
+  // Cross-team view (support/admin): ignore the active-team filter and add a
+  // "Команда" column so it's clear which team owns each order.
+  allTeams?: boolean;
 }
 
 // Statuses offered in the filter, in lifecycle order. DELETED is hidden by default.
@@ -60,7 +65,7 @@ const STATUSES: RequestStatus[] = [
 ];
 const DEFAULT_HIDDEN: RequestStatus[] = ["DELETED"];
 
-export function OrdersTable({ title, filter, orderTo, orderDisabledReason, emptyHint }: Props) {
+export function OrdersTable({ title, filter, orderTo, orderDisabledReason, emptyHint, allTeams }: Props) {
   // Fetch including deleted so the status filter can reveal them on demand.
   const { data, error, loading, reload } = useAsync(
     () => api.listRequests({ include_deleted: "true" }),
@@ -102,12 +107,27 @@ export function OrdersTable({ title, filter, orderTo, orderDisabledReason, empty
     () => new Set(STATUSES.filter((s) => !DEFAULT_HIDDEN.includes(s))),
   );
   const [newestFirst, setNewestFirst] = useState(true);
+  // Cross-team facet filters (only used when allTeams). Empty set = no filter.
+  const [teamFilter, setTeamFilter] = useState<Set<string>>(new Set());
+  const [productFilter, setProductFilter] = useState<Set<string>>(new Set());
   // The order pending delete confirmation (null = dialog closed).
   const [deleting, setDeleting] = useState<OrderRequest | null>(null);
 
+  // Distinct teams/products present in the data, for the facet filter options.
+  const teamOptions = useMemo(
+    () => [...new Set((data ?? []).map((r) => r.team))].filter(Boolean).sort(),
+    [data],
+  );
+  const productOptions = useMemo(
+    () => [...new Set((data ?? []).map((r) => r.chart_name))].filter(Boolean).sort(),
+    [data],
+  );
+
   const rows = useMemo(() => {
     const base = (data ?? [])
-      .filter((r) => !team || r.team === team)
+      .filter((r) => allTeams || !team || r.team === team)
+      .filter((r) => teamFilter.size === 0 || teamFilter.has(r.team))
+      .filter((r) => productFilter.size === 0 || productFilter.has(r.chart_name))
       .filter((r) => (filter ? filter(r) : true))
       .filter((r) => shown.has(r.status));
     const dir = newestFirst ? -1 : 1;
@@ -118,7 +138,7 @@ export function OrdersTable({ title, filter, orderTo, orderDisabledReason, empty
       if (ad !== bd) return ad - bd;
       return dir * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
     });
-  }, [data, team, filter, shown, newestFirst]);
+  }, [data, team, filter, shown, newestFirst, allTeams, teamFilter, productFilter]);
 
   if (loading) return <Spinner />;
   if (error) return <ErrorBox error={error} />;
@@ -138,10 +158,15 @@ export function OrdersTable({ title, filter, orderTo, orderDisabledReason, empty
   }
 
   const filtersDefault =
-    newestFirst && STATUSES.every((s) => shown.has(s) === !DEFAULT_HIDDEN.includes(s));
+    newestFirst &&
+    teamFilter.size === 0 &&
+    productFilter.size === 0 &&
+    STATUSES.every((s) => shown.has(s) === !DEFAULT_HIDDEN.includes(s));
   const resetFilters = () => {
     setShown(new Set(STATUSES.filter((s) => !DEFAULT_HIDDEN.includes(s))));
     setNewestFirst(true);
+    setTeamFilter(new Set());
+    setProductFilter(new Set());
   };
 
   return (
@@ -172,6 +197,24 @@ export function OrdersTable({ title, filter, orderTo, orderDisabledReason, empty
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        {allTeams && (
+          <>
+            <SearchFilter
+              label="Команды"
+              searchPlaceholder="Найти команду..."
+              options={teamOptions}
+              selected={teamFilter}
+              onChange={setTeamFilter}
+            />
+            <SearchFilter
+              label="Продукты"
+              searchPlaceholder="Найти продукт..."
+              options={productOptions}
+              selected={productFilter}
+              onChange={setProductFilter}
+            />
+          </>
+        )}
         <StatusFilter shown={shown} onChange={setShown} />
         <button
           onClick={() => setNewestFirst((v) => !v)}
@@ -195,6 +238,7 @@ export function OrdersTable({ title, filter, orderTo, orderDisabledReason, empty
         <Table aria-label={title} className="w-full text-sm">
           <TableHeader className="border-b border-slate-200 bg-slate-50 text-xs font-medium uppercase tracking-wide text-slate-500">
             <Column className="px-4 py-2.5 text-left">Категория</Column>
+            {allTeams && <Column className="px-4 py-2.5 text-left">Команда</Column>}
             <Column className="px-4 py-2.5 text-left">Продукт</Column>
             <Column isRowHeader className="px-4 py-2.5 text-left">Имя</Column>
             <Column className="px-4 py-2.5 text-left">Метка</Column>
@@ -238,6 +282,7 @@ export function OrdersTable({ title, filter, orderTo, orderDisabledReason, empty
                   <Cell className="px-4 py-3 text-left text-slate-500">
                     {categoryOf(r.chart_project, r.chart_name) ?? r.chart_project}
                   </Cell>
+                  {allTeams && <Cell className="px-4 py-3 text-left text-slate-600">{r.team}</Cell>}
                   <Cell className="px-4 py-3 text-left">
                     <span className="flex items-center gap-2 font-medium text-slate-800">
                       <ProductIcon project={r.chart_project} name={r.chart_name} />
@@ -387,6 +432,106 @@ function StatusFilter({
         </Menu>
       </Popover>
     </MenuTrigger>
+  );
+}
+
+// SearchFilter is a chip that opens a popover with a search box and a checkbox
+// list - for facets with many values (teams, products) where typing to narrow
+// down is faster than scanning. Empty selection means "no filter" (show all).
+function SearchFilter({
+  label,
+  searchPlaceholder,
+  options,
+  selected,
+  onChange,
+}: {
+  label: string;
+  searchPlaceholder: string;
+  options: string[];
+  selected: Set<string>;
+  onChange: (s: Set<string>) => void;
+}) {
+  const [q, setQ] = useState("");
+  const filtered = q
+    ? options.filter((o) => o.toLowerCase().includes(q.toLowerCase()))
+    : options;
+  const toggle = (v: string) => {
+    const next = new Set(selected);
+    if (next.has(v)) next.delete(v);
+    else next.add(v);
+    onChange(next);
+  };
+  const active = selected.size > 0;
+  return (
+    <DialogTrigger>
+      <Button
+        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
+          active
+            ? "border-brand-200 bg-brand-50 text-brand-700"
+            : "border-slate-200 text-slate-600 hover:bg-slate-50"
+        }`}
+      >
+        {label}
+        {active && <span className="text-brand-500">{selected.size}</span>}
+        <IconChevronDown size={13} stroke={1.8} className={active ? "text-brand-400" : "text-slate-400"} />
+      </Button>
+      <Popover className="w-60 rounded-md border border-slate-200 bg-surface shadow-lg outline-none entering:animate-in entering:fade-in">
+        <Dialog className="outline-none">
+          <div className="border-b border-slate-100 p-2">
+            <div className="relative">
+              <IconSearch size={14} stroke={1.8} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                autoFocus
+                type="text"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full rounded-md border border-slate-200 bg-surface py-1 pl-7 pr-2 text-sm outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-100"
+              />
+            </div>
+          </div>
+          <ul className="max-h-64 overflow-auto p-1">
+            {filtered.length === 0 ? (
+              <li className="px-3 py-2 text-xs text-slate-400">Ничего не найдено</li>
+            ) : (
+              filtered.map((o) => {
+                const isSelected = selected.has(o);
+                return (
+                  <li key={o}>
+                    <button
+                      type="button"
+                      onClick={() => toggle(o)}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm outline-none hover:bg-slate-50 focus-visible:bg-slate-50"
+                    >
+                      <span
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                          isSelected ? "border-brand-600 bg-brand-600 text-on-accent" : "border-slate-300"
+                        }`}
+                      >
+                        {isSelected && <IconCheck size={12} stroke={3} />}
+                      </span>
+                      <span className="truncate text-slate-700">{o}</span>
+                    </button>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+          {active && (
+            <div className="border-t border-slate-100 p-1">
+              <button
+                type="button"
+                onClick={() => onChange(new Set())}
+                className="flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-xs font-medium text-slate-500 outline-none hover:bg-slate-100 hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-brand-500"
+              >
+                <IconX size={13} stroke={2} />
+                Сбросить ({selected.size})
+              </button>
+            </div>
+          )}
+        </Dialog>
+      </Popover>
+    </DialogTrigger>
   );
 }
 
