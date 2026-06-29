@@ -69,8 +69,20 @@ Monaco). E2e проверен: заказ проходит цикл до HEALTHY
   загрузкой и действием) формы заказа и диалог удаления показывают понятный
   русский текст вместо доменной строки.
 - [ ] **MR не смержился** (пример `.../managed-services/team-core/ingress-gateway/-/merge_requests/6`).
-  Расследовать сценарий: MR создан, но не мержится/не подхватывается порталом.
-  Проверить поллер переходов статусов и приём вебхуков GitLab (см. раздел 4).
+  Расследовано: на стенде `GITLAB_AUTO_MERGE=true` (`run-oidc.ps1`), и поллер
+  сам мержит MR в `reconcileOne`. Но `MergeMR`/`GetMR`/`UpdateMR` глотали ошибку
+  (`_ = ...`), поэтому при реальном отказе мержа (merge-конфликт, требуемый
+  pipeline/approvals, branch protection) заказ молча застревал в `MR_CREATED` без
+  единого следа. Вебхук и поллинг идут через тот же `reconcileOne`, так что
+  «не подхватывается» - это та же тихая ошибка `GetMR`.
+  - [x] Добавлена наблюдаемость: метрика `console_mr_merge_total{result}`
+    (растущий `error` без `ok` = заказ заклинило), лог `mr auto-merged` (Info) /
+    `mr auto-merge deferred` (Debug, с причиной от GitLab), `mr state fetch
+    failed` / `mr state persist failed` (Warn). Панели на дашборде Grafana.
+  - [ ] По логам с реального стенда определить конкретную причину отказа мержа
+    (скорее всего настройки merge checks проекта: «Pipelines must succeed» без
+    пайплайна, либо required approvals) и устранить на стороне bootstrap GitLab
+    или обработать в портале.
 
 ### Каталог и публикации
 

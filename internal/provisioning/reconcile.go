@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"console/internal/argocd"
+	"console/internal/observability"
 	"console/pkg/models"
 )
 
@@ -33,13 +34,35 @@ func (s *Service) reconcileOne(ctx context.Context, r *models.Request) {
 		// next tick. The GetMR below then observes the merged state.
 		if s.autoMerge && latest.Status == models.MROpened &&
 			(r.Status == models.StatusMRCreated || r.Status == models.StatusDeleteRequested) {
-			_ = s.gl.MergeMR(ctx, latest.GitLabProjectID, latest.MRIID)
+			merr := s.gl.MergeMR(ctx, latest.GitLabProjectID, latest.MRIID)
+			observability.ObserveMRMerge(merr)
+			if merr != nil {
+				// A freshly created MR is often not mergeable yet (merge_status
+				// still "checking" -> 405), which clears on a later tick. But a
+				// persistent failure (merge conflict, required pipeline/approvals,
+				// branch protection) wedges the order here forever. The metric (an
+				// error count that climbs with no successes) flags that, and this
+				// log carries GitLab's reason - previously the error was dropped,
+				// so a stuck MR was undiagnosable.
+				s.logger().Debug("mr auto-merge deferred",
+					"order_id", r.ID, "mr_iid", latest.MRIID, "err", merr)
+			} else {
+				s.logger().Info("mr auto-merged", "order_id", r.ID, "mr_iid", latest.MRIID)
+			}
 		}
 		if live, gerr := s.gl.GetMR(ctx, latest.GitLabProjectID, latest.MRIID); gerr == nil {
 			if live.State != latest.Status {
 				latest.Status = live.State
-				_ = s.store.UpdateMR(ctx, latest)
+				if uerr := s.store.UpdateMR(ctx, latest); uerr != nil {
+					s.logger().Warn("mr state persist failed",
+						"order_id", r.ID, "mr_iid", latest.MRIID, "err", uerr)
+				}
 			}
+		} else {
+			// Without the live MR state the order cannot observe a merge/close and
+			// is stuck at MR_CREATED. Surface it instead of stalling silently.
+			s.logger().Warn("mr state fetch failed",
+				"order_id", r.ID, "mr_iid", latest.MRIID, "err", gerr)
 		}
 		switch r.Status {
 		case models.StatusMRCreated:

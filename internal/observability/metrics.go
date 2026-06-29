@@ -75,7 +75,25 @@ var (
 		Name: "console_argocd_sync_total",
 		Help: "Total admin-triggered ArgoCD syncs, by result.",
 	}, []string{"result"})
+
+	// mrMerges counts auto-merge attempts on the portal's own MRs by result
+	// (ok|error). A rising error count with no successes means an order is wedged
+	// unable to merge (conflict, required pipeline/approvals); the poller would
+	// otherwise retry silently every tick with no trace.
+	mrMerges = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "console_mr_merge_total",
+		Help: "Total portal MR auto-merge attempts, by result.",
+	}, []string{"result"})
 )
+
+// ObserveMRMerge records one auto-merge attempt on a portal MR and its result.
+func ObserveMRMerge(err error) {
+	result := "ok"
+	if err != nil {
+		result = "error"
+	}
+	mrMerges.WithLabelValues(result).Inc()
+}
 
 // ObserveArgoSync records one admin-triggered ArgoCD sync and its result.
 func ObserveArgoSync(err error) {

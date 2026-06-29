@@ -355,6 +355,62 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "type": "row",
+      "title": "Provisioning (merge & sync)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 37 },
+      "id": 15
+    },
+    {
+      "type": "timeseries",
+      "title": "MR auto-merge rate (by result)",
+      "description": "Auto-merge attempts on the portal's own MRs. A climbing error rate with no successes means an order is wedged unable to merge (conflict, required pipeline/approvals).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 38 },
+      "id": 16,
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" },
+          "unit": "ops",
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (result) (rate(console_mr_merge_total[5m]))",
+          "legendFormat": "{{result}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "ArgoCD manual sync rate (by result)",
+      "description": "Admin-triggered \"deploy from Git\" syncs (hard refresh + sync).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 38 },
+      "id": 17,
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" },
+          "unit": "ops",
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (result) (rate(console_argocd_sync_total[5m]))",
+          "legendFormat": "{{result}}",
+          "refId": "A"
+        }
+      ]
     }
   ]
 }
