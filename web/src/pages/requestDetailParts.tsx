@@ -163,7 +163,7 @@ export function DetailActions({
           )}
           {onSync && (
             <MenuItem id="sync" className={item}>
-              Синхронизировать
+              Выкатить из Git
             </MenuItem>
           )}
           {onDelete && (

@@ -112,14 +112,28 @@ func TestClientGetApplicationForbiddenIsNotFound(t *testing.T) {
 }
 
 func TestClientSync(t *testing.T) {
+	var refreshed, synced bool
 	c := newServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/applications/core-pg1/sync" {
+		switch {
+		// Sync hard-refreshes the app first so ArgoCD re-pulls Git, then syncs.
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/applications/core-pg1":
+			if r.URL.Query().Get("refresh") != "hard" {
+				http.Error(w, "want refresh=hard, got "+r.URL.RawQuery, http.StatusInternalServerError)
+				return
+			}
+			refreshed = true
+			_, _ = w.Write([]byte(`{}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/applications/core-pg1/sync":
+			synced = true
+			_, _ = w.Write([]byte(`{}`))
+		default:
 			http.Error(w, "unexpected "+r.Method+" "+r.URL.Path, http.StatusInternalServerError)
-			return
 		}
-		_, _ = w.Write([]byte(`{}`))
 	})
 	if err := c.Sync(context.Background(), "core-pg1"); err != nil {
 		t.Fatalf("Sync err=%v", err)
+	}
+	if !refreshed || !synced {
+		t.Fatalf("want refresh then sync, got refreshed=%v synced=%v", refreshed, synced)
 	}
 }

@@ -49,11 +49,17 @@ Monaco). E2e проверен: заказ проходит цикл до HEALTHY
 
 ### Заказы и провижининг
 
-- [ ] **Действие «Синхронизировать» не работает.** Это `ForceSync` ->
-  `argo.Sync(r.ArgoCDAppName)`, только для admin (`internal/provisioning/service.go:550`).
-  На фронте показывается «Синхронизация запрошена», но эффекта нет. Выяснить
-  причину: пустой/неверный `ArgoCDAppName`, не сконфигурён ArgoCD-клиент, или
-  тихо падает апстрим. Добавить понятный фидбэк об ошибке и лог.
+- [x] **Действие «Синхронизировать» не работало и было неверно названо.**
+  Причина: дочерний `Application` под `syncPolicy.automated`+`selfHeal`, поэтому
+  голый `POST /sync` с пустым телом синхронизировал **закешированную** git-ревизию
+  - на already-synced аппе это no-op. Исправлено: `argocd.Client.Sync` теперь
+    сначала делает hard refresh (`GET /applications/{name}?refresh=hard`), затем
+    sync, так что ArgoCD перечитывает git и выкатывает свежий коммит. Добавлены
+    лог (`provisioning`, событие `sync forced`) и метрика
+    `console_argocd_sync_total{result}` в `ForceSync`. Кнопка переименована в
+    «Выкатить из Git» (жаргон ArgoCD убран), тост - «Выкатка из Git запущена»;
+    действие остаётся админским. Корневое лечение (вебхук GitLab -> ArgoCD,
+    чтобы не ждать git-поллинг) - отдельный пункт в разделе 4.
 - [ ] **Ошибка «an open merge request already exists for this order»** (`ErrOpenMR`,
   `guardOpenMR`, `internal/provisioning/service.go:567`). Сейчас просто доменная
   ошибка. Обработать по-человечески: показать ссылку на уже открытый MR и/или не

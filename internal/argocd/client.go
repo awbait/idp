@@ -168,13 +168,20 @@ func (c *Client) ListApplications(ctx context.Context, selector map[string]strin
 }
 
 func (c *Client) GetApplication(ctx context.Context, name string) (*Application, error) {
+	return c.getApplication(ctx, name, "")
+}
+
+// getApplication fetches one application. refresh ("normal"|"hard"|"") asks
+// ArgoCD to re-pull the app's Git revision before answering; "" reads the cached
+// state. A 403 (ArgoCD hides non-existent apps behind "permission denied" rather
+// than 404) maps to ErrNotFound so callers can observe a pruned app.
+func (c *Client) getApplication(ctx context.Context, name, refresh string) (*Application, error) {
+	var query url.Values
+	if refresh != "" {
+		query = url.Values{"refresh": {refresh}}
+	}
 	var app apiApp
-	if err := c.do(ctx, http.MethodGet, "/applications/"+url.PathEscape(name), nil, nil, &app); err != nil {
-		// ArgoCD returns 403 "permission denied" (not 404) for an application
-		// that doesn't exist, to avoid leaking existence. With our admin token a
-		// 403 on a specific app therefore means "not found" - map it so the
-		// delete flow (DELETE_MR_MERGED -> DELETED, gated on ErrNotFound) can
-		// observe a pruned app.
+	if err := c.do(ctx, http.MethodGet, "/applications/"+url.PathEscape(name), query, nil, &app); err != nil {
 		var ae *apiError
 		if errors.Is(err, models.ErrNotFound) || (errors.As(err, &ae) && ae.status == http.StatusForbidden) {
 			return nil, models.ErrNotFound
@@ -186,7 +193,14 @@ func (c *Client) GetApplication(ctx context.Context, name string) (*Application,
 }
 
 func (c *Client) Sync(ctx context.Context, name string) error {
-	// Empty body = sync the app's target revision with default options.
+	// Force a hard refresh first so ArgoCD re-pulls the latest Git revision. A
+	// plain sync only applies ArgoCD's cached manifests, which is a no-op on an
+	// app whose automated syncPolicy already keeps that cached revision applied -
+	// the refresh is what makes a freshly-pushed commit visible to the sync.
+	if _, err := c.getApplication(ctx, name, "hard"); err != nil {
+		return err
+	}
+	// Empty body = sync the (now refreshed) target revision with default options.
 	return c.do(ctx, http.MethodPost, "/applications/"+url.PathEscape(name)+"/sync", nil, struct{}{}, nil)
 }
 

@@ -17,6 +17,7 @@ import (
 	"console/internal/catalog"
 	"console/internal/events"
 	"console/internal/gitlab"
+	"console/internal/observability"
 	"console/internal/store"
 	"console/internal/views"
 	"console/pkg/models"
@@ -559,7 +560,9 @@ func (s *Service) Delete(ctx context.Context, u *models.User, id string) (*model
 	return r, nil
 }
 
-// ForceSync triggers an ArgoCD sync (admin only).
+// ForceSync triggers an ArgoCD sync (admin only). The sync hard-refreshes the
+// app first so ArgoCD re-pulls the latest Git revision before applying it (a
+// plain sync would only re-apply the cached, already-deployed manifests).
 func (s *Service) ForceSync(ctx context.Context, u *models.User, id string) error {
 	r, err := s.store.GetRequest(ctx, id)
 	if err != nil {
@@ -568,9 +571,18 @@ func (s *Service) ForceSync(ctx context.Context, u *models.User, id string) erro
 	if !u.IsAdmin() {
 		return ErrForbidden
 	}
-	if err := s.argo.Sync(ctx, r.ArgoCDAppName); err != nil {
+	start := time.Now()
+	err = s.argo.Sync(ctx, r.ArgoCDAppName)
+	observability.ObserveArgoSync(err)
+	if err != nil {
+		s.logger().Error("sync forced",
+			"order_id", r.ID, "argocd_app_name", r.ArgoCDAppName,
+			"actor", u.Subject, "duration_ms", time.Since(start).Milliseconds(), "err", err)
 		return fmt.Errorf("%w: argocd: %v", ErrUpstream, err)
 	}
+	s.logger().Info("sync forced",
+		"order_id", r.ID, "argocd_app_name", r.ArgoCDAppName,
+		"actor", u.Subject, "duration_ms", time.Since(start).Milliseconds())
 	s.event(ctx, r, u.Subject, "sync_forced", "", "")
 	return nil
 }

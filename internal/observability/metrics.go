@@ -67,7 +67,24 @@ var (
 		Name: "console_webhooks_received_total",
 		Help: "Total inbound upstream webhooks, by source and result.",
 	}, []string{"source", "result"})
+
+	// argocdSyncs counts admin-triggered ArgoCD syncs (refresh + sync) by result
+	// (ok|error). Lets us see whether the manual "deploy from Git" action actually
+	// reaches ArgoCD and succeeds.
+	argocdSyncs = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "console_argocd_sync_total",
+		Help: "Total admin-triggered ArgoCD syncs, by result.",
+	}, []string{"result"})
 )
+
+// ObserveArgoSync records one admin-triggered ArgoCD sync and its result.
+func ObserveArgoSync(err error) {
+	result := "ok"
+	if err != nil {
+		result = "error"
+	}
+	argocdSyncs.WithLabelValues(result).Inc()
+}
 
 // ObserveWebhook records one inbound webhook delivery: its source and result.
 func ObserveWebhook(source, result string) {
