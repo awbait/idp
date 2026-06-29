@@ -1,0 +1,8 @@
+# The portal embeds the SQL migrations via go:embed and validates an Atlas
+# checksum (atlas.sum) of them at startup. The checksum is computed over the
+# file bytes, so line endings matter: on a machine with core.autocrlf=true these
+# .sql files would be checked out as CRLF, the embedded bytes would differ from
+# the LF bytes atlas.sum was generated from, and startup fails with
+# "validate migrations: checksum mismatch". Pin them to LF on every platform.
+internal/store/migrations/*.sql text eol=lf
+internal/store/migrations/atlas.sum text eol=lf
