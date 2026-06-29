@@ -590,8 +590,8 @@ func (s *Service) ForceSync(ctx context.Context, u *models.User, id string) erro
 // --- helpers ---
 
 func (s *Service) guardOpenMR(ctx context.Context, id string) error {
-	if _, err := s.store.GetOpenMR(ctx, id); err == nil {
-		return ErrOpenMR
+	if mr, err := s.store.GetOpenMR(ctx, id); err == nil {
+		return &OpenMRError{URL: mr.MRURL, IID: mr.MRIID}
 	} else if !errors.Is(err, models.ErrNotFound) {
 		return err
 	}

@@ -42,11 +42,17 @@ export class HttpError extends Error {
   status: number;
   code: string;
   details: FieldError[];
+  // Open merge request that blocks the change (code "open_mr"); lets callers
+  // link the user straight to it.
+  mrUrl?: string;
+  mrIid?: number;
   constructor(status: number, body: ApiError | null) {
     super(body?.message || body?.error || `HTTP ${status}`);
     this.status = status;
     this.code = body?.error ?? "error";
     this.details = body?.details ?? [];
+    this.mrUrl = body?.mr_url;
+    this.mrIid = body?.mr_iid;
   }
 }
 

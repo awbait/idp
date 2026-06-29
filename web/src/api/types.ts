@@ -354,4 +354,6 @@ export interface ApiError {
   error: string;
   message?: string;
   details?: FieldError[]; // per-field schema validation failures
+  mr_url?: string; // open merge request blocking the change (error "open_mr")
+  mr_iid?: number;
 }

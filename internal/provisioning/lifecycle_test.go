@@ -237,6 +237,14 @@ func TestUpdateBlockedByOpenMR(t *testing.T) {
 	if !errors.Is(err, provisioning.ErrOpenMR) {
 		t.Fatalf("want ErrOpenMR, got %v", err)
 	}
+	// The error must carry the blocking MR so the API can link to it.
+	var ome *provisioning.OpenMRError
+	if !errors.As(err, &ome) {
+		t.Fatalf("want *OpenMRError, got %T", err)
+	}
+	if ome.IID == 0 || ome.URL == "" {
+		t.Fatalf("OpenMRError missing MR details: iid=%d url=%q", ome.IID, ome.URL)
+	}
 }
 
 func TestDraftLifecycle(t *testing.T) {

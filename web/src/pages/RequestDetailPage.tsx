@@ -8,6 +8,7 @@ import {
   IconArrowUpCircle,
   IconCheck,
   IconGitFork,
+  IconGitPullRequest,
   IconPencil,
   IconRefresh,
   IconTrash,
@@ -29,9 +30,16 @@ import { NotFound } from "../components/NotFound";
 import { StatusBadge } from "../components/StatusBadge";
 import { Button, Card, Select, Spinner } from "../components/ui";
 import { useAsync } from "../hooks/useAsync";
+import { safeHref } from "../lib/href";
 import { upgradeTargets } from "../lib/semver";
 import { attachSseLogger } from "../lib/sse";
 import { DetailActions, fmtDateTime, Meta, ProductView } from "./requestDetailParts";
+
+// Message for the "open MR blocks this change" conflict (proactive banner and
+// the delete race), kept consistent across both call sites.
+function openMRBlockedText(iid?: number): string {
+  return `Уже открыт запрос на слияние${iid ? ` #${iid}` : ""} для этого сервиса. Дождитесь его обработки или закройте его, прежде чем вносить новые изменения.`;
+}
 
 export function RequestDetailPage() {
   const { id = "" } = useParams();
@@ -134,6 +142,10 @@ export function RequestDetailPage() {
   const r = data.request;
   const mrs = data.merge_requests ?? [];
   const events = data.events ?? [];
+  // An open MR blocks any new change (edit/upgrade/delete) - the backend rejects
+  // it with 409 open_mr. Surface it up front so we can disable those actions and
+  // point at the MR instead of letting the user hit the error.
+  const openMR = mrs.find((m) => m.mr_status === "opened") ?? null;
   // modifiable: provision-class affordances (create/delete) - owner or admin.
   // editable: value/rename/upgrade affordances - also support, across teams.
   const modifiable = canModify(user, r.team) && r.status !== "DELETED";
@@ -152,7 +164,8 @@ export function RequestDetailPage() {
     pub?.approved_view_version,
   );
   const upgradeTo = upgradeVersions[0] ?? null; // recommended (approved) version
-  const canUpgrade = editable && !isDraft && liveStatus && upgradeVersions.length > 0 && !r.drifted;
+  const canUpgrade =
+    editable && !isDraft && liveStatus && upgradeVersions.length > 0 && !r.drifted && !openMR;
   const showUpgradeNudge = canUpgrade && upgradeDismissed !== upgradeTo;
 
   function dismissUpgradeNudge() {
@@ -165,8 +178,17 @@ export function RequestDetailPage() {
   }
 
   async function onConfirmDelete() {
-    await api.deleteRequest(id);
-    isDraft ? navigate("/requests") : reload();
+    try {
+      await api.deleteRequest(id);
+      isDraft ? navigate("/requests") : reload();
+    } catch (e) {
+      // Race: an MR may have opened between load and confirm. Show the blocked
+      // reason in Russian (ConfirmDialog renders a thrown message inline).
+      if (e instanceof HttpError && e.code === "open_mr") {
+        throw new Error(openMRBlockedText(e.mrIid));
+      }
+      throw e;
+    }
   }
   function startRename() {
     setNameDraft(r.display_name || "");
@@ -270,6 +292,30 @@ export function RequestDetailPage() {
             )}
         </div>
       )}
+      {openMR && (
+        <div className="flex items-start justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <div className="flex items-start gap-2">
+            <IconGitPullRequest size={18} stroke={1.8} className="mt-0.5 shrink-0" />
+            <div>
+              <p className="font-medium">Открыт запрос на слияние{openMR.mr_iid ? ` #${openMR.mr_iid}` : ""}</p>
+              <p className="mt-0.5 text-amber-700">
+                Пока он не обработан, изменение, обновление и удаление сервиса недоступны.
+              </p>
+            </div>
+          </div>
+          {safeHref(openMR.mr_url) && (
+            <a
+              href={safeHref(openMR.mr_url)}
+              target="_blank"
+              rel="noreferrer"
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-surface px-3 py-1.5 text-xs font-medium text-amber-800 outline-none hover:bg-amber-100 focus-visible:ring-2 focus-visible:ring-amber-500"
+            >
+              <IconGitPullRequest size={14} stroke={1.8} />
+              Открыть MR
+            </a>
+          )}
+        </div>
+      )}
       {showUpgradeNudge && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
           <div className="flex items-center gap-2">
@@ -342,7 +388,7 @@ export function RequestDetailPage() {
           onSubmit={isDraft && modifiable ? onSubmit : undefined}
           onUpgrade={canUpgrade ? () => setUpgradeOpen(true) : undefined}
           onSync={!isDraft && user?.role === "admin" ? onSync : undefined}
-          onDelete={modifiable ? () => setConfirmDelete(true) : undefined}
+          onDelete={modifiable && !openMR ? () => setConfirmDelete(true) : undefined}
           notify={canUpgrade}
         />
       </div>

@@ -1,27 +1,27 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { TabList, TabPanel, Tabs } from "react-aria-components";
 import yaml from "js-yaml";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { TabList, TabPanel, Tabs } from "react-aria-components";
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, HttpError } from "../api/client";
-import { useAsync } from "../hooks/useAsync";
-import { useUser } from "../auth/UserContext";
+import type { ChangelogEntry, FieldError, OrderRequest, ViewDocument } from "../api/types";
+import { chartLabel, findCatalogChart, useCatalog } from "../app/CatalogContext";
 import { useTeam } from "../app/TeamContext";
-import { Button, Card, ErrorBox, Spinner } from "../components/ui";
+import { useUser } from "../auth/UserContext";
+import { Breadcrumbs } from "../components/Breadcrumbs";
 import { FormErrors } from "../components/FormErrors";
 import { NotFound } from "../components/NotFound";
-import { Breadcrumbs } from "../components/Breadcrumbs";
 import { OrderMetaCard, OrderValuesCard } from "../components/OrderFormParts";
-import { DetailTab } from "./requestDetailParts";
 import {
   GenericInfoActions,
   GenericListTab,
   type PersistValues,
 } from "../components/products/GenericProductTabs";
 import { actionViews, productTabs } from "../components/products/genericView";
-import { chartLabel, findCatalogChart, useCatalog } from "../app/CatalogContext";
+import { Button, Card, ErrorBox, Spinner } from "../components/ui";
+import { collectErrors, pruneEmpty } from "../form/SchemaForm";
+import { useAsync } from "../hooks/useAsync";
 import { isNewer, upgradeTargets } from "../lib/semver";
-import type { ChangelogEntry, FieldError, OrderRequest, ViewDocument } from "../api/types";
-import { pruneEmpty, collectErrors } from "../form/SchemaForm";
+import { DetailTab } from "./requestDetailParts";
 
 type Values = Record<string, unknown>;
 
@@ -236,8 +236,15 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
   }
 
   function fail(e: unknown) {
-    if (e instanceof HttpError) setSubmitErr({ message: e.message, details: e.details });
-    else setSubmitErr({ message: (e as Error).message });
+    if (e instanceof HttpError) {
+      // An open MR blocks the change: explain it in Russian instead of the bare
+      // English domain string. The order page itself links to the MR.
+      const message =
+        e.code === "open_mr"
+          ? `Уже открыт запрос на слияние${e.mrIid ? ` #${e.mrIid}` : ""} для этого сервиса. Дождитесь его обработки или закройте его, прежде чем вносить новые изменения.`
+          : e.message;
+      setSubmitErr({ message, details: e.details });
+    } else setSubmitErr({ message: (e as Error).message });
   }
 
   // saveDraft persists the in-progress order without opening an MR.

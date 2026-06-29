@@ -15,6 +15,10 @@ type errorBody struct {
 	Error   string                    `json:"error"`
 	Message string                    `json:"message,omitempty"`
 	Details []provisioning.FieldError `json:"details,omitempty"`
+	// MRURL/MRIID accompany the "open_mr" conflict so the UI can link to the
+	// merge request that blocks a new change.
+	MRURL string `json:"mr_url,omitempty"`
+	MRIID int    `json:"mr_iid,omitempty"`
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
@@ -33,7 +37,13 @@ func writeErr(w http.ResponseWriter, code int, errCode, msg string) {
 func writeDomainErr(w http.ResponseWriter, err error) {
 	var ve *provisioning.ValidationError
 	var pve *publications.ValidationError
+	var ome *provisioning.OpenMRError
 	switch {
+	case errors.As(err, &ome):
+		// An order's open MR blocks the change: 409 with a link so the UI can
+		// point the user at it instead of showing a bare English domain string.
+		writeJSON(w, http.StatusConflict,
+			errorBody{Error: "open_mr", Message: ome.Error(), MRURL: ome.URL, MRIID: ome.IID})
 	case errors.As(err, &ve):
 		writeJSON(w, http.StatusUnprocessableEntity,
 			errorBody{Error: "validation_failed", Message: ve.Message, Details: ve.Fields})

@@ -16,7 +16,7 @@ import {
   TableHeader,
 } from "react-aria-components";
 import { Link, useNavigate } from "react-router-dom";
-import { api, errorMessage } from "../api/client";
+import { api, errorMessage, HttpError } from "../api/client";
 import type { OrderRequest, RequestStatus } from "../api/types";
 import { useCatalog } from "../app/CatalogContext";
 import { useTeam } from "../app/TeamContext";
@@ -153,8 +153,19 @@ export function OrdersTable({ title, filter, orderTo, orderDisabledReason, empty
   }
   async function onConfirmDelete() {
     if (!deleting) return;
-    await api.deleteRequest(deleting.id);
-    reload();
+    try {
+      await api.deleteRequest(deleting.id);
+      reload();
+    } catch (e) {
+      // An open MR blocks deletion: explain it in Russian (ConfirmDialog renders
+      // a thrown message inline) instead of the bare English domain string.
+      if (e instanceof HttpError && e.code === "open_mr") {
+        throw new Error(
+          `Уже открыт запрос на слияние${e.mrIid ? ` #${e.mrIid}` : ""} для этого сервиса. Дождитесь его обработки или закройте его, прежде чем удалять сервис.`,
+        );
+      }
+      throw e;
+    }
   }
 
   const filtersDefault =
