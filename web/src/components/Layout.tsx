@@ -54,7 +54,7 @@ import { Spinner } from "./ui";
 
 const navItems = [
   { to: "/requests", label: "Список заказов", Icon: IconBox },
-  { to: "/catalog", label: "Чарты", Icon: IconPackages },
+  { to: "/catalog", label: "Каталог", Icon: IconPackages },
 ];
 
 // Top-level sidebar sections. The platform section is the default product

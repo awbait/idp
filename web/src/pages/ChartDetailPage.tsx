@@ -49,7 +49,7 @@ export function ChartDetailPage() {
         <div>
           <Breadcrumbs
             items={[
-              { label: "Чарты", to: "/catalog" },
+              { label: "Каталог", to: "/catalog" },
               { label: `${chart.project}/${chart.name}` },
             ]}
           />
@@ -114,8 +114,8 @@ export function ChartDetailPage() {
 
       <Tabs>
         <TabList aria-label="Документация чарта" className="flex gap-1 border-b border-gray-200">
-          <DocTab id="readme">README</DocTab>
-          <DocTab id="changelog">CHANGELOG</DocTab>
+          <DocTab id="readme">Описание</DocTab>
+          <DocTab id="changelog">Изменения</DocTab>
         </TabList>
         <TabPanel id="readme" className="pt-4 outline-none">
           <Readme project={project} name={name} version={version} />
@@ -149,12 +149,28 @@ function Readme({ project, name, version }: { project: string; name: string; ver
       {loading ? (
         <Spinner />
       ) : error || !data?.trim() ? (
-        <p className="text-sm text-gray-500">README недоступен.</p>
+        <p className="text-sm text-gray-500">Описание недоступно.</p>
       ) : (
         <Markdown>{data}</Markdown>
       )}
     </Card>
   );
+}
+
+// Keep-a-Changelog section -> a chip style. Each category gets its own soft
+// (muted) tint so they're scannable, but the palette stays low-saturation rather
+// than loud semantic green/red.
+const CHANGELOG_SECTION_CLASS: Record<string, string> = {
+  added: "bg-emerald-50 text-emerald-700",
+  changed: "bg-blue-50 text-blue-700",
+  fixed: "bg-violet-50 text-violet-700",
+  removed: "bg-rose-50 text-rose-700",
+  deprecated: "bg-amber-50 text-amber-700",
+  security: "bg-orange-50 text-orange-700",
+};
+
+function changelogSectionClass(section: string): string {
+  return CHANGELOG_SECTION_CLASS[section.toLowerCase()] ?? "bg-gray-100 text-gray-600";
 }
 
 function Changelog({ project, name }: { project: string; name: string }) {
@@ -163,7 +179,8 @@ function Changelog({ project, name }: { project: string; name: string }) {
     [project, name],
   );
   if (loading) return <Spinner label="Загрузка истории изменений…" />;
-  if (error || !data?.length) return <p className="text-sm text-gray-500">CHANGELOG недоступен.</p>;
+  if (error || !data?.length)
+    return <p className="text-sm text-gray-500">История изменений недоступна.</p>;
   return (
     <Card>
       <div className="flex flex-col gap-4">
@@ -175,7 +192,11 @@ function Changelog({ project, name }: { project: string; name: string }) {
             </div>
             {Object.entries(e.sections).map(([sec, items]) => (
               <div key={sec} className="mt-1">
-                <span className="text-xs font-semibold uppercase text-gray-500">{sec}</span>
+                <span
+                  className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${changelogSectionClass(sec)}`}
+                >
+                  {sec}
+                </span>
                 <ul className="ml-4 list-disc text-sm text-gray-700">
                   {items.map((it, i) => (
                     <li key={i}>

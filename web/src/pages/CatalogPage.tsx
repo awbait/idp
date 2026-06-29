@@ -47,7 +47,7 @@ export function CatalogPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Чарты</h1>
+        <h1 className="text-xl font-semibold">Каталог</h1>
         <AddChartDialog />
       </div>
 
@@ -79,7 +79,7 @@ export function CatalogPage() {
       )}
 
       {approved.length > 0 && (
-        <ChartSection title="Согласованные" charts={approved} categoryLabel={categoryLabel} />
+        <ChartSection title="Опубликованные" charts={approved} categoryLabel={categoryLabel} />
       )}
       {others.length > 0 && (
         <ChartSection title="Остальные" charts={others} categoryLabel={categoryLabel} />
@@ -127,29 +127,35 @@ function ChartCard({ chart: c, categoryLabel }: { chart: CatalogChart; categoryL
   const description = (approved && pub?.approved_description) || c.description;
   const category = categoryLabel(pub?.category_id);
   return (
-    <Link to={`/catalog/${c.project}/${c.name}`}>
-      <Card className="h-full transition hover:border-brand-400 hover:shadow">
-        <div className="flex items-baseline justify-between gap-2">
-          <h2 className="flex min-w-0 items-center gap-1.5 font-medium text-gray-900">
-            <ProductIcon project={c.project} name={c.name} size={20} />
-            <span className="truncate">{c.name}</span>
-            {/* Published and approved: a plain green check. */}
-            {approved && (
-              <IconCircleCheckFilled
-                size={16}
-                className="shrink-0 text-emerald-500"
-                title="Опубликован в каталоге"
-              />
-            )}
-          </h2>
-          {category && (
-            <span className="shrink-0 rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
-              {category}
-            </span>
-          )}
+    <Link to={`/catalog/${c.project}/${c.name}`} className="group block h-full">
+      <Card className="flex h-full flex-col transition group-hover:border-brand-400 group-hover:shadow-md">
+        <div className="flex items-start gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition group-hover:bg-brand-50 group-hover:text-brand-600">
+            <ProductIcon project={c.project} name={c.name} size={24} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <h2 className="flex min-w-0 items-center gap-1.5 font-semibold text-gray-900 transition-colors group-hover:text-brand-700">
+                <span className="truncate">{c.name}</span>
+                {/* Published and approved: a plain green check. */}
+                {approved && (
+                  <IconCircleCheckFilled
+                    size={16}
+                    className="shrink-0 text-emerald-500"
+                    title="Опубликован в каталоге"
+                  />
+                )}
+              </h2>
+              {category && (
+                <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+                  {category}
+                </span>
+              )}
+            </div>
+            <p className="mt-1 line-clamp-2 min-h-[2.5rem] text-sm text-gray-600">{description}</p>
+          </div>
         </div>
-        <p className="mt-1 text-sm text-gray-600">{description}</p>
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 text-xs text-gray-500">
           {c.missing ? (
             <span
               title="Публикация ссылается на чарт, которого больше нет в Harbor"
@@ -167,9 +173,6 @@ function ChartCard({ chart: c, categoryLabel }: { chart: CatalogChart; categoryL
             >
               {pub.owner_team}
             </span>
-          )}
-          {pub?.status === "PENDING" && (
-            <span className="rounded bg-amber-50 px-2 py-0.5 text-amber-700">на согласовании</span>
           )}
           {c.allowed_teams && c.allowed_teams.length > 0 && (
             <span className="rounded bg-amber-50 px-2 py-0.5 text-amber-700">

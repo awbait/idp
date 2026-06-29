@@ -1,5 +1,5 @@
+import { IconCheck, IconPlus, IconX } from "@tabler/icons-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Button as AriaButton,
   Dialog,
@@ -8,12 +8,12 @@ import {
   Modal,
   ModalOverlay,
 } from "react-aria-components";
-import { IconCheck, IconPlus, IconX } from "@tabler/icons-react";
+import { useNavigate } from "react-router-dom";
 import { api, HttpError } from "../api/client";
-import { useUser } from "../auth/UserContext";
-import { useCatalog } from "../app/CatalogContext";
-import { Button, Select, TextField } from "./ui";
 import type { ChartCheckResult } from "../api/types";
+import { useCatalog } from "../app/CatalogContext";
+import { useUser } from "../auth/UserContext";
+import { Button, Select, TextField } from "./ui";
 
 // "Add chart": a chart may live at an arbitrary path in Harbor (outside the
 // configured projects). Enter project/name -> check it exists and the files are
@@ -90,7 +90,7 @@ export function AddChartDialog() {
     <DialogTrigger onOpenChange={(open) => !open && reset()}>
       <AriaButton className="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-on-accent outline-none hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500">
         <IconPlus size={16} stroke={2} />
-        Добавить чарт
+        Добавить сервис
       </AriaButton>
       <ModalOverlay
         isDismissable
@@ -102,7 +102,7 @@ export function AddChartDialog() {
               <div className="flex flex-col gap-3 p-4">
                 <div>
                   <Heading slot="title" className="text-sm font-semibold text-slate-800">
-                    Добавить чарт из Harbor
+                    Добавить сервис из Harbor
                   </Heading>
                   <p className="mt-0.5 text-xs text-slate-500">
                     Чарты из настроенных проектов появляются в каталоге автоматически. Чарт по
