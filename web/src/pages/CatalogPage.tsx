@@ -11,6 +11,13 @@ import { isNewer } from "../lib/semver";
 
 type CatLabel = (id?: string) => string | undefined;
 
+// isApprovedChart: the chart is published with an order form available - the
+// legacy single approved view, or at least one orderable version.
+function isApprovedChart(c: CatalogChart): boolean {
+  const p = c.publication;
+  return !!p?.published && (!!p.has_order_view || (p.orderable_versions?.length ?? 0) > 0);
+}
+
 export function CatalogPage() {
   const { categories, charts, error, loading } = useCatalog();
   const { team } = useTeam();
@@ -26,11 +33,11 @@ export function CatalogPage() {
     (c) => !team || !c.allowed_teams?.length || c.allowed_teams.includes(team),
   );
 
-  // Approved: published with an order-view (passed moderation + has a view);
-  // the rest: found by scan / in progress / under review.
-  const isApproved = (c: CatalogChart) => !!c.publication?.published && !!c.publication?.has_order_view;
-  const approved = visible.filter(isApproved);
-  const others = visible.filter((c) => !isApproved(c));
+  // Approved: published with an order-view (passed moderation + has a view) -
+  // either the legacy single view, or at least one orderable version
+  // (multi-version publications). The rest: found by scan / in progress / review.
+  const approved = visible.filter(isApprovedChart);
+  const others = visible.filter((c) => !isApprovedChart(c));
 
   // Notify owners: a version newer than the approved one is out in Harbor for their charts.
   const outdated = visible.filter((c) => {
@@ -119,11 +126,18 @@ function ChartSection({
 
 function ChartCard({ chart: c, categoryLabel }: { chart: CatalogChart; categoryLabel: CatLabel }) {
   const pub = c.publication;
-  const approved = !!pub?.published && !!pub?.has_order_view;
+  const approved = isApprovedChart(c);
+  const orderable = pub?.orderable_versions ?? [];
   // Approved charts show a snapshot (version + description + icon at approve time),
   // not the live Harbor data; the rest show live data. For approved charts take the
   // icon strictly from the snapshot (even if empty), else a new version's icon leaks.
-  const version = (approved && pub?.approved_view_version) || c.latest_version;
+  // Main chip: recommended (or highest orderable) version for multi-version
+  // publications, else the legacy approved version, else the live latest.
+  const version =
+    (approved && (pub?.recommended_version || orderable[0] || pub?.approved_view_version)) ||
+    c.latest_version;
+  // Other orderable versions beyond the main one, shown as "+N" with a tooltip.
+  const extraVersions = orderable.filter((v) => v !== version);
   const description = (approved && pub?.approved_description) || c.description;
   const category = categoryLabel(pub?.category_id);
   return (
@@ -165,6 +179,14 @@ function ChartCard({ chart: c, categoryLabel }: { chart: CatalogChart; categoryL
             </span>
           ) : (
             <span className="rounded bg-gray-100 px-2 py-0.5">v{version}</span>
+          )}
+          {!c.missing && extraVersions.length > 0 && (
+            <span
+              title={`Доступные версии: ${orderable.join(", ")}`}
+              className="rounded bg-gray-100 px-2 py-0.5 text-gray-500"
+            >
+              +{extraVersions.length}
+            </span>
           )}
           {pub && (
             <span
