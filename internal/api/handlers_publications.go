@@ -219,6 +219,140 @@ func (s *Server) handleRejectPublication(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, pub)
 }
 
+// --- publication versions (per-version view + approval FSM) ---
+
+func (s *Server) handleListVersions(w http.ResponseWriter, r *http.Request) {
+	versions, err := s.Pubs.ListVersions(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		writeDomainErr(w, err)
+		return
+	}
+	if versions == nil {
+		versions = []*models.PublicationVersion{}
+	}
+	writeJSON(w, http.StatusOK, versions)
+}
+
+type saveVersionReq struct {
+	View json.RawMessage `json:"view"`
+}
+
+func (s *Server) handleSaveVersionView(w http.ResponseWriter, r *http.Request) {
+	u := auth.UserFrom(r.Context())
+	var body saveVersionReq
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.View) == 0 {
+		writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON")
+		return
+	}
+	v, err := s.Pubs.SaveVersionView(r.Context(), u, chi.URLParam(r, "id"), chi.URLParam(r, "version"), body.View)
+	if err != nil {
+		writeDomainErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
+}
+
+// handleValidateVersion is a live builder check of a draft view against a
+// specific version's schema; always 200 with a list of issues (empty = valid).
+func (s *Server) handleValidateVersion(w http.ResponseWriter, r *http.Request) {
+	var body validatePubReq
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.View) == 0 {
+		writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON")
+		return
+	}
+	issues, err := s.Pubs.ValidateVersionView(r.Context(), chi.URLParam(r, "id"), chi.URLParam(r, "version"), body.View)
+	if err != nil {
+		writeDomainErr(w, err)
+		return
+	}
+	if issues == nil {
+		issues = []views.Issue{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"issues": issues})
+}
+
+func (s *Server) handleSubmitVersion(w http.ResponseWriter, r *http.Request) {
+	u := auth.UserFrom(r.Context())
+	v, err := s.Pubs.SubmitVersion(r.Context(), u, chi.URLParam(r, "id"), chi.URLParam(r, "version"))
+	if err != nil {
+		writeDomainErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
+}
+
+func (s *Server) handleWithdrawVersion(w http.ResponseWriter, r *http.Request) {
+	u := auth.UserFrom(r.Context())
+	v, err := s.Pubs.WithdrawVersion(r.Context(), u, chi.URLParam(r, "id"), chi.URLParam(r, "version"))
+	if err != nil {
+		writeDomainErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
+}
+
+func (s *Server) handleApproveVersion(w http.ResponseWriter, r *http.Request) {
+	u := auth.UserFrom(r.Context())
+	v, err := s.Pubs.ApproveVersion(r.Context(), u, chi.URLParam(r, "id"), chi.URLParam(r, "version"))
+	if err != nil {
+		writeDomainErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
+}
+
+func (s *Server) handleRejectVersion(w http.ResponseWriter, r *http.Request) {
+	u := auth.UserFrom(r.Context())
+	var body rejectPubReq
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON")
+		return
+	}
+	v, err := s.Pubs.RejectVersion(r.Context(), u, chi.URLParam(r, "id"), chi.URLParam(r, "version"), strings.TrimSpace(body.Comment))
+	if err != nil {
+		writeDomainErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
+}
+
+type orderableReq struct {
+	Orderable bool `json:"orderable"`
+}
+
+func (s *Server) handleSetVersionOrderable(w http.ResponseWriter, r *http.Request) {
+	u := auth.UserFrom(r.Context())
+	var body orderableReq
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON")
+		return
+	}
+	v, err := s.Pubs.SetVersionOrderable(r.Context(), u, chi.URLParam(r, "id"), chi.URLParam(r, "version"), body.Orderable)
+	if err != nil {
+		writeDomainErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
+}
+
+type recommendedReq struct {
+	Version string `json:"version"`
+}
+
+func (s *Server) handleSetRecommendedVersion(w http.ResponseWriter, r *http.Request) {
+	u := auth.UserFrom(r.Context())
+	var body recommendedReq
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON")
+		return
+	}
+	if err := s.Pubs.SetRecommendedVersion(r.Context(), u, chi.URLParam(r, "id"), strings.TrimSpace(body.Version)); err != nil {
+		writeDomainErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusNoContent, nil)
+}
+
 // --- catalog overlay & active view ---
 
 // publicationSummary is a lightweight projection of a publication for the

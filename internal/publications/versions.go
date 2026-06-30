@@ -225,6 +225,17 @@ func (s *Service) SetRecommendedVersion(ctx context.Context, u *models.User, pub
 	return nil
 }
 
+// ValidateVersionView runs a full validation of a draft view against a specific
+// chart version's schema (the live builder check). Returns the list of problems
+// (empty = valid), not an error.
+func (s *Service) ValidateVersionView(ctx context.Context, pubID, chartVersion string, view json.RawMessage) ([]views.Issue, error) {
+	p, err := s.store.GetPublication(ctx, pubID)
+	if err != nil {
+		return nil, err
+	}
+	return s.validateVersionView(ctx, p, chartVersion, view), nil
+}
+
 // CatalogVersions projects a publication's versions for the catalog: the
 // resolved recommended (default-served) chart version and the list of all
 // orderable+APPROVED versions, highest first (for the "+N" chip and tooltip).

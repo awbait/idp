@@ -11,6 +11,68 @@ import (
 	"console/pkg/models"
 )
 
+// TestVersionManagementAPI drives the per-version view + approval FSM over HTTP.
+func TestVersionManagementAPI(t *testing.T) {
+	srv, _, _ := newServer(t)
+	h := srv.Router()
+	ctx := context.Background()
+	view := json.RawMessage(`{"views":{"order":{"identity":"/gateways/0/name","include":["gateways"]}}}`)
+
+	// Set up a category + publication via the service (owner is team core).
+	owner := &models.User{Subject: "owner", Teams: []string{"core"}, Role: models.RoleMember}
+	if err := srv.Pubs.CreateCategory(ctx, &models.User{Role: models.RoleAdmin}, &models.Category{ID: "network", Label: "net"}); err != nil {
+		t.Fatal(err)
+	}
+	pub, err := srv.Pubs.Create(ctx, owner, publications.CreateInput{
+		ChartProject: "platform", ChartName: "myservice", CategoryID: "network", OwnerTeam: "core",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := "/api/v1/publications/" + pub.ID
+
+	do := func(req *http.Request) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+
+	// Save a draft view for version 1.0.0.
+	if rec := do(devReq("PUT", base+"/versions/1.0.0", "core", map[string]any{"view": view})); rec.Code != http.StatusOK {
+		t.Fatalf("save view: %d body=%s", rec.Code, rec.Body.String())
+	}
+	// Submit, approve (admin), allowlist, recommend.
+	if rec := do(devReq("POST", base+"/versions/1.0.0/submit", "core", nil)); rec.Code != http.StatusOK {
+		t.Fatalf("submit: %d body=%s", rec.Code, rec.Body.String())
+	}
+	// A member cannot approve.
+	if rec := do(devReq("POST", base+"/versions/1.0.0/approve", "core", nil)); rec.Code != http.StatusForbidden {
+		t.Fatalf("member approve: want 403, got %d", rec.Code)
+	}
+	if rec := do(adminReq("POST", base+"/versions/1.0.0/approve", nil)); rec.Code != http.StatusOK {
+		t.Fatalf("approve: %d body=%s", rec.Code, rec.Body.String())
+	}
+	if rec := do(devReq("POST", base+"/versions/1.0.0/orderable", "core", map[string]any{"orderable": true})); rec.Code != http.StatusOK {
+		t.Fatalf("orderable: %d body=%s", rec.Code, rec.Body.String())
+	}
+	if rec := do(devReq("POST", base+"/recommended", "core", map[string]any{"version": "1.0.0"})); rec.Code != http.StatusNoContent {
+		t.Fatalf("recommend: %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	// List versions reflects the approved+orderable state.
+	rec := do(devReq("GET", base+"/versions", "core", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list: %d", rec.Code)
+	}
+	var versions []models.PublicationVersion
+	if err := json.Unmarshal(rec.Body.Bytes(), &versions); err != nil {
+		t.Fatal(err)
+	}
+	if len(versions) != 1 || versions[0].Status != models.PubApproved || !versions[0].Orderable {
+		t.Fatalf("unexpected versions: %+v", versions)
+	}
+}
+
 // publishes two orderable versions of a synthetic chart and checks that the
 // catalog summary and the version-aware view endpoint reflect them.
 func TestCatalogAndViewExposeVersions(t *testing.T) {

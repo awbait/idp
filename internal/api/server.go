@@ -154,6 +154,17 @@ func (s *Server) Router() http.Handler {
 			r.Post("/publications/{id}/approve", s.handleApprovePublication)   // admin
 			r.Post("/publications/{id}/reject", s.handleRejectPublication)     // admin
 
+			// per-version view builder + approval FSM (multi-version publications)
+			r.Get("/publications/{id}/versions", s.handleListVersions)
+			r.Put("/publications/{id}/versions/{version}", s.handleSaveVersionView)
+			r.Post("/publications/{id}/versions/{version}/validate", s.handleValidateVersion)
+			r.Post("/publications/{id}/versions/{version}/submit", s.handleSubmitVersion)
+			r.Post("/publications/{id}/versions/{version}/withdraw", s.handleWithdrawVersion)
+			r.Post("/publications/{id}/versions/{version}/approve", s.handleApproveVersion) // admin
+			r.Post("/publications/{id}/versions/{version}/reject", s.handleRejectVersion)   // admin
+			r.Post("/publications/{id}/versions/{version}/orderable", s.handleSetVersionOrderable)
+			r.Post("/publications/{id}/recommended", s.handleSetRecommendedVersion)
+
 			// requests
 			r.Get("/requests", s.handleListRequests)
 			r.Post("/requests", s.handleCreateRequest)
