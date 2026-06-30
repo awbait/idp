@@ -3,11 +3,100 @@ import { IconArrowNarrowRight, IconCircleCheck, IconCircleX, IconClock } from "@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, HttpError } from "../api/client";
-import type { ChartPublication } from "../api/types";
+import type { ChartPublication, PublicationVersion } from "../api/types";
 import { useCatalog } from "../app/CatalogContext";
 import { useTheme } from "../app/ThemeContext";
 import { useToast } from "../app/ToastContext";
 import { Button, Card, Chip, TextField } from "./ui";
+
+// VersionReview is the admin decision surface for one PENDING publication
+// version: the view-document diff (approved vs the submitted draft) and the
+// approve/reject controls. The per-version analogue of PublicationReview.
+export function VersionReview({
+  pubId,
+  version,
+  onReviewed,
+}: {
+  pubId: string;
+  version: PublicationVersion;
+  onReviewed: () => void;
+}) {
+  const { theme } = useTheme();
+  const monacoTheme = theme === "light" ? "light" : "vs-dark";
+  const { success } = useToast();
+  const [busy, setBusy] = useState<null | "approve" | "reject">(null);
+  const [rejectComment, setRejectComment] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+
+  async function onApprove() {
+    setBusy("approve");
+    setErr(null);
+    try {
+      await api.approveVersion(pubId, version.chart_version);
+      success(`Версия ${version.chart_version} согласована`);
+      onReviewed();
+    } catch (e) {
+      setErr(e instanceof HttpError ? e.message : (e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onReject() {
+    setBusy("reject");
+    setErr(null);
+    try {
+      await api.rejectVersion(pubId, version.chart_version, rejectComment.trim());
+      success(`Версия ${version.chart_version} отклонена`);
+      onReviewed();
+    } catch (e) {
+      setErr(e instanceof HttpError ? e.message : (e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Card className="flex flex-col gap-3 border-amber-200">
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold text-slate-800">Согласование версии</h2>
+        <Chip className="bg-slate-100 text-slate-600">v{version.chart_version}</Chip>
+      </div>
+      {version.approved_view_json ? (
+        <div className="overflow-hidden rounded-md border border-slate-200">
+          <DiffEditor
+            height="400px"
+            language="json"
+            theme={monacoTheme}
+            original={JSON.stringify(version.approved_view_json, null, 2)}
+            modified={JSON.stringify(version.view_json ?? {}, null, 2)}
+            options={{ readOnly: true, renderSideBySide: true, minimap: { enabled: false }, fontSize: 12 }}
+          />
+        </div>
+      ) : (
+        <p className="text-sm text-gray-500">
+          Первое согласование этой версии: действующего view для сравнения нет.
+        </p>
+      )}
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
+          <TextField
+            label="Комментарий (для отклонения)"
+            value={rejectComment}
+            onChange={(v) => setRejectComment(v)}
+          />
+        </div>
+        <Button variant="primary" isDisabled={busy !== null} onPress={onApprove}>
+          <IconCircleCheck size={16} stroke={1.8} /> Согласовать
+        </Button>
+        <Button variant="danger" isDisabled={busy !== null} onPress={onReject}>
+          <IconCircleX size={16} stroke={1.8} /> Отклонить
+        </Button>
+      </div>
+      {err && <p className="text-sm text-red-600">{err}</p>}
+    </Card>
+  );
+}
 
 // ProposalChip: an amber "was -> now" chip for an unapproved metadata change.
 function ProposalChip({ label, from, to }: { label: string; from: string; to: string }) {

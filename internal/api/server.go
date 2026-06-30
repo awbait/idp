@@ -155,6 +155,7 @@ func (s *Server) Router() http.Handler {
 			r.Post("/publications/{id}/reject", s.handleRejectPublication)     // admin
 
 			// per-version view builder + approval FSM (multi-version publications)
+			r.Get("/publications/pending-versions", s.handlePendingVersions) // admin queue (static path wins over /{id})
 			r.Get("/publications/{id}/versions", s.handleListVersions)
 			r.Put("/publications/{id}/versions/{version}", s.handleSaveVersionView)
 			r.Post("/publications/{id}/versions/{version}/validate", s.handleValidateVersion)

@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"console/internal/auth"
 	"console/internal/catalog"
 	"console/internal/publications"
 	"console/internal/store"
 	"console/internal/views"
 	"console/pkg/models"
+	"github.com/go-chi/chi/v5"
 )
 
 // --- categories ---
@@ -220,6 +220,24 @@ func (s *Server) handleRejectPublication(w http.ResponseWriter, r *http.Request)
 }
 
 // --- publication versions (per-version view + approval FSM) ---
+
+// handlePendingVersions is the admin approval queue for per-version submissions.
+func (s *Server) handlePendingVersions(w http.ResponseWriter, r *http.Request) {
+	u := auth.UserFrom(r.Context())
+	if !u.IsAdmin() {
+		writeErr(w, http.StatusForbidden, "forbidden", "admin only")
+		return
+	}
+	pending, err := s.Pubs.PendingVersions(r.Context())
+	if err != nil {
+		writeDomainErr(w, err)
+		return
+	}
+	if pending == nil {
+		pending = []publications.PendingVersion{}
+	}
+	writeJSON(w, http.StatusOK, pending)
+}
 
 func (s *Server) handleListVersions(w http.ResponseWriter, r *http.Request) {
 	versions, err := s.Pubs.ListVersions(r.Context(), chi.URLParam(r, "id"))

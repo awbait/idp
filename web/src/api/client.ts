@@ -13,6 +13,7 @@ import type {
   FieldError,
   JSONSchema,
   OrderRequest,
+  PendingVersion,
   PublicationDetail,
   PublicationVersion,
   RequestDetail,
@@ -196,6 +197,10 @@ export const api = {
     req<ChartPublication>("POST", `/publications/${enc(id)}/reject`, { comment }),
 
   // publication versions (per-version view builder + approval FSM)
+  pendingVersions: (signal?: AbortSignal) =>
+    req<PendingVersion[] | null>("GET", "/publications/pending-versions", undefined, signal).then(
+      (r) => r ?? [],
+    ),
   listVersions: (id: string, signal?: AbortSignal) =>
     req<PublicationVersion[] | null>("GET", `/publications/${enc(id)}/versions`, undefined, signal).then(
       (r) => r ?? [],

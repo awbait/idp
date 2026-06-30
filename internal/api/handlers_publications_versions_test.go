@@ -45,6 +45,25 @@ func TestVersionManagementAPI(t *testing.T) {
 	if rec := do(devReq("POST", base+"/versions/1.0.0/submit", "core", nil)); rec.Code != http.StatusOK {
 		t.Fatalf("submit: %d body=%s", rec.Code, rec.Body.String())
 	}
+	// Pending-versions queue: admin sees it, a member is forbidden.
+	if rec := do(devReq("GET", "/api/v1/publications/pending-versions", "core", nil)); rec.Code != http.StatusForbidden {
+		t.Fatalf("member pending-versions: want 403, got %d", rec.Code)
+	}
+	{
+		rec := do(adminReq("GET", "/api/v1/publications/pending-versions", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("pending-versions: %d body=%s", rec.Code, rec.Body.String())
+		}
+		var pending []struct {
+			Version models.PublicationVersion `json:"version"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &pending); err != nil {
+			t.Fatal(err)
+		}
+		if len(pending) != 1 || pending[0].Version.ChartVersion != "1.0.0" {
+			t.Fatalf("unexpected pending versions: %+v", pending)
+		}
+	}
 	// A member cannot approve.
 	if rec := do(devReq("POST", base+"/versions/1.0.0/approve", "core", nil)); rec.Code != http.StatusForbidden {
 		t.Fatalf("member approve: want 403, got %d", rec.Code)

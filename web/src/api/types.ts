@@ -315,6 +315,12 @@ export interface PublicationVersion {
   updated_at: string;
 }
 
+// A version awaiting review together with its publication (admin approval queue).
+export interface PendingVersion {
+  publication: ChartPublication;
+  version: PublicationVersion;
+}
+
 export interface PublicationEvent {
   id: number;
   publication_id: string;

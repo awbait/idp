@@ -34,7 +34,7 @@ import type { Category, ChartPublication, PublicationStatus } from "../api/types
 import { chartLabel, useCatalog } from "../app/CatalogContext";
 import { useUser } from "../auth/UserContext";
 import { CATEGORY_ICON_CHOICES, categoryIcon } from "../components/icons";
-import { PublicationReview } from "../components/PublicationReview";
+import { PublicationReview, VersionReview } from "../components/PublicationReview";
 import { Button, ErrorBox, Spinner } from "../components/ui";
 import { useAsync } from "../hooks/useAsync";
 
@@ -129,11 +129,14 @@ export function AdminSection() {
 
 export function AdminOverviewPage() {
   const { data: pubs, error, loading } = useAsync(() => api.listPublications(), []);
+  const { data: pendingVers } = useAsync(() => api.pendingVersions(), []);
   if (loading) return <Spinner />;
   if (error) return <ErrorBox error={error} />;
 
   const all = pubs ?? [];
-  const pending = all.filter((p) => p.status === "PENDING");
+  const pendingMeta = all.filter((p) => p.status === "PENDING");
+  const pendingVersions = pendingVers ?? [];
+  const pendingCount = pendingMeta.length + pendingVersions.length;
   const published = all.filter((p) => !!p.approved_view_json).length;
   const drafts = all.filter((p) => p.status === "DRAFT" || p.status === "REJECTED").length;
 
@@ -149,7 +152,7 @@ export function AdminOverviewPage() {
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Ждут согласования" value={pending.length} tone="amber" Icon={IconClock} />
+        <StatCard label="Ждут согласования" value={pendingCount} tone="amber" Icon={IconClock} />
         <StatCard label="Опубликовано" value={published} tone="emerald" Icon={IconCircleCheck} />
         <StatCard label="Черновики" value={drafts} tone="slate" Icon={IconFileText} />
         <StatCard label="Всего публикаций" value={all.length} tone="brand" Icon={IconStack} />
@@ -160,13 +163,13 @@ export function AdminOverviewPage() {
         <div className="rounded-lg border border-slate-200 bg-surface p-4 shadow-sm lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-800">Очередь на согласование</h2>
-            {pending.length > 0 && (
+            {pendingCount > 0 && (
               <Link to="/admin/approvals" className="text-xs font-medium text-brand-600 hover:text-brand-700">
                 Все
               </Link>
             )}
           </div>
-          {pending.length === 0 ? (
+          {pendingCount === 0 ? (
             <div className="flex flex-col items-center gap-2 py-8 text-center">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
                 <IconCircleCheck size={22} stroke={1.8} />
@@ -175,8 +178,8 @@ export function AdminOverviewPage() {
             </div>
           ) : (
             <ul className="-mx-2 flex flex-col">
-              {pending.map((p) => (
-                <li key={p.id}>
+              {pendingMeta.map((p) => (
+                <li key={`meta-${p.id}`}>
                   <Link
                     to={reviewPath(p)}
                     className="group flex items-center justify-between gap-3 rounded-md px-2 py-2.5 hover:bg-slate-50"
@@ -187,7 +190,7 @@ export function AdminOverviewPage() {
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-medium text-slate-800">
-                          {chartLabel(p.chart_name)}
+                          {chartLabel(p.chart_name)} <span className="text-slate-400">метаданные</span>
                         </span>
                         <span className="block truncate text-xs text-slate-400">
                           {p.chart_project}/{p.chart_name}
@@ -196,6 +199,33 @@ export function AdminOverviewPage() {
                     </span>
                     <span className="flex shrink-0 items-center gap-2">
                       <Badge tone="brand">{p.owner_team}</Badge>
+                      <IconArrowRight size={16} className="text-slate-300 group-hover:text-brand-500" />
+                    </span>
+                  </Link>
+                </li>
+              ))}
+              {pendingVersions.map((pv) => (
+                <li key={`ver-${pv.version.id}`}>
+                  <Link
+                    to={reviewPath(pv.publication)}
+                    className="group flex items-center justify-between gap-3 rounded-md px-2 py-2.5 hover:bg-slate-50"
+                  >
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
+                        <IconPackage size={16} stroke={1.8} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-slate-800">
+                          {chartLabel(pv.publication.chart_name)}{" "}
+                          <span className="text-slate-400">v{pv.version.chart_version}</span>
+                        </span>
+                        <span className="block truncate text-xs text-slate-400">
+                          {pv.publication.chart_project}/{pv.publication.chart_name}
+                        </span>
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <Badge tone="brand">{pv.publication.owner_team}</Badge>
                       <IconArrowRight size={16} className="text-slate-300 group-hover:text-brand-500" />
                     </span>
                   </Link>
@@ -212,7 +242,7 @@ export function AdminOverviewPage() {
             tone="amber"
             Icon={IconChecklist}
             title="Согласование публикаций"
-            desc={pending.length > 0 ? `${pending.length} в очереди` : "очередь пуста"}
+            desc={pendingCount > 0 ? `${pendingCount} в очереди` : "очередь пуста"}
           />
           <QuickLink
             to="/admin/status"
@@ -274,12 +304,14 @@ type Filter = "ALL" | PublicationStatus;
 
 export function AdminApprovalsPage() {
   const { data: pubs, error, loading } = useAsync(() => api.listPublications(), []);
+  const { data: pendingVers } = useAsync(() => api.pendingVersions(), []);
   const [filter, setFilter] = useState<Filter>("ALL");
 
   if (loading) return <Spinner />;
   if (error) return <ErrorBox error={error} />;
 
   const all = pubs ?? [];
+  const pendingVersions = pendingVers ?? [];
   const count = (s: Filter) => (s === "ALL" ? all.length : all.filter((p) => p.status === s).length);
   const rows = filter === "ALL" ? all : all.filter((p) => p.status === filter);
   const filters: { id: Filter; label: string }[] = [
@@ -294,8 +326,47 @@ export function AdminApprovalsPage() {
     <div className="flex flex-col gap-5">
       <PageTitle
         title="Согласование публикаций"
-        badge={<Badge tone="amber">{count("PENDING")} в очереди</Badge>}
+        badge={<Badge tone="amber">{count("PENDING") + pendingVersions.length} в очереди</Badge>}
       />
+
+      {/* Per-version view submissions awaiting review (separate from the
+          publication metadata FSM below). */}
+      {pendingVersions.length > 0 && (
+        <div className="overflow-hidden rounded-lg border border-amber-200 bg-surface shadow-sm">
+          <div className="border-b border-amber-100 bg-amber-50/60 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-amber-800">
+            Версии на согласовании
+          </div>
+          <ul className="flex flex-col">
+            {pendingVersions.map((pv) => (
+              <li key={pv.version.id} className="border-b border-slate-100 last:border-0">
+                <Link
+                  to={reviewPath(pv.publication)}
+                  className="group flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
+                >
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
+                      <IconPackage size={16} stroke={1.8} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block font-medium text-slate-800">
+                        {chartLabel(pv.publication.chart_name)}{" "}
+                        <span className="text-slate-400">v{pv.version.chart_version}</span>
+                      </span>
+                      <span className="block truncate text-xs text-slate-400">
+                        {pv.publication.chart_project}/{pv.publication.chart_name}
+                      </span>
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <Badge tone="brand">{pv.publication.owner_team}</Badge>
+                    <IconArrowRight size={14} className="text-slate-300 group-hover:text-brand-500" />
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {filters.map((f) => (
@@ -400,6 +471,12 @@ export function AdminApprovalDetailPage() {
     () => api.listPublications({ chart: name }).then((l) => l.find((p) => p.chart_project === project) ?? null),
     [project, name],
   );
+  // Pending versions of this chart (per-version submissions to review).
+  const { data: versions, reload: reloadVersions } = useAsync(
+    () => (pub ? api.listVersions(pub.id) : Promise.resolve([])),
+    [pub?.id],
+  );
+  const pendingVersions = (versions ?? []).filter((v) => v.status === "PENDING");
 
   const back = (
     <Link
@@ -441,9 +518,21 @@ export function AdminApprovalDetailPage() {
         <Badge tone="brand">{pub.owner_team}</Badge>
       </div>
 
-      {pub.status === "PENDING" ? (
-        <PublicationReview pub={pub} onReviewed={reload} />
-      ) : (
+      {/* Metadata (category/owner) approval, if any. */}
+      {pub.status === "PENDING" && <PublicationReview pub={pub} onReviewed={reload} />}
+      {/* Per-version view submissions awaiting review. */}
+      {pendingVersions.map((v) => (
+        <VersionReview
+          key={v.id}
+          pubId={pub.id}
+          version={v}
+          onReviewed={() => {
+            reloadVersions();
+            reload();
+          }}
+        />
+      ))}
+      {pub.status !== "PENDING" && pendingVersions.length === 0 && (
         <div className="flex flex-col items-start gap-3 rounded-lg border border-slate-200 bg-surface p-4 shadow-sm">
           <p className="text-sm text-slate-600">
             Эта публикация не находится на согласовании, решать нечего. Открыть редактор публикации:

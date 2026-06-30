@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"console/internal/store"
 	"console/internal/views"
 	"console/pkg/models"
 )
@@ -223,6 +224,34 @@ func (s *Service) SetRecommendedVersion(ctx context.Context, u *models.User, pub
 	s.logger().Info("publication version recommended",
 		"publication_id", p.ID, "chart", p.ChartName, "chart_version", chartVersion, "actor", u.Subject)
 	return nil
+}
+
+// PendingVersion is a version awaiting review together with its publication.
+type PendingVersion struct {
+	Publication *models.ChartPublication   `json:"publication"`
+	Version     *models.PublicationVersion `json:"version"`
+}
+
+// PendingVersions returns every PENDING version across all publications (the
+// admin approval queue for per-version submissions).
+func (s *Service) PendingVersions(ctx context.Context) ([]PendingVersion, error) {
+	pubs, err := s.store.ListPublications(ctx, store.PublicationFilter{})
+	if err != nil {
+		return nil, err
+	}
+	var out []PendingVersion
+	for _, p := range pubs {
+		vs, err := s.store.ListVersions(ctx, p.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, v := range vs {
+			if v.Status == models.PubPending {
+				out = append(out, PendingVersion{Publication: p, Version: v})
+			}
+		}
+	}
+	return out, nil
 }
 
 // ValidateVersionView runs a full validation of a draft view against a specific
