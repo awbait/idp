@@ -60,6 +60,9 @@ type SchemaSource interface {
 	LatestVersion(ctx context.Context, project, name string) (string, error)
 	LatestDescription(ctx context.Context, project, name string) (string, error)
 	LatestIcon(ctx context.Context, project, name string) (string, error)
+	// GetSchema returns values.schema.json for a specific chart version, used to
+	// cross-validate that version's view document (multi-version publications).
+	GetSchema(ctx context.Context, project, name, version string) ([]byte, error)
 }
 
 // Service owns publication metadata and the view-approval workflow.

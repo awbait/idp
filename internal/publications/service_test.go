@@ -262,6 +262,9 @@ func TestOwnerTeamHandoff(t *testing.T) {
 // fakeSchemas - schema/version source for testing the ApprovedViewVersion stamp.
 type fakeSchemas struct{ version string }
 
+func (f fakeSchemas) GetSchema(context.Context, string, string, string) ([]byte, error) {
+	return nil, nil
+}
 func (f fakeSchemas) LatestSchema(context.Context, string, string) ([]byte, error) { return nil, nil }
 func (f fakeSchemas) LatestVersion(context.Context, string, string) (string, error) {
 	return f.version, nil
