@@ -225,6 +225,34 @@ func (s *Service) SetRecommendedVersion(ctx context.Context, u *models.User, pub
 	return nil
 }
 
+// CatalogVersions projects a publication's versions for the catalog: the
+// resolved recommended (default-served) chart version and the list of all
+// orderable+APPROVED versions, highest first (for the "+N" chip and tooltip).
+// Both are empty when the publication has no orderable versions yet.
+func (s *Service) CatalogVersions(ctx context.Context, p *models.ChartPublication) (recommended string, orderable []string, err error) {
+	versions, err := s.store.ListVersions(ctx, p.ID)
+	if err != nil {
+		return "", nil, err
+	}
+	pub := make([]*models.PublicationVersion, 0, len(versions))
+	for _, v := range versions {
+		if v.Published() {
+			pub = append(pub, v)
+		}
+	}
+	sort.Slice(pub, func(i, j int) bool {
+		return compareChartVersions(pub[i].ChartVersion, pub[j].ChartVersion) > 0 // highest first
+	})
+	orderable = make([]string, len(pub))
+	for i, v := range pub {
+		orderable[i] = v.ChartVersion
+	}
+	if v := resolveOrderableVersion(p, versions, ""); v != nil {
+		recommended = v.ChartVersion
+	}
+	return recommended, orderable, nil
+}
+
 // ActiveViewVersion returns the approved view of an orderable version (for order
 // forms). An empty chartVersion resolves the recommended version, falling back
 // to the highest orderable+APPROVED one.

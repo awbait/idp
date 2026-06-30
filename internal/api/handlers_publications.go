@@ -235,6 +235,14 @@ type publicationSummary struct {
 	// ApprovedViewVersion is the "blessed" chart version: the view is checked up
 	// to it, and orders on a lower version can be upgraded.
 	ApprovedViewVersion string `json:"approved_view_version,omitempty"`
+	// RecommendedVersion is the version served by default for new orders (the
+	// owner's choice, or the highest orderable+APPROVED as a fall back). Empty
+	// when the service has no orderable versions yet (multi-version publications).
+	RecommendedVersion string `json:"recommended_version,omitempty"`
+	// OrderableVersions are all versions available for ordering (allowlist),
+	// highest first - the catalog card shows the first as the main chip and the
+	// rest as "+N".
+	OrderableVersions []string `json:"orderable_versions,omitempty"`
 	// ApprovedDescription is the chart description at approval time (the catalog
 	// shows this, not the live one from Harbor).
 	ApprovedDescription string `json:"approved_description,omitempty"`
@@ -275,6 +283,10 @@ func (s *Server) handleCatalog(w http.ResponseWriter, r *http.Request) {
 	}
 	byChart := make(map[string]*publicationSummary, len(pubs))
 	for _, p := range pubs {
+		// Per-version allowlist projection (multi-version publications); empty for
+		// services that have no orderable versions yet. Best-effort: a lookup error
+		// degrades to the legacy single-view fields below.
+		recommended, orderable, _ := s.Pubs.CatalogVersions(ctx, p)
 		byChart[p.ChartProject+"/"+p.ChartName] = &publicationSummary{
 			ID:                  p.ID,
 			CategoryID:          p.CategoryID,
@@ -282,11 +294,13 @@ func (s *Server) handleCatalog(w http.ResponseWriter, r *http.Request) {
 			CreatedBy:           p.CreatedBy,
 			CreatedByName:       p.CreatedByName,
 			Status:              p.Status,
-			Published:           p.Published(),
+			Published:           p.Published() || len(orderable) > 0,
 			HasOrderView:        hasOrderView(p.ApprovedViewJSON),
 			ApprovedViewVersion: p.ApprovedViewVersion,
 			ApprovedDescription: p.ApprovedDescription,
 			ApprovedIconURL:     p.ApprovedIconURL,
+			RecommendedVersion:  recommended,
+			OrderableVersions:   orderable,
 		}
 	}
 	out := make([]catalogChart, 0, len(charts))
@@ -375,9 +389,20 @@ func hasOrderView(view json.RawMessage) bool {
 	return ok
 }
 
-// handleGetChartView returns the chart's active approved view.
+// handleGetChartView returns a chart's approved view. With ?version=X it returns
+// that orderable version's view (multi-version publications); without it, the
+// legacy single active approved view.
 func (s *Server) handleGetChartView(w http.ResponseWriter, r *http.Request) {
-	view, err := s.Pubs.ActiveView(r.Context(), chi.URLParam(r, "project"), chi.URLParam(r, "name"))
+	project, name := chi.URLParam(r, "project"), chi.URLParam(r, "name")
+	var (
+		view []byte
+		err  error
+	)
+	if version := r.URL.Query().Get("version"); version != "" {
+		view, err = s.Pubs.ActiveViewVersion(r.Context(), project, name, version)
+	} else {
+		view, err = s.Pubs.ActiveView(r.Context(), project, name)
+	}
 	if err != nil {
 		if errors.Is(err, models.ErrNotFound) {
 			writeErr(w, http.StatusNotFound, "not_found", "no approved view for chart")
