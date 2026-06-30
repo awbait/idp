@@ -169,6 +169,37 @@ func TestNestedIncludeValid(t *testing.T) {
 	}
 }
 
+// A "*" in a ui:table path may iterate a string-keyed map (additionalProperties)
+// and step into the value object, so "selector/*/weight" pulls one field out of
+// each map entry; an unknown field after the map is still flagged.
+func TestUITableMapWildcardPath(t *testing.T) {
+	sch := `{
+	  "type": "object",
+	  "properties": {
+	    "egress": { "type": "array", "items": {
+	      "type": "object",
+	      "properties": {
+	        "selector": { "type": "object", "additionalProperties": {
+	          "type": "object",
+	          "properties": { "name": { "type": "string" }, "weight": { "type": "integer" } }
+	        } }
+	      }
+	    } }
+	  }
+	}`
+	tab := func(path string) string {
+		return `{"views":{"order":{"identity":"/egress/0/selector"},"egressForm":{}},
+			"tabs":[{"id":"eg","items":"/egress","form":"egressForm",
+				"ui:table":[{"path":"` + path + `","label":"X"}]}]}`
+	}
+	if issues := views.Validate([]byte(tab("selector/*/weight")), []byte(sch)); len(issues) > 0 {
+		t.Fatalf("map wildcard path must validate, got %+v", issues)
+	}
+	if issues := views.Validate([]byte(tab("selector/*/nope")), []byte(sch)); !hasIssue(issues, "/tabs/0/ui:table/0/path", "не находит поле в элементе") {
+		t.Fatalf("want unknown map-value field flagged, got %+v", issues)
+	}
+}
+
 // tabs section: list tabs (items + form + ui:table).
 func TestTabsValid(t *testing.T) {
 	doc := `{"views":{"order":{"identity":"/gateways/0/name"},"listener":{}},"tabs":[

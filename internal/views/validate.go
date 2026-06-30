@@ -707,9 +707,10 @@ func pointerResolves(ptr string, node, root map[string]any) bool {
 
 // tablePathResolves checks a ui:table column path against the list element
 // schema. Unlike a JSON pointer it has no leading slash and is relative to one
-// element; a "*" (or numeric) segment iterates the array at that point, e.g.
-// "from/*/namespace". Unknown/free-form parts count as a match, mirroring
-// pointerResolves: only a path we can prove wrong is flagged.
+// element; a "*" (or numeric) segment iterates the array or string-keyed map at
+// that point, e.g. "from/*/namespace" or "selector/*/weight". Unknown/free-form
+// parts count as a match, mirroring pointerResolves: only a path we can prove
+// wrong is flagged.
 func tablePathResolves(p string, elem, root map[string]any) bool {
 	cur := deref(elem, root)
 	for seg := range strings.SplitSeq(p, "/") {
@@ -717,15 +718,23 @@ func tablePathResolves(p string, elem, root map[string]any) bool {
 			return true // schema not described further, do not blame
 		}
 		if seg == "*" || isIndex(seg) {
-			if t, _ := cur["type"].(string); t != "" && t != "array" {
+			// "*" over an array steps into its items.
+			if items, ok := cur["items"].(map[string]any); ok {
+				cur = deref(items, root)
+				continue
+			}
+			// "*" over a string-keyed map (object with an additionalProperties
+			// schema) steps into the value schema.
+			if ap, ok := cur["additionalProperties"].(map[string]any); ok {
+				cur = deref(ap, root)
+				continue
+			}
+			// A described scalar cannot be iterated; an array without items, a
+			// free-form map, or an undescribed node cannot be proven wrong.
+			if t, _ := cur["type"].(string); t != "" && t != "array" && t != "object" {
 				return false
 			}
-			items, _ := cur["items"].(map[string]any)
-			if items == nil {
-				return true
-			}
-			cur = deref(items, root)
-			continue
+			return true
 		}
 		props := collectProperties(cur, root)
 		if props == nil {
