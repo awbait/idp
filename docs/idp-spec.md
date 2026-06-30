@@ -324,6 +324,20 @@ CREATE UNIQUE INDEX uniq_active_service
 - `GET /charts/{project}/{name}/changelog/aggregated?limit=20` - changelog по всем версиям
 - `GET /charts/{project}/{name}/{version}/schema` - values.schema.json для рендера формы
 - `GET /charts/{project}/{name}/icon` - иконка
+- `GET /charts/{project}/{name}/view?version=X` - согласованный view-документ. С `version` - view конкретной orderable-версии; без него - активный view по умолчанию
+
+### Публикации и версии
+
+Чарт публикуется в каталог с метаданными (категория, владелец) и view-документами **по версиям**: у сервиса может быть несколько опубликованных версий, каждая со своим view и собственным FSM согласования (`DRAFT -> PENDING -> APPROVED | REJECTED`). Владелец помечает версии доступными для заказа (allowlist, `orderable`) и выбирает рекомендуемую (`recommended_version`); пользователь при заказе выбирает версию (по умолчанию - рекомендуемая, фолбэк - максимальная orderable+APPROVED). Метаданные (категория/владелец) согласуются отдельным publication-level FSM. Подробности и план: `docs/multi-version-publications.md`.
+
+- `GET /publications`, `POST /publications`, `GET|PATCH /publications/{id}` - публикации (метаданные + legacy single-view)
+- `POST /publications/{id}/submit|withdraw|approve|reject` - FSM метаданных
+- `GET /publications/{id}/versions` - версии публикации
+- `PUT /publications/{id}/versions/{version}` - сохранить черновик view версии
+- `POST /publications/{id}/versions/{version}/validate|submit|withdraw|approve|reject` - FSM версии
+- `POST /publications/{id}/versions/{version}/orderable` - allowlist (доступность для заказа)
+- `POST /publications/{id}/recommended` - выбрать рекомендуемую версию
+- `GET /publications/pending-versions` - очередь версий на согласование (admin)
 
 ### Заказы (provisioning)
 
