@@ -144,11 +144,16 @@ export function applyEnums(itemSchema: Schema, enums: EnumRule[] | undefined, fu
 }
 
 // collectKeys reads values from an item by a slash path that may contain "*" to
-// iterate every element of the array at that point.
+// iterate every element at that point: an array's items or, for a string-keyed
+// map (object with additionalProperties), its values. So "selector/*/weight"
+// pulls the weight field out of each map entry's object.
 function collectKeys(item: any, path: string): any[] {
   let cur: any[] = [item];
   for (const seg of path.replace(/^\//, "").split("/")) {
-    if (seg === "*") cur = cur.flatMap((c) => (Array.isArray(c) ? c : []));
+    if (seg === "*")
+      cur = cur.flatMap((c) =>
+        Array.isArray(c) ? c : c && typeof c === "object" ? Object.values(c) : [],
+      );
     else cur = cur.map((c) => (c == null ? undefined : c[seg]));
   }
   return cur.filter((v) => v != null && v !== "");
@@ -156,8 +161,9 @@ function collectKeys(item: any, path: string): any[] {
 
 // computeCell returns a column's display value for an item: a lookup column joins
 // against the order's full values, a plain column reads the item by path. A path
-// with a "*" segment iterates the array at that point (e.g. "from/*/namespace"
-// over a list of peers) and returns the distinct collected values.
+// with a "*" segment iterates the array or map at that point (e.g.
+// "from/*/namespace" over a list of peers, or "selector/*/weight" over a map of
+// objects) and returns the distinct collected values.
 export function computeCell(item: any, full: any, col: TableColumn): any {
   const lk = col.lookup;
   if (lk) {
