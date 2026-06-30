@@ -116,17 +116,64 @@ func shortID() string { return uuid.NewString()[:8] }
 // index locality and roughly creation-sortable, unlike random v4.
 func newID() string { return uuid.Must(uuid.NewV7()).String() }
 
-// resourceIdentity resolves the per-order identity used to detect resource-name
-// collisions within a namespace. It reads the chart's approved order view for the
-// "identity" JSON pointer and resolves it against the order's values, falling
-// back to serviceName when no view/identity is published or the pointer does not
-// resolve (still a usable, unique-per-service discriminator).
-func (s *Service) resourceIdentity(ctx context.Context, chartProject, chartName, serviceName string, values map[string]any) string {
+// orderView returns the approved view to build an order of (chart, version) from:
+// the selected version's view for a multi-version publication, falling back to
+// the legacy single approved view during the transition. Nil when there is no
+// published view (no publication, or nothing approved yet).
+func (s *Service) orderView(ctx context.Context, chartProject, chartName, version string) []byte {
 	pub, err := s.store.GetPublicationByChart(ctx, chartProject, chartName)
-	if err != nil || pub == nil || len(pub.ApprovedViewJSON) == 0 {
+	if err != nil || pub == nil {
+		return nil
+	}
+	if version != "" {
+		if v, verr := s.store.GetVersion(ctx, pub.ID, version); verr == nil && v.Published() {
+			return v.ApprovedViewJSON
+		}
+	}
+	return pub.ApprovedViewJSON // legacy single-view fallback
+}
+
+// ensureOrderable rejects an order whose version is not an orderable+APPROVED
+// version of a multi-version publication. Legacy single-view publications (still
+// carrying approved_view_json) and charts without a publication are not
+// restricted, so the guard is a no-op until a service is fully version-managed.
+func (s *Service) ensureOrderable(ctx context.Context, chartProject, chartName, version string) error {
+	pub, err := s.store.GetPublicationByChart(ctx, chartProject, chartName)
+	if err != nil || pub == nil {
+		return nil // no publication: provisioning is not restricted
+	}
+	if version != "" {
+		if v, verr := s.store.GetVersion(ctx, pub.ID, version); verr == nil && v.Published() {
+			return nil // requested version is orderable+APPROVED
+		}
+	}
+	if len(pub.ApprovedViewJSON) > 0 {
+		return nil // legacy single-view publication: not restricted
+	}
+	// Version-managed publication with no legacy view: enforce the allowlist.
+	versions, lerr := s.store.ListVersions(ctx, pub.ID)
+	if lerr != nil {
+		return nil // best-effort; do not block on a store hiccup
+	}
+	for _, v := range versions {
+		if v.Published() {
+			return &ValidationError{Message: "выбранная версия чарта недоступна для заказа, выберите доступную версию"}
+		}
+	}
+	return nil // nothing orderable at all (unpublished): leave to existing checks
+}
+
+// resourceIdentity resolves the per-order identity used to detect resource-name
+// collisions within a namespace. It reads the order version's approved order view
+// for the "identity" JSON pointer and resolves it against the order's values,
+// falling back to serviceName when no view/identity is published or the pointer
+// does not resolve (still a usable, unique-per-service discriminator).
+func (s *Service) resourceIdentity(ctx context.Context, chartProject, chartName, version, serviceName string, values map[string]any) string {
+	view := s.orderView(ctx, chartProject, chartName, version)
+	if len(view) == 0 {
 		return serviceName
 	}
-	ptr := views.OrderIdentity(pub.ApprovedViewJSON)
+	ptr := views.OrderIdentity(view)
 	if ptr == "" {
 		return serviceName
 	}
@@ -136,17 +183,17 @@ func (s *Service) resourceIdentity(ctx context.Context, chartProject, chartName,
 	return serviceName
 }
 
-// applyViewDefaults stamps order-time values declared in the chart's approved
-// view "defaults" block (JSON pointer -> value) into values, overwriting any
-// present value. It lets the portal record provenance or force fixed fields
+// applyViewDefaults stamps order-time values declared in the order version's
+// approved view "defaults" block (JSON pointer -> value) into values, overwriting
+// any present value. It lets the portal record provenance or force fixed fields
 // (e.g. namespace.creator=console) without chart-specific code: the rule lives
 // in the chart's view document. A missing view/publication leaves values as-is.
-func (s *Service) applyViewDefaults(ctx context.Context, chartProject, chartName string, values map[string]any) map[string]any {
-	pub, err := s.store.GetPublicationByChart(ctx, chartProject, chartName)
-	if err != nil || pub == nil || len(pub.ApprovedViewJSON) == 0 {
+func (s *Service) applyViewDefaults(ctx context.Context, chartProject, chartName, version string, values map[string]any) map[string]any {
+	view := s.orderView(ctx, chartProject, chartName, version)
+	if len(view) == 0 {
 		return values
 	}
-	return views.ApplyDefaults(values, pub.ApprovedViewJSON)
+	return views.ApplyDefaults(values, view)
 }
 
 // checkNamespaceIdentity returns a friendly ValidationError when another active
@@ -231,6 +278,11 @@ func (s *Service) Create(ctx context.Context, u *models.User, in CreateInput) (*
 		}
 		return nil, fmt.Errorf("%w: harbor: %v", ErrUpstream, err)
 	}
+	// Only an orderable+APPROVED version may be ordered (multi-version
+	// publications); a no-op for legacy single-view publications.
+	if err := s.ensureOrderable(ctx, in.ChartProject, in.ChartName, in.Version); err != nil {
+		return nil, err
+	}
 	// A draft may hold incomplete values; defer schema validation to Submit.
 	valuesYAML, err := s.validateAndMarshal(ctx, in.ChartProject, in.ChartName, in.Version, in.Values, !in.Draft)
 	if err != nil {
@@ -271,7 +323,7 @@ func (s *Service) Create(ctx context.Context, u *models.User, in CreateInput) (*
 		Status:        models.StatusDraft,
 	}
 	r.ArgoCDAppName = s.gitops.AppName(r.Team, r.ChartName, r.ServiceName) // computed once
-	r.ResourceIdentity = s.resourceIdentity(ctx, r.ChartProject, r.ChartName, r.ServiceName, in.Values)
+	r.ResourceIdentity = s.resourceIdentity(ctx, r.ChartProject, r.ChartName, r.ChartVersion, r.ServiceName, in.Values)
 	if err := s.checkNamespaceIdentity(ctx, r); err != nil {
 		return nil, err
 	}
@@ -386,6 +438,9 @@ func (s *Service) Update(ctx context.Context, u *models.User, id string, in Upda
 	if in.Version != "" {
 		version = in.Version
 	}
+	if err := s.ensureOrderable(ctx, r.ChartProject, r.ChartName, version); err != nil {
+		return nil, err
+	}
 	valuesYAML, err := s.validateAndMarshal(ctx, r.ChartProject, r.ChartName, version, in.Values, true)
 	if err != nil {
 		return nil, err
@@ -422,6 +477,9 @@ func (s *Service) updateDraft(ctx context.Context, u *models.User, r *models.Req
 			}
 			return nil, fmt.Errorf("%w: harbor: %v", ErrUpstream, err)
 		}
+		if err := s.ensureOrderable(ctx, r.ChartProject, r.ChartName, in.Version); err != nil {
+			return nil, err
+		}
 		r.ChartVersion = in.Version
 	}
 	if in.ServiceName != "" && in.ServiceName != r.ServiceName {
@@ -451,7 +509,7 @@ func (s *Service) updateDraft(ctx context.Context, u *models.User, r *models.Req
 		return nil, err
 	}
 	r.ValuesYAML = valuesYAML
-	r.ResourceIdentity = s.resourceIdentity(ctx, r.ChartProject, r.ChartName, r.ServiceName, in.Values)
+	r.ResourceIdentity = s.resourceIdentity(ctx, r.ChartProject, r.ChartName, r.ChartVersion, r.ServiceName, in.Values)
 	if err := s.checkNamespaceIdentity(ctx, r); err != nil {
 		return nil, err
 	}
@@ -609,7 +667,7 @@ func (s *Service) validateAndMarshal(ctx context.Context, project, name, version
 	// (e.g. namespace.creator=console). Applied before validation so the
 	// stamped values are schema-checked too. Chart-agnostic: the rule lives in
 	// the chart's view document, not here.
-	values = s.applyViewDefaults(ctx, project, name, values)
+	values = s.applyViewDefaults(ctx, project, name, version, values)
 	if !validate {
 		out, merr := yaml.Marshal(values)
 		if merr != nil {
