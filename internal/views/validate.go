@@ -707,44 +707,53 @@ func pointerResolves(ptr string, node, root map[string]any) bool {
 
 // tablePathResolves checks a ui:table column path against the list element
 // schema. Unlike a JSON pointer it has no leading slash and is relative to one
-// element; a "*" (or numeric) segment iterates the array or string-keyed map at
-// that point, e.g. "from/*/namespace" or "selector/*/weight". Unknown/free-form
-// parts count as a match, mirroring pointerResolves: only a path we can prove
-// wrong is flagged.
+// element. Segments: "*"/"*val" iterate an array's items or a string-keyed map's
+// values, "*key" a map's keys, a number picks one element (positional), a name
+// reads a property. E.g. "from/*/namespace", "selector/*/weight",
+// "selector/*key", "selector/*val/0". Unknown/free-form parts count as a match,
+// mirroring pointerResolves: only a path we can prove wrong is flagged.
 func tablePathResolves(p string, elem, root map[string]any) bool {
 	cur := deref(elem, root)
 	for seg := range strings.SplitSeq(p, "/") {
 		if cur == nil {
 			return true // schema not described further, do not blame
 		}
-		if seg == "*" || isIndex(seg) {
-			// "*" over an array steps into its items.
-			if items, ok := cur["items"].(map[string]any); ok {
-				cur = deref(items, root)
-				continue
-			}
-			// "*" over a string-keyed map (object with an additionalProperties
-			// schema) steps into the value schema.
-			if ap, ok := cur["additionalProperties"].(map[string]any); ok {
-				cur = deref(ap, root)
-				continue
-			}
-			// A described scalar cannot be iterated; an array without items, a
-			// free-form map, or an undescribed node cannot be proven wrong.
-			if t, _ := cur["type"].(string); t != "" && t != "array" && t != "object" {
+		switch {
+		case seg == "*key":
+			// Keys of a string-keyed map; meaningful only on an object. The keys
+			// are terminal strings, so any following segment cannot resolve.
+			if t, _ := cur["type"].(string); t != "" && t != "object" {
 				return false
 			}
-			return true
+			cur = nil
+		case seg == "*" || seg == "*val":
+			// Iterate an array's items or a map's value schema.
+			if items, ok := cur["items"].(map[string]any); ok {
+				cur = deref(items, root)
+			} else if ap, ok := cur["additionalProperties"].(map[string]any); ok {
+				cur = deref(ap, root)
+			} else if t, _ := cur["type"].(string); t != "" && t != "array" && t != "object" {
+				return false // a described scalar cannot be iterated
+			} else {
+				cur = nil // array w/o items, free-form map, or undescribed
+			}
+		case isIndex(seg):
+			// Positional pick: into an array's element, else the same-typed item
+			// of a collected list (type unchanged).
+			if items, ok := cur["items"].(map[string]any); ok {
+				cur = deref(items, root)
+			}
+		default:
+			props := collectProperties(cur, root)
+			if props == nil {
+				return true // free-form object
+			}
+			next, ok := props[seg].(map[string]any)
+			if !ok {
+				return false
+			}
+			cur = deref(next, root)
 		}
-		props := collectProperties(cur, root)
-		if props == nil {
-			return true // free-form object
-		}
-		next, ok := props[seg].(map[string]any)
-		if !ok {
-			return false
-		}
-		cur = deref(next, root)
 	}
 	return true
 }

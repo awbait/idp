@@ -143,27 +143,49 @@ export function applyEnums(itemSchema: Schema, enums: EnumRule[] | undefined, fu
   return out;
 }
 
-// collectKeys reads values from an item by a slash path that may contain "*" to
-// iterate every element at that point: an array's items or, for a string-keyed
-// map (object with additionalProperties), its values. So "selector/*/weight"
-// pulls the weight field out of each map entry's object.
+// collectKeys reads values from an item by a slash path. Segments:
+//   "*" / "*val" - iterate the array items or, for a string-keyed map (object
+//                  with additionalProperties), its values.
+//   "*key"       - iterate a map's keys.
+//   <number>     - after an iterate segment, pick that element of the collected
+//                  list (so "selector/*val/0" is the first value); otherwise it
+//                  indexes into each element (array positional, e.g. "to/0").
+//   <name>       - read that property of each element.
+// So "selector/*/weight" pulls one field out of each map entry's object, and
+// "selector/*key" lists the labels.
 function collectKeys(item: any, path: string): any[] {
   let cur: any[] = [item];
+  // Whether the previous segment expanded a collection, so a following integer
+  // means "the Nth collected item" rather than "index into each element".
+  let flat = false;
   for (const seg of path.replace(/^\//, "").split("/")) {
-    if (seg === "*")
+    if (seg === "*" || seg === "*val") {
       cur = cur.flatMap((c) =>
         Array.isArray(c) ? c : c && typeof c === "object" ? Object.values(c) : [],
       );
-    else cur = cur.map((c) => (c == null ? undefined : c[seg]));
+      flat = true;
+    } else if (seg === "*key") {
+      cur = cur.flatMap((c) =>
+        c && typeof c === "object" && !Array.isArray(c) ? Object.keys(c) : [],
+      );
+      flat = true;
+    } else if (/^\d+$/.test(seg) && flat) {
+      const i = Number(seg);
+      cur = i < cur.length ? [cur[i]] : [];
+      flat = false;
+    } else {
+      cur = cur.map((c) => (c == null ? undefined : c[seg]));
+      flat = false;
+    }
   }
   return cur.filter((v) => v != null && v !== "");
 }
 
 // computeCell returns a column's display value for an item: a lookup column joins
 // against the order's full values, a plain column reads the item by path. A path
-// with a "*" segment iterates the array or map at that point (e.g.
-// "from/*/namespace" over a list of peers, or "selector/*/weight" over a map of
-// objects) and returns the distinct collected values.
+// with a "*"/"*val"/"*key" segment iterates the array or map at that point (e.g.
+// "from/*/namespace", "selector/*/weight", "selector/*key") and returns the
+// distinct collected values; a trailing integer picks one (e.g. "selector/*/0").
 export function computeCell(item: any, full: any, col: TableColumn): any {
   const lk = col.lookup;
   if (lk) {

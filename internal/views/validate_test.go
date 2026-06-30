@@ -192,8 +192,16 @@ func TestUITableMapWildcardPath(t *testing.T) {
 			"tabs":[{"id":"eg","items":"/egress","form":"egressForm",
 				"ui:table":[{"path":"` + path + `","label":"X"}]}]}`
 	}
-	if issues := views.Validate([]byte(tab("selector/*/weight")), []byte(sch)); len(issues) > 0 {
-		t.Fatalf("map wildcard path must validate, got %+v", issues)
+	for _, p := range []string{
+		"selector/*/weight",      // value-iterate + field
+		"selector/*val/weight",   // "*val" alias of "*"
+		"selector/*key",          // map keys
+		"selector/*val/0",        // positional pick of an entry
+		"selector/*val/1/weight", // Nth entry, then a field
+	} {
+		if issues := views.Validate([]byte(tab(p)), []byte(sch)); len(issues) > 0 {
+			t.Fatalf("path %q must validate, got %+v", p, issues)
+		}
 	}
 	if issues := views.Validate([]byte(tab("selector/*/nope")), []byte(sch)); !hasIssue(issues, "/tabs/0/ui:table/0/path", "не находит поле в элементе") {
 		t.Fatalf("want unknown map-value field flagged, got %+v", issues)
