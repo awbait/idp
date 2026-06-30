@@ -70,7 +70,7 @@ func (s *Service) ImportFromGit(ctx context.Context) error {
 		if yaml.Unmarshal(vb, &vmap) != nil {
 			continue
 		}
-		if _, verr := s.validateAndMarshal(ctx, r.ChartProject, r.ChartName, r.ChartVersion, vmap, true); verr != nil {
+		if _, verr := s.validateAndMarshal(ctx, r.ChartProject, r.ChartName, r.ChartVersion, r.Namespace, vmap, true); verr != nil {
 			continue
 		}
 		r.ValuesYAML = string(vb)

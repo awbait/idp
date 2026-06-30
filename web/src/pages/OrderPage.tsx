@@ -37,6 +37,29 @@ function readPointer(obj: unknown, pointer: string): string {
   return cur == null ? "" : String(cur);
 }
 
+// writePointer returns a copy of obj with value set at an object JSON Pointer
+// (e.g. "/namespace/namespaceName"), creating intermediate objects. Used to
+// mirror the order's destination namespace into the values field a view binds
+// via "namespace" - matching the backend, which stamps the same field. Numeric
+// segments are not addressed (object fields only, like the backend setPointer).
+function writePointer(obj: Values, pointer: string, value: string): Values {
+  const parts = pointer.split("/").filter(Boolean);
+  if (parts.length === 0) return obj;
+  const root: Values = { ...obj };
+  let cur: Record<string, unknown> = root;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const next = cur[parts[i]];
+    const clone: Record<string, unknown> =
+      next != null && typeof next === "object" && !Array.isArray(next)
+        ? { ...(next as Record<string, unknown>) }
+        : {};
+    cur[parts[i]] = clone;
+    cur = clone;
+  }
+  cur[parts[parts.length - 1]] = value;
+  return root;
+}
+
 // OrderPage drives ordering a new service (/catalog/:project/:name/order),
 // editing an existing DRAFT (/requests/:id/edit), and upgrading a live order to
 // a newer chart version (/requests/:id/upgrade?to=X - the upgrade flag). Upgrade
@@ -163,14 +186,25 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
   // (service_name). When set, we source the name from the form instead of a
   // separate "Service name" input - e.g. the gateway's own name field.
   const identity: string | undefined = orderView?.identity;
-  const identityName = identity ? readPointer(values, identity) : "";
+  // A view may bind destination.namespace to a values field for a chart that
+  // provisions its own namespace (managed-namespace): the single "Namespace"
+  // input is mirrored into that field (which is hidden in the form), so the chart
+  // renders into the namespace it creates. The backend stamps the same field.
+  const nsBinding: string | undefined = orderView?.namespace;
+  // Values with the namespace binding applied - used for validation, identity and
+  // submission so the bound (hidden) field is populated from the Namespace input.
+  const effectiveValues = useMemo(
+    () => (nsBinding && namespace ? writePointer(values, nsBinding, namespace) : values),
+    [values, nsBinding, namespace],
+  );
+  const identityName = identity ? readPointer(effectiveValues, identity) : "";
 
   // Client-side validation of the form values against the schema (required /
   // pattern / minLength / minItems), honoring the order view. Recomputed live so
   // red highlights clear as the user fixes fields. Empty in raw mode.
   const clientErrors = useMemo(
-    () => (mode === "form" && schema ? collectErrors(schema, values, orderView) : new Map<string, string>()),
-    [mode, schema, values, orderView],
+    () => (mode === "form" && schema ? collectErrors(schema, effectiveValues, orderView) : new Map<string, string>()),
+    [mode, schema, effectiveValues, orderView],
   );
 
   // Hydrate the form from the draft once (edit mode only).
@@ -252,6 +286,9 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
       setSubmitErr({ message: "Невалидный YAML: " + (e as Error).message });
       return null;
     }
+    // Mirror the destination namespace into the bound (hidden) field so the sent
+    // values match what the backend stamps; covers raw mode too.
+    if (nsBinding && namespace) finalValues = writePointer(finalValues, nsBinding, namespace);
     const svcName = identity ? readPointer(finalValues, identity) : serviceName;
     return { values: finalValues, svcName };
   }

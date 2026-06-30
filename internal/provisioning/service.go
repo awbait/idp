@@ -183,17 +183,20 @@ func (s *Service) resourceIdentity(ctx context.Context, chartProject, chartName,
 	return serviceName
 }
 
-// applyViewDefaults stamps order-time values declared in the order version's
-// approved view "defaults" block (JSON pointer -> value) into values, overwriting
-// any present value. It lets the portal record provenance or force fixed fields
-// (e.g. namespace.creator=console) without chart-specific code: the rule lives
-// in the chart's view document. A missing view/publication leaves values as-is.
-func (s *Service) applyViewDefaults(ctx context.Context, chartProject, chartName, version string, values map[string]any) map[string]any {
+// applyViewStamps stamps order-time values from the order version's approved
+// view into values: the "defaults" block (JSON pointer -> fixed value, e.g.
+// namespace.creator=console) and the "namespace" binding (mirrors the order's
+// destination namespace into the values field a self-provisioning chart names it
+// by, e.g. managed-namespace's /namespace/namespaceName). Both overwrite any
+// present value. Chart-agnostic: the rules live in the chart's view document, not
+// here. A missing view/publication leaves values as-is.
+func (s *Service) applyViewStamps(ctx context.Context, chartProject, chartName, version, namespace string, values map[string]any) map[string]any {
 	view := s.orderView(ctx, chartProject, chartName, version)
 	if len(view) == 0 {
 		return values
 	}
-	return views.ApplyDefaults(values, view)
+	values = views.ApplyDefaults(values, view)
+	return views.BindNamespace(values, view, namespace)
 }
 
 // checkNamespaceIdentity returns a friendly ValidationError when another active
@@ -283,8 +286,13 @@ func (s *Service) Create(ctx context.Context, u *models.User, in CreateInput) (*
 	if err := s.ensureOrderable(ctx, in.ChartProject, in.ChartName, in.Version); err != nil {
 		return nil, err
 	}
+	namespace := in.Namespace
+	if namespace == "" {
+		namespace = in.ServiceName
+	}
 	// A draft may hold incomplete values; defer schema validation to Submit.
-	valuesYAML, err := s.validateAndMarshal(ctx, in.ChartProject, in.ChartName, in.Version, in.Values, !in.Draft)
+	// namespace is passed so a view "namespace" binding can mirror it into values.
+	valuesYAML, err := s.validateAndMarshal(ctx, in.ChartProject, in.ChartName, in.Version, namespace, in.Values, !in.Draft)
 	if err != nil {
 		return nil, err
 	}
@@ -302,10 +310,6 @@ func (s *Service) Create(ctx context.Context, u *models.User, in CreateInput) (*
 	// carry "../" or newlines into Git paths/manifests.
 	if !nameRe.MatchString(cluster) || len(cluster) > 63 {
 		return nil, &ValidationError{Message: "cluster must be a valid Kubernetes name"}
-	}
-	namespace := in.Namespace
-	if namespace == "" {
-		namespace = in.ServiceName
 	}
 	r := &models.Request{
 		ID:            newID(),
@@ -380,7 +384,7 @@ func (s *Service) Submit(ctx context.Context, u *models.User, id string) (*model
 	if uerr := yaml.Unmarshal([]byte(r.ValuesYAML), &values); uerr != nil {
 		return nil, &ValidationError{Message: "invalid values: " + uerr.Error()}
 	}
-	valuesYAML, err := s.validateAndMarshal(ctx, r.ChartProject, r.ChartName, r.ChartVersion, values, true)
+	valuesYAML, err := s.validateAndMarshal(ctx, r.ChartProject, r.ChartName, r.ChartVersion, r.Namespace, values, true)
 	if err != nil {
 		return nil, err
 	}
@@ -441,7 +445,7 @@ func (s *Service) Update(ctx context.Context, u *models.User, id string, in Upda
 	if err := s.ensureOrderable(ctx, r.ChartProject, r.ChartName, version); err != nil {
 		return nil, err
 	}
-	valuesYAML, err := s.validateAndMarshal(ctx, r.ChartProject, r.ChartName, version, in.Values, true)
+	valuesYAML, err := s.validateAndMarshal(ctx, r.ChartProject, r.ChartName, version, r.Namespace, in.Values, true)
 	if err != nil {
 		return nil, err
 	}
@@ -504,7 +508,7 @@ func (s *Service) updateDraft(ctx context.Context, u *models.User, r *models.Req
 		}
 		r.Namespace = in.Namespace
 	}
-	valuesYAML, err := s.validateAndMarshal(ctx, r.ChartProject, r.ChartName, r.ChartVersion, in.Values, false)
+	valuesYAML, err := s.validateAndMarshal(ctx, r.ChartProject, r.ChartName, r.ChartVersion, r.Namespace, in.Values, false)
 	if err != nil {
 		return nil, err
 	}
@@ -659,15 +663,16 @@ func (s *Service) guardOpenMR(ctx context.Context, id string) error {
 // validateAndMarshal marshals values to YAML. When validate is true it first
 // checks them against the chart's JSON schema (drafts pass false, since their
 // values may still be incomplete).
-func (s *Service) validateAndMarshal(ctx context.Context, project, name, version string, values map[string]any, validate bool) (string, error) {
+func (s *Service) validateAndMarshal(ctx context.Context, project, name, version, namespace string, values map[string]any, validate bool) (string, error) {
 	if values == nil {
 		values = map[string]any{}
 	}
-	// Stamp order-time values the chart declares in its view "defaults" block
-	// (e.g. namespace.creator=console). Applied before validation so the
-	// stamped values are schema-checked too. Chart-agnostic: the rule lives in
-	// the chart's view document, not here.
-	values = s.applyViewDefaults(ctx, project, name, version, values)
+	// Stamp order-time values the chart declares in its view: fixed "defaults"
+	// (e.g. namespace.creator=console) and the "namespace" binding (mirror the
+	// destination namespace into the field a self-provisioning chart names it by).
+	// Applied before validation so the stamped values are schema-checked too.
+	// Chart-agnostic: the rules live in the chart's view document, not here.
+	values = s.applyViewStamps(ctx, project, name, version, namespace, values)
 	if !validate {
 		out, merr := yaml.Marshal(values)
 		if merr != nil {

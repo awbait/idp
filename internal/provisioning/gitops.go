@@ -168,8 +168,6 @@ spec:
     automated:
       prune: true
       selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
 `))
 
 // RenderApplication produces the application.yaml content for a request: a

@@ -101,6 +101,9 @@ func TestStructuralIssues(t *testing.T) {
 		{"identity not pointer", `{"views":{"order":{"identity":"gateways"}}}`, "/identity", "pointer"},
 		{"order missing identity", `{"views":{"order":{"include":["x"]}}}`, "/views/order", "должна объявлять"},
 		{"identity nested", `{"views":{"order":{"overrides":{"x":{"ui:view":{"identity":"/a"}}}}}}`, "ui:view/identity", "верхнем уровне"},
+		{"namespace not pointer", `{"views":{"order":{"identity":"/a","namespace":"ns"}}}`, "/views/order/namespace", "pointer"},
+		{"namespace nested", `{"views":{"order":{"identity":"/a","overrides":{"x":{"ui:view":{"namespace":"/b"}}}}}}`, "ui:view/namespace", "верхнем уровне"},
+		{"namespace misplaced in override", `{"views":{"order":{"identity":"/a","overrides":{"x":{"namespace":"/b"}}}}}`, "/views/order/overrides/x/namespace", `внутрь "ui:view"`},
 		// view "order", exactly one.
 		{"order missing", `{"views":{"routes":{}}}`, "", `Не хватает view "order"`},
 		{"order duplicated", `{"views":{"order":{},"order":{}}}`, "/views/order", "указан дважды"},
@@ -145,6 +148,11 @@ func TestSchemaCrossChecks(t *testing.T) {
 			"identity unresolved",
 			`{"views":{"order":{"identity":"/gateways/0/nope"}}}`,
 			"/identity", "не находит",
+		},
+		{
+			"namespace unresolved",
+			`{"views":{"order":{"identity":"/naming","namespace":"/gateways/0/nope"}}}`,
+			"/views/order/namespace", "не находит",
 		},
 	}
 	for _, c := range cases {

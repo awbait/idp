@@ -1,13 +1,14 @@
 {
-  "$comment": "Presentation document for the managed-namespace chart. The order form covers namespace, resource quotas and the optional subnet. The defaults block stamps namespace.creator=console at order time (the chart defaults it to lk for non-console deploys); the field is hidden in the form via the chart schema.",
+  "$comment": "Presentation document for the managed-namespace chart. The chart provisions its own namespace (namespace, resource quotas, optional subnet), so destination.namespace is not a separate input: the order's single Namespace field is mirrored into namespace.namespaceName via the order view's \"namespace\" binding, and that field is hidden in the form. The defaults block stamps namespace.creator=console at order time (the chart defaults it to lk for non-console deploys).",
   "views": {
     "order": {
-      "$comment": "identity = the namespace name: settable on create, locked on edit so the deploy identity cannot change.",
+      "$comment": "identity = the namespace name (locks the deploy identity); namespace = bind destination.namespace to the same field so the chart renders into the namespace it creates.",
       "identity": "/namespace/namespaceName",
+      "namespace": "/namespace/namespaceName",
       "include": ["namespace", "resourceQuotas", "subnet"],
       "overrides": {
         "namespace": {
-          "ui:view": { "overrides": { "namespaceName": { "ui:readOnly": true } } }
+          "ui:view": { "overrides": { "namespaceName": { "ui:widget": "hidden" } } }
         }
       }
     }

@@ -1,6 +1,6 @@
 // Package views validates chart publication view documents: the format
-// structure (views.* with include/exclude/overrides/identity, plus optional
-// tabs/actions/defaults) and, when the chart's values.schema.json is present,
+// structure (views.* with include/exclude/overrides/identity/namespace, plus
+// optional tabs/actions/defaults) and, when the chart's values.schema.json is present,
 // references to real schema fields. The chart schema stays the single source of
 // truth; a view only projects its fields. The "defaults" block additionally
 // lets a chart declare order-time values the portal stamps in (see Defaults /
@@ -430,6 +430,25 @@ func validateView(path string, vm map[string]any, node, root map[string]any, top
 				issues = append(issues, Issue{path + "/identity",
 					fmt.Sprintf("Указатель %q не находит поле в values.schema.json. Проверьте путь", s)})
 			}
+		case "namespace":
+			// Binds the order's destination namespace to a values field: a chart
+			// that provisions its own namespace (managed-namespace) is rendered into
+			// the namespace it creates. The portal mirrors the namespace into it.
+			s, ok := v.(string)
+			if !ok || !strings.HasPrefix(s, "/") {
+				issues = append(issues, Issue{path + "/namespace",
+					`Поле "namespace" должно быть JSON pointer'ом, строкой вида "/namespace/namespaceName"`})
+				continue
+			}
+			if !top {
+				issues = append(issues, Issue{path + "/namespace",
+					`Поле "namespace" допустимо только на верхнем уровне view. Уберите его из ui:view`})
+				continue
+			}
+			if node != nil && !pointerResolves(s, node, root) {
+				issues = append(issues, Issue{path + "/namespace",
+					fmt.Sprintf("Указатель %q не находит поле в values.schema.json. Проверьте путь", s)})
+			}
 		case "include", "exclude", "required":
 			checkFieldList(k)
 		case "overrides":
@@ -460,7 +479,7 @@ func validateView(path string, vm map[string]any, node, root map[string]any, top
 			}
 		default:
 			issues = append(issues, Issue{path + "/" + k,
-				fmt.Sprintf("Неизвестное поле %q: во view допустимы identity, include, exclude, required, overrides", k)})
+				fmt.Sprintf("Неизвестное поле %q: во view допустимы identity, namespace, include, exclude, required, overrides", k)})
 		}
 	}
 	return issues
@@ -531,7 +550,7 @@ func validateOverride(path string, ovm, fieldNode, root map[string]any) []Issue 
 			if _, ok := v.(string); !ok {
 				issues = append(issues, Issue{path + "/title", `Поле "title" должно быть строкой`})
 			}
-		case "include", "exclude", "required", "overrides", "identity":
+		case "include", "exclude", "required", "overrides", "identity", "namespace":
 			// These are view keys, not schema hints. Placed directly in a field
 			// override (instead of inside "ui:view") they are silently ignored at
 			// render time, so flag the misplacement rather than skip it as a hint.
