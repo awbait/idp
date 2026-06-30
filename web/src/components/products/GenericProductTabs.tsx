@@ -54,11 +54,23 @@ function parseValues(valuesYaml: string): Values {
   }
 }
 
-function fmtCell(v: unknown): React.ReactNode {
-  if (v == null || v === "") return "-";
-  if (Array.isArray(v)) return v.length ? v.join(", ") : "-";
-  if (typeof v === "object") return JSON.stringify(v);
+// fmtScalar renders a resolved cell value as plain text: a string map (e.g. a
+// PodSelector) as "key: value" pairs, an array as its formatted elements joined,
+// scalars as-is. Empty parts are dropped; an empty result yields "" (fmtCell
+// turns that into the "-" placeholder).
+function fmtScalar(v: unknown): string {
+  if (v == null || v === "") return "";
+  if (Array.isArray(v)) return v.map(fmtScalar).filter((s) => s !== "").join(", ");
+  if (typeof v === "object")
+    return Object.entries(v as Record<string, unknown>)
+      .map(([k, val]) => `${k}: ${fmtScalar(val)}`)
+      .join(", ");
   return String(v);
+}
+
+function fmtCell(v: unknown): React.ReactNode {
+  const s = fmtScalar(v);
+  return s === "" ? "-" : s;
 }
 
 // Stub explains an unconfigured tab (items/form missing, or no ui:table) instead
