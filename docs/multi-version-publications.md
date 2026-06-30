@@ -5,9 +5,11 @@
 своим view-документом), помечает, какие доступны пользователю для заказа
 (allowlist) и какая рекомендуемая; пользователь при заказе выбирает версию.
 
-Статус: план зафиксирован, реализация - отдельными PR по фазам (см. ниже).
-Объём - полный (включая явный выбор рекомендуемой версии владельцем и per-version
-конструктор view).
+Статус: реализовано отдельными PR по фазам (см. ниже). Переход выполнен
+аддитивно и с фолбэком на legacy single-view, поэтому каждый слой не ломает ещё
+не обновлённые. Объём - полный (включая явный выбор рекомендуемой версии владельцем
+и per-version конструктор view). Остаётся техдолг: удалить старые колонки
+`approved_*` отдельной поздней миграцией после полного перехода (см. ниже).
 
 ## Текущее состояние (что меняем)
 
@@ -133,12 +135,22 @@ CREATE TABLE publication_versions (
 
 ## Разбивка на PR (фазы)
 
-1. Миграция + бэкфилл + модель `PublicationVersion` + store (postgres+memory).
-2. FSM-по-версии в `publications.Service` + `ActiveView(version)` + allowlist +
-   recommended.
-3. Catalog/view API: `publicationSummary` с версиями, `view?version=`.
-4. Provisioning: identity/defaults/гард по выбранной версии.
-5. Фронт заказа: селектор версии + upgrade по allowlist.
-6. Фронт каталога: «+N» на карточке.
-7. Конструктор view по версиям + approvals по версии.
-8. Тесты/доки/наблюдаемость (по ходу каждой фазы, финальная вычитка здесь).
+1. [x] Миграция + бэкфилл + модель `PublicationVersion` + store (postgres+memory).
+2. [x] FSM-по-версии в `publications.Service` + `ActiveViewVersion(version)` +
+   allowlist + recommended.
+3. [x] Catalog/view API: `publicationSummary` с версиями, `view?version=`.
+4. [x] Provisioning: identity/defaults/гард по выбранной версии.
+5. [x] Фронт заказа: селектор версии + upgrade по allowlist.
+6. [x] Фронт каталога: «+N» на карточке.
+7. [x] Конструктор view по версиям (7b) + approvals по версии (7c); HTTP-слой
+   управления версиями выделен в 7a.
+8. [x] Тесты/доки/наблюдаемость: метрика `console_publication_version_events_total`,
+   обновление `docs/idp-spec.md` и этого документа.
+
+### Техдолг после полного перехода
+
+- Удалить колонки `chart_publications.approved_view_json` / `approved_view_version`
+  / `approved_description` / `approved_icon_url` отдельной поздней миграцией, когда
+  все публикации переведены на версии и legacy-фолбэки больше не нужны. Заодно
+  убрать legacy-методы `ActiveView`/`Submit`/`Approve`/`Reject` уровня публикации
+  для view (метаданный FSM остаётся).

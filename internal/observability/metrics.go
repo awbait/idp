@@ -84,7 +84,20 @@ var (
 		Name: "console_mr_merge_total",
 		Help: "Total portal MR auto-merge attempts, by result.",
 	}, []string{"result"})
+
+	// publicationVersionEvents counts per-version publication FSM events by type
+	// (submitted|approved|rejected|withdrawn|orderable_on|orderable_off|
+	// recommended) - the lifecycle of multi-version service publications.
+	publicationVersionEvents = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "console_publication_version_events_total",
+		Help: "Total publication version FSM events, by type.",
+	}, []string{"event"})
 )
+
+// ObservePublicationVersionEvent records one per-version publication FSM event.
+func ObservePublicationVersionEvent(event string) {
+	publicationVersionEvents.WithLabelValues(event).Inc()
+}
 
 // ObserveMRMerge records one auto-merge attempt on a portal MR and its result.
 func ObserveMRMerge(err error) {

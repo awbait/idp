@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"console/internal/observability"
 	"console/internal/store"
 	"console/internal/views"
 	"console/pkg/models"
@@ -89,6 +90,7 @@ func (s *Service) SubmitVersion(ctx context.Context, u *models.User, pubID, char
 		return nil, err
 	}
 	s.addEvent(ctx, p.ID, u, "version_submitted", from, v.Status, map[string]any{"chart_version": chartVersion})
+	observability.ObservePublicationVersionEvent("submitted")
 	return v, nil
 }
 
@@ -107,6 +109,7 @@ func (s *Service) WithdrawVersion(ctx context.Context, u *models.User, pubID, ch
 		return nil, err
 	}
 	s.addEvent(ctx, p.ID, u, "version_withdrawn", from, v.Status, map[string]any{"chart_version": chartVersion})
+	observability.ObservePublicationVersionEvent("withdrawn")
 	return v, nil
 }
 
@@ -158,14 +161,17 @@ func (s *Service) reviewVersion(ctx context.Context, u *models.User, pubID, char
 		return nil, err
 	}
 	event := "version_approved"
+	metric := "approved"
 	var payload map[string]any
 	if to == models.PubRejected {
 		event = "version_rejected"
+		metric = "rejected"
 		payload = map[string]any{"chart_version": chartVersion, "comment": comment}
 	} else {
 		payload = map[string]any{"chart_version": chartVersion}
 	}
 	s.addEvent(ctx, p.ID, u, event, from, to, payload)
+	observability.ObservePublicationVersionEvent(metric)
 	s.logger().Debug("publication version review",
 		"publication_id", p.ID, "chart", p.ChartName, "chart_version", chartVersion,
 		"from", from, "to", to, "actor", u.Subject)
@@ -195,6 +201,11 @@ func (s *Service) SetVersionOrderable(ctx context.Context, u *models.User, pubID
 	s.logger().Info("publication version allowlist",
 		"publication_id", p.ID, "chart", p.ChartName, "chart_version", chartVersion,
 		"orderable", orderable, "actor", u.Subject)
+	if orderable {
+		observability.ObservePublicationVersionEvent("orderable_on")
+	} else {
+		observability.ObservePublicationVersionEvent("orderable_off")
+	}
 	return v, nil
 }
 
@@ -223,6 +234,7 @@ func (s *Service) SetRecommendedVersion(ctx context.Context, u *models.User, pub
 	s.addEvent(ctx, p.ID, u, "version_recommended", "", "", map[string]any{"chart_version": chartVersion})
 	s.logger().Info("publication version recommended",
 		"publication_id", p.ID, "chart", p.ChartName, "chart_version", chartVersion, "actor", u.Subject)
+	observability.ObservePublicationVersionEvent("recommended")
 	return nil
 }
 
