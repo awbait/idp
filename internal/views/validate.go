@@ -518,6 +518,12 @@ func validateOverride(path string, ovm, fieldNode, root map[string]any) []Issue 
 			if _, ok := v.(string); !ok {
 				issues = append(issues, Issue{path + "/title", `Поле "title" должно быть строкой`})
 			}
+		case "include", "exclude", "required", "overrides", "identity":
+			// These are view keys, not schema hints. Placed directly in a field
+			// override (instead of inside "ui:view") they are silently ignored at
+			// render time, so flag the misplacement rather than skip it as a hint.
+			issues = append(issues, Issue{path + "/" + k,
+				fmt.Sprintf("Ключ %q задаёт вложенную view: положите его внутрь \"ui:view\", а не прямо в настройку поля", k)})
 		}
 	}
 	return issues

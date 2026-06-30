@@ -96,6 +96,8 @@ func TestStructuralIssues(t *testing.T) {
 		{"unknown view key", `{"views":{"order":{"includ":["x"]}}}`, "/views/order/includ", "Неизвестное поле"},
 		{"include not array", `{"views":{"order":{"include":"naming"}}}`, "/views/order/include", "массивом"},
 		{"bad widget", `{"views":{"order":{"overrides":{"x":{"ui:widget":"fancy"}}}}}`, "ui:widget", "single"},
+		{"override key misplaced", `{"views":{"order":{"overrides":{"x":{"overrides":{"y":{"title":"z"}}}}}}}`, "/views/order/overrides/x/overrides", `внутрь "ui:view"`},
+		{"include key misplaced", `{"views":{"order":{"overrides":{"x":{"include":["y"]}}}}}`, "/views/order/overrides/x/include", `внутрь "ui:view"`},
 		{"identity not pointer", `{"views":{"order":{"identity":"gateways"}}}`, "/identity", "pointer"},
 		{"order missing identity", `{"views":{"order":{"include":["x"]}}}`, "/views/order", "должна объявлять"},
 		{"identity nested", `{"views":{"order":{"overrides":{"x":{"ui:view":{"identity":"/a"}}}}}}`, "ui:view/identity", "верхнем уровне"},
