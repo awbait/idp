@@ -356,7 +356,7 @@ export function OrderPage({ upgrade = false }: { upgrade?: boolean }) {
     if (!c) return;
     if (!c.svcName) {
       setShowErrors(true);
-      setSubmitErr({ message: identity ? "Укажите имя Gateway в форме" : "Укажите имя сервиса" });
+      setSubmitErr({ message: identity ? "Укажите идентификатор в форме" : "Укажите имя сервиса" });
       return;
     }
     if (!cluster || !namespace) {

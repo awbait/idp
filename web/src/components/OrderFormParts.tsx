@@ -58,7 +58,7 @@ export function OrderMetaCard({
       <TextField
         label="Отображаемое имя"
         description="Произвольное имя для отображения. Можно изменить позже; на деплой не влияет."
-        placeholder={identity ? "Напр. Public Gateway" : "payments-db"}
+        placeholder={identity ? "Напр. Production" : "payments-db"}
         value={displayName}
         onChange={onDisplayName}
       />
@@ -110,7 +110,7 @@ export function OrderMetaCard({
         {identity && (
           <>
             {" "}· идентификатор:{" "}
-            <span className="font-medium text-gray-700">{identityName || "-"}</span> (из имени Gateway)
+            <span className="font-medium text-gray-700">{identityName || "-"}</span> (из формы)
           </>
         )}
       </p>
